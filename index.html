@@ -2,12 +2,251 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>kai</title>
+    <title>kai — dev shell</title>
+    <style>
+      :root {
+        --brand: #2563eb;
+        --brand-light: #dbeafe;
+        --surface: #f8fafc;
+        --text: #0f172a;
+        --text-muted: #64748b;
+        --border: #e2e8f0;
+        --radius: 12px;
+        --gap: 24px;
+      }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        color: var(--text);
+        background: var(--surface);
+        line-height: 1.6;
+        padding: 48px var(--gap);
+        max-width: 960px;
+        margin: 0 auto;
+      }
+
+      h1 { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+      h2 { font-size: 20px; font-weight: 600; margin-bottom: 12px; }
+      h3 { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+
+      .subtitle {
+        font-size: 16px;
+        color: var(--text-muted);
+        margin-bottom: 48px;
+      }
+
+      section { margin-bottom: 48px; }
+
+      .card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: var(--gap);
+      }
+
+      .card {
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 24px;
+      }
+
+      .card p {
+        font-size: 14px;
+        color: var(--text-muted);
+        margin-bottom: 16px;
+      }
+
+      .badge {
+        display: inline-block;
+        background: var(--brand-light);
+        color: var(--brand);
+        font-size: 12px;
+        font-weight: 500;
+        padding: 2px 10px;
+        border-radius: 999px;
+      }
+
+      .button-row { display: flex; gap: 12px; flex-wrap: wrap; }
+
+      button, .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 40px;
+        padding: 0 20px;
+        font-size: 14px;
+        font-weight: 500;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: white;
+        color: var(--text);
+        cursor: pointer;
+        font-family: inherit;
+      }
+
+      .btn-primary {
+        background: var(--brand);
+        color: white;
+        border-color: var(--brand);
+      }
+
+      .text-sample {
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 24px;
+        font-size: 15px;
+      }
+
+      .text-sample h3 { margin-bottom: 4px; }
+      .text-sample p { color: var(--text-muted); font-size: 14px; }
+      .text-sample p + p { margin-top: 8px; }
+
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        background: var(--brand-light);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 13px;
+      }
+
+      .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+      }
+
+      .stat {
+        text-align: center;
+        padding: 20px;
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+      }
+
+      .stat-value {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--brand);
+      }
+
+      .stat-label {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 4px;
+      }
+
+      .avatar-row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--brand-light);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--brand);
+      }
+
+      .input {
+        width: 100%;
+        height: 40px;
+        padding: 0 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 14px;
+        font-family: inherit;
+        background: white;
+        color: var(--text);
+        margin-bottom: 12px;
+      }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <header>
+      <h1>kai dev shell</h1>
+      <p class="subtitle">Sample page for testing the UI annotator. Click the FAB or press <code>Ctrl+Shift+A</code> to start.</p>
+    </header>
+
+    <section>
+      <h2>Cards</h2>
+      <div class="card-grid">
+        <div class="card">
+          <h3>Typography</h3>
+          <p>System font stack with 1.6 line-height. Headings use weight 600–700. Body is 14–15px.</p>
+          <span class="badge">Design</span>
+        </div>
+        <div class="card">
+          <h3>Spacing</h3>
+          <p>24px grid gap, 48px section margins. Card padding is 24px with 12px border-radius.</p>
+          <span class="badge">Layout</span>
+        </div>
+        <div class="card">
+          <h3>Colors</h3>
+          <p>Brand blue <code>#2563eb</code>, slate grays for text hierarchy. Light surface background.</p>
+          <span class="badge">Tokens</span>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Stats</h2>
+      <div class="stat-grid">
+        <div class="stat">
+          <div class="stat-value">43.6</div>
+          <div class="stat-label">kB unminified</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">0</div>
+          <div class="stat-label">Dependencies</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">15</div>
+          <div class="stat-label">Modules</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Text &amp; Elements</h2>
+      <div class="text-sample">
+        <h3>What is kai?</h3>
+        <p>kai is a zero-dependency UI annotation tool built as a single Web Component. Developers activate it on any web page to click elements, write feedback, and export structured data for AI coding agents.</p>
+        <p>The tool runs entirely client-side and outputs JSON or Markdown that includes CSS selectors, computed styles, and human feedback.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Form Elements</h2>
+      <div class="card">
+        <input class="input" type="text" placeholder="Type something here…" />
+        <div class="button-row">
+          <button class="btn-primary">Primary Action</button>
+          <button>Secondary</button>
+          <button>Tertiary</button>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Avatars</h2>
+      <div class="avatar-row">
+        <div class="avatar">DK</div>
+        <div class="avatar">AI</div>
+        <div class="avatar">回</div>
+      </div>
+    </section>
+
     <script type="module" src="/src/annotator.ts"></script>
   </body>
 </html>

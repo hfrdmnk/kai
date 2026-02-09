@@ -62,8 +62,8 @@ class UIAnnotator extends HTMLElement {
     });
 
     this.overlay = createOverlay(this.shadow);
-    this.markers = createMarkerManager(this.shadow, (annotation) => {
-      this.openEditPopover(annotation);
+    this.markers = createMarkerManager(this.shadow, (annotation, markerRect) => {
+      this.openEditPopover(annotation, markerRect);
     });
 
     if (this.annotations.length) {
@@ -186,7 +186,7 @@ class UIAnnotator extends HTMLElement {
     });
   }
 
-  private openEditPopover(annotation: Annotation) {
+  private openEditPopover(annotation: Annotation, markerRect?: DOMRect) {
     this.closePopover();
 
     const target = document.querySelector(annotation.selector);
@@ -201,6 +201,7 @@ class UIAnnotator extends HTMLElement {
       path,
       styles: computedStyles,
       existingComment: annotation.comment,
+      anchorRect: markerRect,
       onSubmit: (comment) => {
         annotation.comment = comment;
         this.persist();

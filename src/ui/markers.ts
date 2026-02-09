@@ -2,7 +2,7 @@ import type { Annotation } from '../types.ts';
 
 export const createMarkerManager = (
   shadowRoot: ShadowRoot,
-  onMarkerClick: (annotation: Annotation) => void,
+  onMarkerClick: (annotation: Annotation, markerRect: DOMRect) => void,
 ) => {
   const markerMap = new Map<string, HTMLElement>();
   const boxMap = new Map<string, HTMLElement>();
@@ -70,7 +70,8 @@ export const createMarkerManager = (
         marker.setAttribute('tabindex', '0');
         marker.addEventListener('click', (e) => {
           e.stopPropagation();
-          onMarkerClick(annotation);
+          const el = e.currentTarget as HTMLElement;
+          onMarkerClick(annotation, el.getBoundingClientRect());
         });
         shadowRoot.appendChild(marker);
         markerMap.set(annotation.id, marker);

@@ -12,6 +12,7 @@ type PopoverOptions = {
   onClose: () => void;
   existingComment?: string;
   onDelete?: () => void;
+  anchorRect?: DOMRect;
 };
 
 const describeElement = (el: Element): string => {
@@ -20,26 +21,25 @@ const describeElement = (el: Element): string => {
   return text ? `${tag}: "${text}${el.textContent!.trim().length > 40 ? '…' : ''}"` : tag;
 };
 
-const positionPopover = (popover: HTMLElement, targetRect: DOMRect) => {
-  const spaceBelow = window.innerHeight - targetRect.bottom;
-  const spaceAbove = targetRect.top;
+const positionPopover = (popover: HTMLElement, targetRect: DOMRect, anchorRect?: DOMRect) => {
+  const ref = anchorRect ?? targetRect;
+  const gap = anchorRect ? 4 : 8;
+
+  const spaceBelow = window.innerHeight - ref.bottom;
+  const spaceAbove = ref.top;
 
   let top: number;
   if (spaceBelow >= 200 || spaceBelow >= spaceAbove) {
-    // Place below
-    top = targetRect.bottom + 8;
+    top = ref.bottom + gap;
   } else {
-    // Place above
-    top = targetRect.top - 8;
-    // We'll measure after appending, but estimate for now
+    top = ref.top - gap;
     requestAnimationFrame(() => {
       const h = popover.getBoundingClientRect().height;
-      popover.style.top = `${targetRect.top - h - 8}px`;
+      popover.style.top = `${ref.top - h - gap}px`;
     });
   }
 
-  // Horizontal: left-aligned with element, clamped to viewport
-  let left = targetRect.left;
+  let left = ref.left;
   left = Math.max(EDGE_GAP, Math.min(left, window.innerWidth - POPOVER_WIDTH - EDGE_GAP));
 
   popover.style.top = `${top}px`;
@@ -144,7 +144,7 @@ export const createPopover = (
 
   // Position
   const rect = opts.element.getBoundingClientRect();
-  positionPopover(popover, rect);
+  positionPopover(popover, rect, opts.anchorRect);
 
   // Store prior focus for restoration
   const previousFocus = shadowRoot.activeElement ?? document.activeElement;

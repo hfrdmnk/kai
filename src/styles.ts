@@ -347,7 +347,7 @@ export const styles = `
   justify-content: center;
   pointer-events: auto;
   cursor: pointer;
-  z-index: var(--z-overlay);
+  z-index: var(--z-tooltip);
   border: none;
 }
 
@@ -359,7 +359,7 @@ export const styles = `
   border: 1.5px dashed var(--color-accent);
   background: oklch(0.9288 0.2299 123.76 / 10%);
   z-index: var(--z-overlay);
-  border-radius: 2px;
+  border-radius: 0.25rem;
 }
 
 /* ── Autocomplete ────────────────────────────────── */

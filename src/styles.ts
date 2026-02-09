@@ -73,6 +73,11 @@ export const styles = `
   color: hsl(0, 0%, 100%);
 }
 
+.kai-fab--active .kai-fab-badge {
+  background: hsl(0, 0%, 100%);
+  color: var(--color-accent);
+}
+
 .kai-fab--dragging {
   cursor: grabbing;
 }

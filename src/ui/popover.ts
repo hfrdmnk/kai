@@ -50,6 +50,8 @@ export const createPopover = (
 ) => {
   const popover = document.createElement('div');
   popover.className = 'kai-popover';
+  popover.setAttribute('role', 'dialog');
+  popover.setAttribute('aria-label', 'Annotate element');
 
   // Body
   const body = document.createElement('div');
@@ -69,6 +71,7 @@ export const createPopover = (
   const textarea = document.createElement('textarea');
   textarea.className = 'kai-popover-textarea';
   textarea.placeholder = 'What should change?';
+  textarea.setAttribute('aria-label', 'Annotation comment');
 
   body.appendChild(pathEl);
   body.appendChild(descEl);
@@ -112,6 +115,9 @@ export const createPopover = (
   const rect = opts.element.getBoundingClientRect();
   positionPopover(popover, rect);
 
+  // Store prior focus for restoration
+  const previousFocus = shadowRoot.activeElement ?? document.activeElement;
+
   // Focus textarea
   requestAnimationFrame(() => textarea.focus());
 
@@ -129,6 +135,7 @@ export const createPopover = (
   const destroy = () => {
     ac.destroy();
     popover.remove();
+    if (previousFocus instanceof HTMLElement) previousFocus.focus();
   };
 
   return { destroy };

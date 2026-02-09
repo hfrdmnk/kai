@@ -128,6 +128,7 @@ export const styles = `
   padding: 0 4px;
   line-height: 1;
   border-radius: 0;
+  border: 1px solid var(--gray-300);
 }
 
 /* Badge position per corner — sits on the outward corner */
@@ -165,8 +166,8 @@ export const styles = `
 }
 
 .kai-fab-action {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border: 1px solid var(--gray-200);
   background: white;
   color: var(--gray-600);
@@ -175,7 +176,7 @@ export const styles = `
   justify-content: center;
   cursor: pointer;
   border-radius: 0;
-  padding: 0;
+  padding: 4px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.08);
   transition: background 0.15s ease, color 0.15s ease;
 }
@@ -273,7 +274,8 @@ export const styles = `
 }
 
 .kai-popover-textarea:focus {
-  outline: none;
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
   border-color: var(--color-accent);
 }
 
@@ -322,7 +324,7 @@ export const styles = `
   background: transparent;
   color: var(--gray-400);
   padding: 0 8px;
-  min-height: 0;
+  min-height: 36px;
 }
 
 .kai-btn--ghost:hover {
@@ -362,6 +364,7 @@ export const styles = `
   pointer-events: none;
   z-index: var(--z-overlay);
   box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  border: 1px solid var(--gray-300);
 }
 
 /* ── Autocomplete ────────────────────────────────── */

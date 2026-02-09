@@ -39,14 +39,14 @@ const positionActions = (
   const gap = 8;
 
   // Vertically center actions with FAB
-  const actionsHeight = 36;
+  const actionsHeight = 44;
   const top = rect.top + (rect.height - actionsHeight) / 2;
   actionsEl.style.top = `${top}px`;
 
   if (corner === 'bottom-right' || corner === 'top-right') {
-    // Extend left
-    actionsEl.style.right = 'auto';
-    actionsEl.style.left = `${rect.left - gap}px`;
+    // Extend left — anchor from right edge
+    actionsEl.style.left = 'auto';
+    actionsEl.style.right = `${window.innerWidth - rect.left + gap}px`;
     actionsEl.style.flexDirection = 'row-reverse';
     actionsEl.style.transformOrigin = 'right center';
   } else {
@@ -69,6 +69,8 @@ export const createFab = (
   const fab = document.createElement('div');
   fab.className = 'kai-fab';
   fab.setAttribute('data-corner', corner);
+  fab.setAttribute('role', 'toolbar');
+  fab.setAttribute('aria-label', 'Annotator controls');
 
   // Drag handle
   const dragZone = document.createElement('button');
@@ -80,6 +82,8 @@ export const createFab = (
   const toggleZone = document.createElement('button');
   toggleZone.className = 'kai-fab-toggle';
   toggleZone.setAttribute('aria-label', 'Toggle UI annotator');
+  toggleZone.setAttribute('aria-pressed', 'false');
+  toggleZone.setAttribute('aria-expanded', 'false');
   setIcon(toggleZone, iconKai);
 
   // Badge
@@ -216,6 +220,8 @@ export const createFab = (
 
   const setActive = (isActive: boolean) => {
     active = isActive;
+    toggleZone.setAttribute('aria-pressed', String(isActive));
+    toggleZone.setAttribute('aria-expanded', String(isActive));
     if (isActive) {
       fab.classList.add('kai-fab--active');
       actions.style.display = 'flex';

@@ -44,7 +44,7 @@ class UIAnnotator extends HTMLElement {
       onToggle: () => this.toggle(),
       onCopyMarkdown: () => {
         navigator.clipboard.writeText(toMarkdown(this.annotations)).then(() => {
-          showToast(this.shadow, 'Markdown copied to clipboard', this.fabCorner);
+          showToast(this.shadow, 'Markdown copied to clipboard');
         });
       },
       onClearAll: () => {

@@ -1,5 +1,5 @@
 import type { FabCorner } from '../types.ts';
-import { iconKai, iconDrag, iconCopy, iconTrash } from '../icons.ts';
+import { iconKai, iconCopy, iconTrash } from '../icons.ts';
 
 const parser = new DOMParser();
 
@@ -58,6 +58,8 @@ const positionActions = (
   }
 };
 
+const DRAG_THRESHOLD = 5;
+
 export const createFab = (
   shadowRoot: ShadowRoot,
   opts: FabOptions,
@@ -65,34 +67,20 @@ export const createFab = (
   let corner = opts.initialCorner;
   let active = false;
 
-  // ── FAB container ──
-  const fab = document.createElement('div');
+  // ── FAB — single 44×44 button ──
+  const fab = document.createElement('button');
   fab.className = 'kai-fab';
   fab.setAttribute('data-corner', corner);
-  fab.setAttribute('role', 'toolbar');
-  fab.setAttribute('aria-label', 'Annotator controls');
-
-  // Drag handle
-  const dragZone = document.createElement('button');
-  dragZone.className = 'kai-fab-drag';
-  dragZone.setAttribute('aria-label', 'Drag to reposition');
-  setIcon(dragZone, iconDrag);
-
-  // Toggle button
-  const toggleZone = document.createElement('button');
-  toggleZone.className = 'kai-fab-toggle';
-  toggleZone.setAttribute('aria-label', 'Toggle UI annotator');
-  toggleZone.setAttribute('aria-pressed', 'false');
-  toggleZone.setAttribute('aria-expanded', 'false');
-  setIcon(toggleZone, iconKai);
+  fab.setAttribute('aria-label', 'Toggle UI annotator');
+  fab.setAttribute('aria-pressed', 'false');
+  fab.setAttribute('aria-expanded', 'false');
+  setIcon(fab, iconKai);
 
   // Badge
   const badge = document.createElement('span');
   badge.className = 'kai-fab-badge';
   badge.style.display = 'none';
 
-  fab.appendChild(dragZone);
-  fab.appendChild(toggleZone);
   fab.appendChild(badge);
 
   // ── Action buttons ──
@@ -116,72 +104,61 @@ export const createFab = (
   shadowRoot.appendChild(fab);
   shadowRoot.appendChild(actions);
 
-  // ── Toggle ──
-  toggleZone.addEventListener('click', (e) => {
-    e.stopPropagation();
-    opts.onToggle();
-  });
+  // ── Click/drag disambiguation via pointer events ──
+  let dragging = false;
+  let pointerDown = false;
+  let startX = 0;
+  let startY = 0;
+  let fabStartX = 0;
+  let fabStartY = 0;
 
-  copyBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    opts.onCopyMarkdown();
-  });
+  const onPointerDown = (e: PointerEvent) => {
+    e.preventDefault();
+    pointerDown = true;
+    dragging = false;
+    startX = e.clientX;
+    startY = e.clientY;
+    const rect = fab.getBoundingClientRect();
+    fabStartX = rect.left;
+    fabStartY = rect.top;
 
-  clearBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    opts.onClearAll();
-  });
+    fab.setPointerCapture(e.pointerId);
+  };
 
-  // ── Drag behavior (progressive enhancement) ──
-  if (supportsAnchor) {
-    let dragging = false;
-    let startX = 0;
-    let startY = 0;
-    let fabStartX = 0;
-    let fabStartY = 0;
+  const onPointerMove = (e: PointerEvent) => {
+    if (!pointerDown) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
 
-    const onPointerDown = (e: PointerEvent) => {
-      e.preventDefault();
+    if (!dragging && dist > DRAG_THRESHOLD) {
       dragging = true;
-      startX = e.clientX;
-      startY = e.clientY;
-      const rect = fab.getBoundingClientRect();
-      fabStartX = rect.left;
-      fabStartY = rect.top;
-
-      // Switch to absolute positioning for free movement
+      // Switch to fixed positioning for free movement
       fab.style.position = 'fixed';
       fab.style.left = `${fabStartX}px`;
       fab.style.top = `${fabStartY}px`;
       fab.style.right = 'auto';
       fab.style.bottom = 'auto';
+      fab.classList.add('kai-fab--dragging');
+    }
 
-      dragZone.style.cursor = 'grabbing';
-      document.addEventListener('pointermove', onPointerMove);
-      document.addEventListener('pointerup', onPointerUp);
-    };
-
-    const onPointerMove = (e: PointerEvent) => {
-      if (!dragging) return;
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-      const newX = Math.max(0, Math.min(window.innerWidth - 88, fabStartX + dx));
+    if (dragging) {
+      const newX = Math.max(0, Math.min(window.innerWidth - 44, fabStartX + dx));
       const newY = Math.max(0, Math.min(window.innerHeight - 44, fabStartY + dy));
       fab.style.left = `${newX}px`;
       fab.style.top = `${newY}px`;
-    };
+    }
+  };
 
-    const onPointerUp = (e: PointerEvent) => {
-      if (!dragging) return;
+  const onPointerUp = (e: PointerEvent) => {
+    if (!pointerDown) return;
+    pointerDown = false;
+    fab.classList.remove('kai-fab--dragging');
+
+    if (dragging) {
       dragging = false;
-      dragZone.style.cursor = '';
-      document.removeEventListener('pointermove', onPointerMove);
-      document.removeEventListener('pointerup', onPointerUp);
-
       // Snap to nearest corner
-      const centerX = e.clientX;
-      const centerY = e.clientY;
-      const newCorner = snapToCorner(centerX, centerY);
+      const newCorner = snapToCorner(e.clientX, e.clientY);
 
       // Reset inline positioning, let data-corner drive it
       fab.style.left = '';
@@ -197,14 +174,33 @@ export const createFab = (
       if (active) {
         positionActions(actions, fab, corner);
       }
-    };
+    } else {
+      // Click — toggle
+      opts.onToggle();
+    }
+  };
 
-    dragZone.addEventListener('pointerdown', onPointerDown);
+  if (supportsAnchor) {
+    fab.addEventListener('pointerdown', onPointerDown);
+    fab.addEventListener('pointermove', onPointerMove);
+    fab.addEventListener('pointerup', onPointerUp);
   } else {
-    // No anchor support — hide drag handle
-    dragZone.style.display = 'none';
-    fab.style.width = '44px';
+    // No anchor support — just handle click
+    fab.addEventListener('click', (e) => {
+      e.stopPropagation();
+      opts.onToggle();
+    });
   }
+
+  copyBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    opts.onCopyMarkdown();
+  });
+
+  clearBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    opts.onClearAll();
+  });
 
   // ── API ──
   const updateBadge = (n: number) => {
@@ -220,8 +216,8 @@ export const createFab = (
 
   const setActive = (isActive: boolean) => {
     active = isActive;
-    toggleZone.setAttribute('aria-pressed', String(isActive));
-    toggleZone.setAttribute('aria-expanded', String(isActive));
+    fab.setAttribute('aria-pressed', String(isActive));
+    fab.setAttribute('aria-expanded', String(isActive));
     if (isActive) {
       fab.classList.add('kai-fab--active');
       actions.style.display = 'flex';

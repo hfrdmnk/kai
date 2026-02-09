@@ -38,9 +38,9 @@ export const loadFabCorner = (): FabCorner => {
     if (raw === 'top-left' || raw === 'top-right' || raw === 'bottom-left' || raw === 'bottom-right') {
       return raw;
     }
-    return 'bottom-right';
+    return 'bottom-left';
   } catch {
-    return 'bottom-right';
+    return 'bottom-left';
   }
 };
 

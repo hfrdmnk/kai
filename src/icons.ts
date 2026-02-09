@@ -18,14 +18,3 @@ export const iconCheck = `<svg width="24" height="24" viewBox="0 0 24 24" fill="
 <path d="M3 12L9 18L21 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
 </svg>`;
 
-export const iconDrag = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<circle cx="8" cy="8" r="1.5" fill="currentColor"/>
-<circle cx="12" cy="8" r="1.5" fill="currentColor"/>
-<circle cx="16" cy="8" r="1.5" fill="currentColor"/>
-<circle cx="8" cy="12" r="1.5" fill="currentColor"/>
-<circle cx="12" cy="12" r="1.5" fill="currentColor"/>
-<circle cx="16" cy="12" r="1.5" fill="currentColor"/>
-<circle cx="8" cy="16" r="1.5" fill="currentColor"/>
-<circle cx="12" cy="16" r="1.5" fill="currentColor"/>
-<circle cx="16" cy="16" r="1.5" fill="currentColor"/>
-</svg>`;

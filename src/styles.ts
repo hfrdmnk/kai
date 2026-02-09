@@ -45,21 +45,39 @@ export const styles = `
 
 .kai-fab {
   position: fixed;
-  width: 88px;
+  width: 44px;
   height: 44px;
   border: 1px solid var(--gray-200);
   background: white;
-  color: var(--gray-900);
+  color: var(--gray-700);
   display: flex;
   align-items: center;
+  justify-content: center;
   z-index: var(--z-fab);
   pointer-events: auto;
   font-family: var(--font-sans);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.10);
-  border-radius: 0;
+  border-radius: 0.25rem;
   padding: 0;
-  cursor: default;
+  cursor: grab;
   user-select: none;
+  transition: color 0.15s ease;
+}
+
+.kai-fab:hover {
+  color: var(--gray-900);
+}
+
+.kai-fab--active {
+  color: var(--color-accent);
+}
+
+.kai-fab--dragging {
+  cursor: grabbing;
+}
+
+.kai-fab svg {
+  width: 24px;
+  height: 24px;
 }
 
 .kai-fab[data-corner="bottom-right"] { bottom: 24px; right: 24px; }
@@ -67,59 +85,13 @@ export const styles = `
 .kai-fab[data-corner="top-right"] { top: 24px; right: 24px; }
 .kai-fab[data-corner="top-left"] { top: 24px; left: 24px; }
 
-.kai-fab-drag {
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: grab;
-  color: var(--gray-400);
-  flex-shrink: 0;
-  border: none;
-  background: transparent;
-  padding: 0;
-}
-
-.kai-fab-drag:active {
-  cursor: grabbing;
-}
-
-.kai-fab-drag svg {
-  width: 16px;
-  height: 16px;
-}
-
-.kai-fab-toggle {
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: var(--gray-700);
-  flex-shrink: 0;
-  border: none;
-  background: transparent;
-  padding: 0;
-  transition: color 0.15s ease;
-}
-
-.kai-fab-toggle:hover {
-  color: var(--gray-900);
-}
-
-.kai-fab--active .kai-fab-toggle {
-  color: var(--color-accent);
-}
-
 .kai-fab-badge {
   position: absolute;
   min-width: 18px;
   height: 18px;
   background: var(--color-accent);
   color: var(--gray-900);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   font-family: var(--font-sans);
   display: flex;
@@ -127,32 +99,31 @@ export const styles = `
   justify-content: center;
   padding: 0 4px;
   line-height: 1;
-  border-radius: 0;
-  border: 1px solid var(--gray-300);
+  border-radius: 9999px;
 }
 
-/* Badge position per corner — sits on the outward corner */
-.kai-fab[data-corner="bottom-right"] .kai-fab-badge { top: -9px; right: -1px; }
-.kai-fab[data-corner="bottom-left"] .kai-fab-badge { top: -9px; left: -1px; }
-.kai-fab[data-corner="top-right"] .kai-fab-badge { bottom: -9px; right: -1px; }
-.kai-fab[data-corner="top-left"] .kai-fab-badge { bottom: -9px; left: -1px; }
+/* Badge position per corner — centered on the inward corner point, 2px outward gap */
+.kai-fab[data-corner="bottom-right"] .kai-fab-badge { top: -2px; left: -2px; transform: translate(-50%, -50%); }
+.kai-fab[data-corner="bottom-left"]  .kai-fab-badge { top: -2px; right: -2px; transform: translate(50%, -50%); }
+.kai-fab[data-corner="top-right"]    .kai-fab-badge { bottom: -2px; left: -2px; transform: translate(-50%, 50%); }
+.kai-fab[data-corner="top-left"]     .kai-fab-badge { bottom: -2px; right: -2px; transform: translate(50%, 50%); }
 
-/* Scoop progressive enhancement */
+/* Scoop progressive enhancement — only the badge corner is scooped */
 .kai-fab--has-badge[data-corner="bottom-right"] {
-  corner-shape: scoop;
-  border-top-right-radius: 12px;
-}
-.kai-fab--has-badge[data-corner="bottom-left"] {
-  corner-shape: scoop;
+  corner-shape: scoop round round round;
   border-top-left-radius: 12px;
 }
+.kai-fab--has-badge[data-corner="bottom-left"] {
+  corner-shape: round scoop round round;
+  border-top-right-radius: 12px;
+}
 .kai-fab--has-badge[data-corner="top-right"] {
-  corner-shape: scoop;
-  border-bottom-right-radius: 12px;
+  corner-shape: round round round scoop;
+  border-bottom-left-radius: 12px;
 }
 .kai-fab--has-badge[data-corner="top-left"] {
-  corner-shape: scoop;
-  border-bottom-left-radius: 12px;
+  corner-shape: round round scoop round;
+  border-bottom-right-radius: 12px;
 }
 
 /* ── FAB Actions ─────────────────────────────────── */
@@ -175,9 +146,8 @@ export const styles = `
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  border-radius: 0;
+  border-radius: 0.25rem;
   padding: 4px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
   transition: background 0.15s ease, color 0.15s ease;
 }
 
@@ -210,10 +180,10 @@ export const styles = `
   background: var(--gray-900);
   color: white;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1;
   padding: 4px 8px;
-  border-radius: 0;
+  border-radius: 0.25rem;
   white-space: nowrap;
   z-index: var(--z-tooltip);
 }
@@ -223,13 +193,13 @@ export const styles = `
 .kai-popover {
   position: fixed;
   width: 320px;
-  background: var(--gray-900);
-  color: white;
+  background: white;
+  color: var(--gray-900);
+  border: 1px solid var(--gray-200);
   z-index: var(--z-host);
   pointer-events: auto;
   font-family: var(--font-sans);
-  box-shadow: 0 4px 24px rgba(0,0,0,0.25);
-  border-radius: 0;
+  border-radius: 0.25rem;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -244,15 +214,15 @@ export const styles = `
 
 .kai-popover-path {
   font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--gray-400);
+  font-size: 12px;
+  color: var(--gray-500);
   line-height: 1.5;
   word-break: break-all;
 }
 
 .kai-popover-desc {
   font-size: 12px;
-  color: var(--gray-300);
+  color: var(--gray-600);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -261,15 +231,15 @@ export const styles = `
 .kai-popover-textarea {
   width: 100%;
   min-height: 72px;
-  border: 1px solid var(--gray-700);
-  background: var(--gray-800);
-  color: white;
+  border: 1px solid var(--gray-200);
+  background: white;
+  color: var(--gray-900);
   padding: 10px 12px;
   font-family: var(--font-sans);
   font-size: 13px;
   resize: vertical;
   line-height: 1.5;
-  border-radius: 0;
+  border-radius: 0.25rem;
   transition: border-color 0.15s ease;
 }
 
@@ -280,7 +250,7 @@ export const styles = `
 }
 
 .kai-popover-textarea::placeholder {
-  color: var(--gray-500);
+  color: var(--gray-400);
 }
 
 .kai-popover-footer {
@@ -301,7 +271,7 @@ export const styles = `
   min-height: 36px;
   padding: 0 14px;
   border: none;
-  border-radius: 0;
+  border-radius: 0.25rem;
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 500;
@@ -322,13 +292,13 @@ export const styles = `
 
 .kai-btn--ghost {
   background: transparent;
-  color: var(--gray-400);
+  color: var(--gray-500);
   padding: 0 8px;
   min-height: 36px;
 }
 
 .kai-btn--ghost:hover {
-  color: white;
+  color: var(--gray-900);
 }
 
 .kai-btn--icon {
@@ -336,7 +306,7 @@ export const styles = `
   height: 36px;
   min-height: 36px;
   padding: 0;
-  border-radius: 0;
+  border-radius: 0.25rem;
   background: transparent;
   color: var(--gray-500);
 }
@@ -352,18 +322,17 @@ export const styles = `
   position: fixed;
   width: 22px;
   height: 22px;
-  border-radius: 0;
+  border-radius: 0.25rem;
   background: var(--color-accent);
   color: var(--gray-900);
   font-family: var(--font-sans);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
   z-index: var(--z-overlay);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
   border: 1px solid var(--gray-300);
 }
 
@@ -371,10 +340,9 @@ export const styles = `
 
 .kai-autocomplete {
   position: fixed;
-  background: var(--gray-800);
-  border: 1px solid var(--gray-700);
-  border-radius: 0;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: 0.25rem;
   max-height: 200px;
   overflow-y: auto;
   z-index: var(--z-fab);
@@ -391,12 +359,12 @@ export const styles = `
   padding: 6px 10px;
   cursor: pointer;
   transition: background 0.08s ease;
-  color: white;
+  color: var(--gray-900);
 }
 
 .kai-autocomplete-item:hover,
 .kai-autocomplete-item[aria-selected="true"] {
-  background: var(--gray-700);
+  background: var(--gray-50);
 }
 
 .kai-autocomplete-item-name {
@@ -405,12 +373,12 @@ export const styles = `
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--gray-200);
+  color: var(--gray-700);
 }
 
 .kai-autocomplete-item-value {
   color: var(--gray-500);
-  font-size: 11px;
+  font-size: 12px;
   max-width: 100px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -420,7 +388,7 @@ export const styles = `
 .kai-autocomplete-swatch {
   width: 12px;
   height: 12px;
-  border-radius: 0;
+  border-radius: 0.25rem;
   border: 1px solid var(--gray-600);
   flex-shrink: 0;
 }
@@ -431,30 +399,30 @@ export const styles = `
   gap: 6px;
   padding: 6px 10px;
   cursor: pointer;
-  color: var(--gray-300);
+  color: var(--gray-600);
 }
 
 .kai-autocomplete-rem:hover,
 .kai-autocomplete-rem[aria-selected="true"] {
-  background: var(--gray-700);
+  background: var(--gray-50);
 }
 
 /* ── Toast ───────────────────────────────────────── */
 
 .kai-toast {
   position: fixed;
-  background: var(--gray-900);
-  color: white;
+  background: white;
+  color: var(--gray-900);
+  border: 1px solid var(--gray-200);
   font-family: var(--font-sans);
   font-size: 13px;
   padding: 10px 16px;
-  border-radius: 0;
+  border-radius: 0.25rem;
   z-index: var(--z-fab);
   pointer-events: none;
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateX(-50%) translateY(8px);
   animation: kai-toast-in 0.15s ease forwards;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
 }
 
 .kai-toast--out {
@@ -462,12 +430,12 @@ export const styles = `
 }
 
 @keyframes kai-toast-in {
-  to { opacity: 1; transform: translateY(0); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
 @keyframes kai-toast-out {
-  from { opacity: 1; transform: translateY(0); }
-  to { opacity: 0; transform: translateY(8px); }
+  from { opacity: 1; transform: translateX(-50%) translateY(0); }
+  to { opacity: 0; transform: translateX(-50%) translateY(8px); }
 }
 
 /* ── Syntax highlighting ─────────────────────────── */

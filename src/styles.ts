@@ -56,7 +56,7 @@ export const styles = `
   z-index: var(--z-fab);
   pointer-events: auto;
   font-family: var(--font-sans);
-  border-radius: 0.25rem;
+  border-radius: 0.5rem;
   padding: 0;
   cursor: grab;
   user-select: none;
@@ -133,7 +133,7 @@ export const styles = `
 .kai-fab-actions {
   position: fixed;
   display: flex;
-  gap: 8px;
+  gap: 4px;
   z-index: var(--z-fab);
   pointer-events: auto;
 }
@@ -153,7 +153,7 @@ export const styles = `
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  border-radius: 0.25rem;
+  border-radius: 0.5rem;
   padding: 4px;
   transition: background 0.15s ease, color 0.15s ease;
   will-change: transform, opacity;
@@ -440,12 +440,12 @@ export const styles = `
 .kai-toast {
   position: fixed;
   background: white;
-  color: var(--gray-900);
-  border: 1px solid var(--gray-100);
+  color: hsl(0, 0%, 100%);
+  background: var(--color-accent);
   font-family: var(--font-sans);
   font-size: 13px;
   padding: 10px 16px;
-  border-radius: 0.25rem;
+  border-radius: 0.5rem;
   z-index: var(--z-fab);
   pointer-events: none;
   opacity: 0;

@@ -8,9 +8,4 @@ export type Annotation = {
   createdAt: string;
 };
 
-export type ExportPayload = {
-  url: string;
-  viewport: { width: number; height: number };
-  exportedAt: string;
-  annotations: Annotation[];
-};
+export type FabCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';

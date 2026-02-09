@@ -1,7 +1,10 @@
 import type { Annotation } from '../types.ts';
+import type { FabCorner } from '../types.ts';
 
 const getKey = (): string =>
   `ui-annotator:${location.origin}${location.pathname}`;
+
+const FAB_CORNER_KEY = 'ui-annotator:fab-corner';
 
 export const loadSession = (): Annotation[] => {
   try {
@@ -24,6 +27,26 @@ export const saveSession = (annotations: Annotation[]): void => {
 export const clearSession = (): void => {
   try {
     localStorage.removeItem(getKey());
+  } catch {
+    // unavailable
+  }
+};
+
+export const loadFabCorner = (): FabCorner => {
+  try {
+    const raw = localStorage.getItem(FAB_CORNER_KEY);
+    if (raw === 'top-left' || raw === 'top-right' || raw === 'bottom-left' || raw === 'bottom-right') {
+      return raw;
+    }
+    return 'bottom-right';
+  } catch {
+    return 'bottom-right';
+  }
+};
+
+export const saveFabCorner = (corner: FabCorner): void => {
+  try {
+    localStorage.setItem(FAB_CORNER_KEY, corner);
   } catch {
     // unavailable
   }

@@ -12,8 +12,8 @@ export const styles = `
   --gray-900: oklch(21% 0.034 264.665);
   --gray-950: oklch(13% 0.028 261.692);
 
-  --color-accent: oklch(0.9288 0.2299 123.76);
-  --color-accent-hover: oklch(0.88 0.22 123.76);
+  --color-accent: oklch(0.6927 0.2513 38.8022);
+  --color-accent-hover: oklch(0.6405 0.2241 38.8022);
 
   --font-sans: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -70,7 +70,7 @@ export const styles = `
 .kai-fab--active,
 .kai-fab--active:hover {
   background: var(--color-accent);
-  color: var(--gray-900);
+  color: hsl(0, 0%, 100%);
 }
 
 .kai-fab--dragging {
@@ -92,7 +92,7 @@ export const styles = `
   min-width: 18px;
   height: 18px;
   background: var(--color-accent);
-  color: var(--gray-900);
+  color: hsl(0, 0%, 100%);
   font-size: 12px;
   font-weight: 600;
   font-family: var(--font-sans);
@@ -181,7 +181,7 @@ export const styles = `
   position: fixed;
   pointer-events: none;
   border: 1.5px dashed var(--color-accent);
-  background: oklch(0.9288 0.2299 123.76 / 5%);
+  background: hsl(from var(--color-accent) h s l / 5%);
   border-radius: 0.25rem;
   z-index: var(--z-overlay);
   transition: all 0.08s ease;
@@ -208,13 +208,13 @@ export const styles = `
 .kai-popover {
   position: fixed;
   width: 320px;
-  background: white;
+  background: hsl(0, 0%, 100%);
   color: var(--gray-900);
   border: 1px solid var(--gray-100);
   z-index: var(--z-host);
   pointer-events: auto;
   font-family: var(--font-sans);
-  border-radius: 0.25rem;
+  border-radius: 0.5rem;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -247,7 +247,7 @@ export const styles = `
   width: 100%;
   min-height: 72px;
   border: 1px solid var(--gray-100);
-  background: white;
+  background: var(--gray-50);
   color: var(--gray-900);
   padding: 10px 12px;
   font-family: var(--font-sans);
@@ -297,7 +297,7 @@ export const styles = `
 
 .kai-btn--primary {
   background: var(--color-accent);
-  color: var(--gray-900);
+  color: hsl(0, 0%, 100%);
   font-weight: 600;
 }
 
@@ -306,13 +306,14 @@ export const styles = `
 }
 
 .kai-btn--ghost {
-  background: transparent;
+  background: var(--gray-100);
   color: var(--gray-500);
   padding: 0 8px;
   min-height: 36px;
 }
 
 .kai-btn--ghost:hover {
+  background: var(--gray-200);
   color: var(--gray-900);
 }
 
@@ -339,7 +340,7 @@ export const styles = `
   height: 22px;
   border-radius: 9999px 9999px 9999px 4px;
   background: var(--color-accent);
-  color: var(--gray-900);
+  color: hsl(0, 0%, 100%);
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 600;
@@ -358,7 +359,7 @@ export const styles = `
   position: fixed;
   pointer-events: none;
   border: 1.5px dashed var(--color-accent);
-  background: oklch(0.9288 0.2299 123.76 / 10%);
+  background:  hsl(from var(--color-accent) h s l / 10%);
   z-index: var(--z-overlay);
   border-radius: 0.25rem;
 }

@@ -10,6 +10,8 @@ type PopoverOptions = {
   styles: Record<string, string>;
   onSubmit: (comment: string) => void;
   onClose: () => void;
+  existingComment?: string;
+  onDelete?: () => void;
 };
 
 const describeElement = (el: Element): string => {
@@ -48,10 +50,12 @@ export const createPopover = (
   shadowRoot: ShadowRoot,
   opts: PopoverOptions,
 ) => {
+  const isEdit = opts.existingComment != null;
+
   const popover = document.createElement('div');
   popover.className = 'kai-popover';
   popover.setAttribute('role', 'dialog');
-  popover.setAttribute('aria-label', 'Annotate element');
+  popover.setAttribute('aria-label', isEdit ? 'Edit annotation' : 'Annotate element');
 
   // Body
   const body = document.createElement('div');
@@ -72,6 +76,7 @@ export const createPopover = (
   textarea.className = 'kai-popover-textarea';
   textarea.placeholder = 'What should change?';
   textarea.setAttribute('aria-label', 'Annotation comment');
+  if (isEdit) textarea.value = opts.existingComment!;
 
   body.appendChild(pathEl);
   body.appendChild(descEl);
@@ -81,31 +86,57 @@ export const createPopover = (
   const footer = document.createElement('div');
   footer.className = 'kai-popover-footer';
 
-  const cancelBtn = document.createElement('button');
-  cancelBtn.className = 'kai-btn kai-btn--ghost';
-  cancelBtn.textContent = 'Cancel';
-  cancelBtn.addEventListener('click', opts.onClose);
-
-  const addBtn = document.createElement('button');
-  addBtn.className = 'kai-btn kai-btn--primary';
-  addBtn.textContent = 'Add';
-
   const submit = () => {
     const comment = textarea.value.trim();
     if (!comment) return;
     opts.onSubmit(comment);
   };
 
-  addBtn.addEventListener('click', submit);
+  if (isEdit && opts.onDelete) {
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'kai-btn kai-btn--ghost';
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.style.color = 'oklch(0.577 0.245 27.325)';
+    deleteBtn.addEventListener('click', opts.onDelete);
+
+    const spacer = document.createElement('div');
+    spacer.style.flex = '1';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'kai-btn kai-btn--ghost';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.addEventListener('click', opts.onClose);
+
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'kai-btn kai-btn--primary';
+    saveBtn.textContent = 'Save';
+    saveBtn.addEventListener('click', submit);
+
+    footer.appendChild(deleteBtn);
+    footer.appendChild(spacer);
+    footer.appendChild(cancelBtn);
+    footer.appendChild(saveBtn);
+  } else {
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'kai-btn kai-btn--ghost';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.addEventListener('click', opts.onClose);
+
+    const addBtn = document.createElement('button');
+    addBtn.className = 'kai-btn kai-btn--primary';
+    addBtn.textContent = 'Add';
+    addBtn.addEventListener('click', submit);
+
+    footer.appendChild(cancelBtn);
+    footer.appendChild(addBtn);
+  }
+
   textarea.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       submit();
     }
   });
-
-  footer.appendChild(cancelBtn);
-  footer.appendChild(addBtn);
 
   popover.appendChild(body);
   popover.appendChild(footer);

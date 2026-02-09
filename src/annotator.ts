@@ -52,6 +52,7 @@ class UIAnnotator extends HTMLElement {
         clearSession();
         this.markers.update([]);
         this.fab.updateBadge(0);
+        this.fab.updateActionStates(0);
         this.closePopover();
       },
       onCornerChange: (c) => {
@@ -61,12 +62,15 @@ class UIAnnotator extends HTMLElement {
     });
 
     this.overlay = createOverlay(this.shadow);
-    this.markers = createMarkerManager(this.shadow);
+    this.markers = createMarkerManager(this.shadow, (annotation) => {
+      this.openEditPopover(annotation);
+    });
 
     if (this.annotations.length) {
       this.markers.update(this.annotations);
       this.fab.updateBadge(this.annotations.length);
     }
+    this.fab.updateActionStates(this.annotations.length);
 
     // Bind event handlers
     this.handleMouseOver = (e: MouseEvent) => {
@@ -182,6 +186,35 @@ class UIAnnotator extends HTMLElement {
     });
   }
 
+  private openEditPopover(annotation: Annotation) {
+    this.closePopover();
+
+    const target = document.querySelector(annotation.selector);
+    if (!target) return;
+
+    const path = annotation.path;
+    const computedStyles = getComputedStyles(target);
+
+    this.activePopover = createPopover(this.shadow, {
+      element: target,
+      selector: annotation.selector,
+      path,
+      styles: computedStyles,
+      existingComment: annotation.comment,
+      onSubmit: (comment) => {
+        annotation.comment = comment;
+        this.persist();
+        this.closePopover();
+      },
+      onDelete: () => {
+        this.annotations = this.annotations.filter(a => a.id !== annotation.id);
+        this.persist();
+        this.closePopover();
+      },
+      onClose: () => this.closePopover(),
+    });
+  }
+
   private closePopover() {
     this.activePopover?.destroy();
     this.activePopover = null;
@@ -191,6 +224,7 @@ class UIAnnotator extends HTMLElement {
     saveSession(this.annotations);
     this.markers.update(this.annotations);
     this.fab.updateBadge(this.annotations.length);
+    this.fab.updateActionStates(this.annotations.length);
   }
 }
 

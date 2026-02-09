@@ -47,7 +47,7 @@ export const styles = `
   position: fixed;
   width: 44px;
   height: 44px;
-  border: 1px solid var(--gray-200);
+  border: 1px solid var(--gray-100);
   background: white;
   color: var(--gray-700);
   display: flex;
@@ -60,15 +60,17 @@ export const styles = `
   padding: 0;
   cursor: grab;
   user-select: none;
-  transition: color 0.15s ease;
+  transition: color 0.15s ease, background 0.15s ease;
 }
 
 .kai-fab:hover {
   color: var(--gray-900);
 }
 
-.kai-fab--active {
-  color: var(--color-accent);
+.kai-fab--active,
+.kai-fab--active:hover {
+  background: var(--color-accent);
+  color: var(--gray-900);
 }
 
 .kai-fab--dragging {
@@ -134,12 +136,18 @@ export const styles = `
   gap: 8px;
   z-index: var(--z-fab);
   pointer-events: auto;
+  transition: opacity 0.15s ease;
+}
+
+.kai-fab--dragging ~ .kai-fab-actions {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .kai-fab-action {
-  width: 44px;
-  height: 44px;
-  border: 1px solid var(--gray-200);
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--gray-100);
   background: white;
   color: var(--gray-600);
   display: flex;
@@ -154,6 +162,12 @@ export const styles = `
 .kai-fab-action:hover {
   background: var(--gray-50);
   color: var(--gray-900);
+}
+
+.kai-fab-action:disabled {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
 }
 
 .kai-fab-action svg {
@@ -195,7 +209,7 @@ export const styles = `
   width: 320px;
   background: white;
   color: var(--gray-900);
-  border: 1px solid var(--gray-200);
+  border: 1px solid var(--gray-100);
   z-index: var(--z-host);
   pointer-events: auto;
   font-family: var(--font-sans);
@@ -231,7 +245,7 @@ export const styles = `
 .kai-popover-textarea {
   width: 100%;
   min-height: 72px;
-  border: 1px solid var(--gray-200);
+  border: 1px solid var(--gray-100);
   background: white;
   color: var(--gray-900);
   padding: 10px 12px;
@@ -322,7 +336,7 @@ export const styles = `
   position: fixed;
   width: 22px;
   height: 22px;
-  border-radius: 0.25rem;
+  border-radius: 9999px 9999px 9999px 4px;
   background: var(--color-accent);
   color: var(--gray-900);
   font-family: var(--font-sans);
@@ -331,9 +345,21 @@ export const styles = `
   display: flex;
   align-items: center;
   justify-content: center;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
   z-index: var(--z-overlay);
-  border: 1px solid var(--gray-300);
+  border: none;
+}
+
+/* ── Annotation Boxes ───────────────────────────── */
+
+.kai-annotation-box {
+  position: fixed;
+  pointer-events: none;
+  border: 1.5px dashed var(--color-accent);
+  background: oklch(0.9288 0.2299 123.76 / 10%);
+  z-index: var(--z-overlay);
+  border-radius: 2px;
 }
 
 /* ── Autocomplete ────────────────────────────────── */
@@ -341,7 +367,7 @@ export const styles = `
 .kai-autocomplete {
   position: fixed;
   background: white;
-  border: 1px solid var(--gray-200);
+  border: 1px solid var(--gray-100);
   border-radius: 0.25rem;
   max-height: 200px;
   overflow-y: auto;
@@ -389,7 +415,7 @@ export const styles = `
   width: 12px;
   height: 12px;
   border-radius: 0.25rem;
-  border: 1px solid var(--gray-600);
+  border: 1px solid var(--gray-100);
   flex-shrink: 0;
 }
 
@@ -413,7 +439,7 @@ export const styles = `
   position: fixed;
   background: white;
   color: var(--gray-900);
-  border: 1px solid var(--gray-200);
+  border: 1px solid var(--gray-100);
   font-family: var(--font-sans);
   font-size: 13px;
   padding: 10px 16px;

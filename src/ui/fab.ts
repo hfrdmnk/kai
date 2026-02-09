@@ -38,10 +38,14 @@ const positionActions = (
   const rect = fabEl.getBoundingClientRect();
   const gap = 8;
 
-  // Vertically center actions with FAB
-  const actionsHeight = 44;
-  const top = rect.top + (rect.height - actionsHeight) / 2;
-  actionsEl.style.top = `${top}px`;
+  // Align actions to top/bottom edge based on corner
+  if (corner === 'top-left' || corner === 'top-right') {
+    actionsEl.style.top = `${rect.top}px`;
+    actionsEl.style.bottom = 'auto';
+  } else {
+    actionsEl.style.top = 'auto';
+    actionsEl.style.bottom = `${window.innerHeight - rect.bottom}px`;
+  }
 
   if (corner === 'bottom-right' || corner === 'top-right') {
     // Extend left — anchor from right edge
@@ -199,7 +203,9 @@ export const createFab = (
 
   clearBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    opts.onClearAll();
+    if (confirm('Clear all annotations?')) {
+      opts.onClearAll();
+    }
   });
 
   // ── API ──
@@ -229,10 +235,16 @@ export const createFab = (
     }
   };
 
+  const updateActionStates = (count: number) => {
+    const disabled = count === 0;
+    copyBtn.disabled = disabled;
+    clearBtn.disabled = disabled;
+  };
+
   const destroy = () => {
     fab.remove();
     actions.remove();
   };
 
-  return { updateBadge, setActive, destroy };
+  return { updateBadge, setActive, updateActionStates, destroy };
 };

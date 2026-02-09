@@ -9,6 +9,10 @@ export const createMarkerManager = (
   let currentAnnotations: Annotation[] = [];
   let rafId = 0;
 
+  let previewMarker: HTMLElement | null = null;
+  let previewBox: HTMLElement | null = null;
+  let previewTarget: Element | null = null;
+
   const reposition = () => {
     for (const annotation of currentAnnotations) {
       const marker = markerMap.get(annotation.id);
@@ -36,6 +40,17 @@ export const createMarkerManager = (
         box.style.width = `${rect.width + gap * 2}px`;
         box.style.height = `${rect.height + gap * 2}px`;
       }
+    }
+
+    if (previewTarget && previewMarker && previewBox) {
+      const pRect = previewTarget.getBoundingClientRect();
+      const gap = 4;
+      previewMarker.style.top = `${pRect.top - 8}px`;
+      previewMarker.style.left = `${pRect.right - 8}px`;
+      previewBox.style.top = `${pRect.top - gap}px`;
+      previewBox.style.left = `${pRect.left - gap}px`;
+      previewBox.style.width = `${pRect.width + gap * 2}px`;
+      previewBox.style.height = `${pRect.height + gap * 2}px`;
     }
 
     rafId = requestAnimationFrame(reposition);
@@ -90,8 +105,46 @@ export const createMarkerManager = (
     });
   };
 
+  const clearPreview = () => {
+    previewMarker?.remove();
+    previewBox?.remove();
+    previewMarker = null;
+    previewBox = null;
+    previewTarget = null;
+  };
+
+  const showPreview = (element: Element, number: number): DOMRect => {
+    clearPreview();
+
+    const rect = element.getBoundingClientRect();
+    const gap = 4;
+
+    const box = document.createElement('div');
+    box.className = 'kai-annotation-box';
+    box.style.top = `${rect.top - gap}px`;
+    box.style.left = `${rect.left - gap}px`;
+    box.style.width = `${rect.width + gap * 2}px`;
+    box.style.height = `${rect.height + gap * 2}px`;
+    shadowRoot.appendChild(box);
+
+    const marker = document.createElement('div');
+    marker.className = 'kai-marker';
+    marker.textContent = String(number);
+    marker.style.pointerEvents = 'none';
+    marker.style.top = `${rect.top - 8}px`;
+    marker.style.left = `${rect.right - 8}px`;
+    shadowRoot.appendChild(marker);
+
+    previewMarker = marker;
+    previewBox = box;
+    previewTarget = element;
+
+    return new DOMRect(rect.right - 8, rect.top - 8, 22, 22);
+  };
+
   const destroy = () => {
     cancelAnimationFrame(rafId);
+    clearPreview();
     for (const el of markerMap.values()) el.remove();
     markerMap.clear();
     for (const el of boxMap.values()) el.remove();
@@ -100,5 +153,5 @@ export const createMarkerManager = (
 
   rafId = requestAnimationFrame(reposition);
 
-  return { update, destroy };
+  return { update, showPreview, clearPreview, destroy };
 };

@@ -62,6 +62,8 @@ const positionActions = (
   }
 };
 
+const SPRING = 'linear(0, 0.008 1.1%, 0.034 2.3%, 0.134 4.9%, 0.264 7.3%, 0.683 14.3%, 0.797 16.5%, 0.89 18.6%, 0.967 20.7%, 1.027 22.8%, 1.073 25%, 1.104 27.3%, 1.123 30.6%, 1.119 34.3%, 1.018 49.5%, 0.988 58.6%, 0.985 65.2%, 1 84.5%, 1)';
+
 const DRAG_THRESHOLD = 5;
 
 export const createFab = (
@@ -70,6 +72,8 @@ export const createFab = (
 ) => {
   let corner = opts.initialCorner;
   let active = false;
+  let fabAnim: Animation | null = null;
+  let actionAnims: Animation[] = [];
 
   // ── FAB — single 44×44 button ──
   const fab = document.createElement('button');
@@ -127,6 +131,12 @@ export const createFab = (
     fabStartY = rect.top;
 
     fab.setPointerCapture(e.pointerId);
+
+    fabAnim?.cancel();
+    fabAnim = fab.animate(
+      [{ transform: 'scale(1)' }, { transform: 'scale(0.9)' }],
+      { duration: 120, easing: 'ease-out', fill: 'forwards' },
+    );
   };
 
   const onPointerMove = (e: PointerEvent) => {
@@ -137,6 +147,7 @@ export const createFab = (
 
     if (!dragging && dist > DRAG_THRESHOLD) {
       dragging = true;
+      fabAnim?.cancel();
       // Switch to fixed positioning for free movement
       fab.style.position = 'fixed';
       fab.style.left = `${fabStartX}px`;
@@ -182,6 +193,12 @@ export const createFab = (
       // Click — toggle
       opts.onToggle();
     }
+
+    fabAnim?.cancel();
+    fabAnim = fab.animate(
+      [{ transform: 'scale(0.9)' }, { transform: 'scale(1)' }],
+      { duration: 600, easing: SPRING },
+    );
   };
 
   if (supportsAnchor) {
@@ -189,7 +206,21 @@ export const createFab = (
     fab.addEventListener('pointermove', onPointerMove);
     fab.addEventListener('pointerup', onPointerUp);
   } else {
-    // No anchor support — just handle click
+    // No anchor support — just handle click + press effect
+    fab.addEventListener('pointerdown', () => {
+      fabAnim?.cancel();
+      fabAnim = fab.animate(
+        [{ transform: 'scale(1)' }, { transform: 'scale(0.9)' }],
+        { duration: 120, easing: 'ease-out', fill: 'forwards' },
+      );
+    });
+    fab.addEventListener('pointerup', () => {
+      fabAnim?.cancel();
+      fabAnim = fab.animate(
+        [{ transform: 'scale(0.9)' }, { transform: 'scale(1)' }],
+        { duration: 600, easing: SPRING },
+      );
+    });
     fab.addEventListener('click', (e) => {
       e.stopPropagation();
       opts.onToggle();
@@ -220,18 +251,64 @@ export const createFab = (
     }
   };
 
+  const isRightCorner = () =>
+    corner === 'bottom-right' || corner === 'top-right';
+
+  const animateActionsIn = () => {
+    actionAnims.forEach(a => a.cancel());
+    actionAnims = [];
+
+    actions.style.display = 'flex';
+    requestAnimationFrame(() => {
+      positionActions(actions, fab, corner);
+      const tx = isRightCorner() ? '12px' : '-12px';
+      [copyBtn, clearBtn].forEach((btn, i) => {
+        const anim = btn.animate(
+          [
+            { transform: `translateX(${tx}) scale(0.8)`, opacity: 0 },
+            { transform: 'translateX(0) scale(1)', opacity: 1 },
+          ],
+          { duration: 400, easing: SPRING, delay: i * 50, fill: 'both' },
+        );
+        actionAnims.push(anim);
+      });
+    });
+  };
+
+  const animateActionsOut = () => {
+    actionAnims.forEach(a => a.cancel());
+    actionAnims = [];
+
+    const tx = isRightCorner() ? '8px' : '-8px';
+    const anims = [copyBtn, clearBtn].map((btn, i) => {
+      const anim = btn.animate(
+        [
+          { transform: 'translateX(0) scale(1)', opacity: 1 },
+          { transform: `translateX(${tx}) scale(0.8)`, opacity: 0 },
+        ],
+        { duration: 150, easing: 'ease-in', delay: i * 30, fill: 'forwards' },
+      );
+      return anim;
+    });
+    actionAnims = anims;
+
+    Promise.all(anims.map(a => a.finished)).then(() => {
+      actions.style.display = 'none';
+      anims.forEach(a => a.cancel());
+      actionAnims = [];
+    });
+  };
+
   const setActive = (isActive: boolean) => {
     active = isActive;
     fab.setAttribute('aria-pressed', String(isActive));
     fab.setAttribute('aria-expanded', String(isActive));
     if (isActive) {
       fab.classList.add('kai-fab--active');
-      actions.style.display = 'flex';
-      // Position actions next frame after display change
-      requestAnimationFrame(() => positionActions(actions, fab, corner));
+      animateActionsIn();
     } else {
       fab.classList.remove('kai-fab--active');
-      actions.style.display = 'none';
+      animateActionsOut();
     }
   };
 

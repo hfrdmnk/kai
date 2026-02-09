@@ -136,7 +136,6 @@ export const styles = `
   gap: 8px;
   z-index: var(--z-fab);
   pointer-events: auto;
-  transition: opacity 0.15s ease;
 }
 
 .kai-fab--dragging ~ .kai-fab-actions {
@@ -157,6 +156,7 @@ export const styles = `
   border-radius: 0.25rem;
   padding: 4px;
   transition: background 0.15s ease, color 0.15s ease;
+  will-change: transform, opacity;
 }
 
 .kai-fab-action:hover {
@@ -180,8 +180,9 @@ export const styles = `
 .kai-overlay {
   position: fixed;
   pointer-events: none;
-  border: 2px solid var(--color-accent);
-  background: oklch(0.9288 0.2299 123.76 / 8%);
+  border: 1.5px dashed var(--color-accent);
+  background: oklch(0.9288 0.2299 123.76 / 5%);
+  border-radius: 0.25rem;
   z-index: var(--z-overlay);
   transition: all 0.08s ease;
 }

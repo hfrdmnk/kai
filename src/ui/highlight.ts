@@ -23,11 +23,12 @@ export const createOverlay = (shadowRoot: ShadowRoot) => {
   const show = (el: Element) => {
     const rect = el.getBoundingClientRect();
 
+    const gap = 4;
     overlay.style.display = 'block';
-    overlay.style.top = `${rect.top}px`;
-    overlay.style.left = `${rect.left}px`;
-    overlay.style.width = `${rect.width}px`;
-    overlay.style.height = `${rect.height}px`;
+    overlay.style.top = `${rect.top - gap}px`;
+    overlay.style.left = `${rect.left - gap}px`;
+    overlay.style.width = `${rect.width + gap * 2}px`;
+    overlay.style.height = `${rect.height + gap * 2}px`;
 
     tooltip.textContent = describeElement(el);
     tooltip.style.display = 'block';

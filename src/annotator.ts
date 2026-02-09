@@ -93,7 +93,8 @@ class UIAnnotator extends HTMLElement {
       const target = this.hoveredElement;
       if (!target) return;
       this.overlay.hide();
-      this.openPopover(target);
+      const markerRect = this.markers.showPreview(target, this.annotations.length + 1);
+      this.openPopover(target, markerRect);
     };
 
     this.handleGlobalKeydown = (e: KeyboardEvent) => {
@@ -155,7 +156,7 @@ class UIAnnotator extends HTMLElement {
     );
   }
 
-  private openPopover(element: Element) {
+  private openPopover(element: Element, anchorRect?: DOMRect) {
     this.closePopover();
 
     const selector = generateSelector(element);
@@ -168,6 +169,7 @@ class UIAnnotator extends HTMLElement {
       selector,
       path,
       styles: computedStyles,
+      anchorRect,
       onSubmit: (comment) => {
         const annotation: Annotation = {
           id: crypto.randomUUID(),
@@ -179,10 +181,14 @@ class UIAnnotator extends HTMLElement {
           createdAt: new Date().toISOString(),
         };
         this.annotations.push(annotation);
+        this.markers.clearPreview();
         this.persist();
         this.closePopover();
       },
-      onClose: () => this.closePopover(),
+      onClose: () => {
+        this.markers.clearPreview();
+        this.closePopover();
+      },
     });
   }
 

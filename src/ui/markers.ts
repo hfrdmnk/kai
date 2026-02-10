@@ -1,4 +1,16 @@
 import type { Annotation } from '../types.ts';
+import { iconKai } from '../icons.ts';
+
+const parser = new DOMParser();
+
+const createMarkerIcon = (): SVGElement => {
+  const doc = parser.parseFromString(iconKai, 'image/svg+xml');
+  const svg = document.importNode(doc.documentElement, true) as unknown as SVGElement;
+  svg.setAttribute('width', '12');
+  svg.setAttribute('height', '12');
+  svg.setAttribute('stroke-width', '2.5');
+  return svg;
+};
 
 export const createMarkerManager = (
   shadowRoot: ShadowRoot,
@@ -15,7 +27,7 @@ export const createMarkerManager = (
   let previewMarker: HTMLElement | null = null;
   let previewBox: HTMLElement | null = null;
   let previewTarget: Element | null = null;
-  let isActive = true;
+  let isActive = false;
 
   const reposition = () => {
     for (const annotation of currentAnnotations) {
@@ -101,7 +113,7 @@ export const createMarkerManager = (
         shadowRoot.appendChild(marker);
         markerMap.set(annotation.id, marker);
       }
-      marker.textContent = '*';
+      if (!marker.querySelector('svg')) marker.appendChild(createMarkerIcon());
       marker.setAttribute('aria-label', `Annotation: ${annotation.comment.slice(0, 50)}`);
 
       // Box
@@ -139,7 +151,7 @@ export const createMarkerManager = (
 
     const marker = document.createElement('div');
     marker.className = 'kai-marker';
-    marker.textContent = '*';
+    marker.appendChild(createMarkerIcon());
     marker.style.pointerEvents = 'none';
     marker.style.top = `${rect.top - 8}px`;
     marker.style.left = `${rect.right - 8}px`;

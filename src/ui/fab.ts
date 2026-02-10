@@ -298,8 +298,10 @@ export const createFab = (
     if (n > 0) {
       badge.textContent = String(n);
       badge.style.display = 'flex';
+      fab.classList.add('kai-fab--has-badge');
     } else {
       badge.style.display = 'none';
+      fab.classList.remove('kai-fab--has-badge');
     }
   };
 

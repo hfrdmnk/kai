@@ -127,10 +127,10 @@ export const styles = `
   height: 24px;
 }
 
-.kai-fab[data-corner="bottom-right"] { bottom: 24px; right: 24px; border-radius: 22px 22px 22px 8px; }
-.kai-fab[data-corner="bottom-left"] { bottom: 24px; left: 24px; border-radius: 22px 22px 8px 22px; }
-.kai-fab[data-corner="top-right"] { top: 24px; right: 24px; border-radius: 8px 22px 22px 22px; }
-.kai-fab[data-corner="top-left"] { top: 24px; left: 24px; border-radius: 22px 8px 22px 22px; }
+.kai-fab[data-corner="bottom-right"] { bottom: 24px; right: 24px; border-radius: 22px 22px 22px 4px; }
+.kai-fab[data-corner="bottom-left"] { bottom: 24px; left: 24px; border-radius: 22px 22px 4px 22px; }
+.kai-fab[data-corner="top-right"] { top: 24px; right: 24px; border-radius: 4px 22px 22px 22px; }
+.kai-fab[data-corner="top-left"] { top: 24px; left: 24px; border-radius: 22px 4px 22px 22px; }
 
 .kai-fab-badge {
   position: absolute;
@@ -149,11 +149,17 @@ export const styles = `
   border-radius: var(--radius-full);
 }
 
-/* Badge position per corner — diagonally opposite the teardrop point */
+/* Badge position per corner — diagonally opposite the pointy corner */
 .kai-fab[data-corner="bottom-right"] .kai-fab-badge { top: -2px; right: -2px; transform: translate(50%, -50%); }
 .kai-fab[data-corner="bottom-left"]  .kai-fab-badge { top: -2px; left: -2px; transform: translate(-50%, -50%); }
 .kai-fab[data-corner="top-right"]    .kai-fab-badge { bottom: -2px; right: -2px; transform: translate(50%, 50%); }
 .kai-fab[data-corner="top-left"]     .kai-fab-badge { bottom: -2px; left: -2px; transform: translate(-50%, 50%); }
+
+/* Corner-shape scoop follows badge (diagonally opposite pointy corner) */
+.kai-fab--has-badge[data-corner="bottom-right"] { corner-shape: round scoop round round; border-top-right-radius: 12px; }
+.kai-fab--has-badge[data-corner="bottom-left"]  { corner-shape: scoop round round round; border-top-left-radius: 12px; }
+.kai-fab--has-badge[data-corner="top-right"]    { corner-shape: round round round scoop; border-bottom-right-radius: 12px; }
+.kai-fab--has-badge[data-corner="top-left"]     { corner-shape: round round scoop round; border-bottom-left-radius: 12px; }
 
 /* ── FAB Actions ─────────────────────────────────── */
 
@@ -369,7 +375,7 @@ export const styles = `
   position: fixed;
   width: 22px;
   height: 22px;
-  border-radius: 9999px 9999px 9999px 4px;
+  border-radius: 9999px 9999px 9999px var(--radius-sm);
   background: var(--color-accent);
   color: var(--white);
   font-family: var(--font-sans);
@@ -385,10 +391,11 @@ export const styles = `
 }
 
 .kai-marker--inactive {
-  background: var(--gray-400);
+  background: var(--bg-3);
+  border: 1.5px solid var(--border-3);
+  color: var(--text-tertiary);
   pointer-events: none;
   cursor: default;
-  opacity: 0.5;
 }
 
 /* ── Annotation Boxes ───────────────────────────── */

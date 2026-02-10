@@ -1,5 +1,5 @@
 export const iconKai = `<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-<text x="12" y="17" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="300" fill="currentColor">回</text>
+<text x="12" y="18" text-anchor="middle" font-family="sans-serif" font-size="22" font-weight="400" fill="currentColor">*</text>
 </svg>`;
 
 export const iconClose = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

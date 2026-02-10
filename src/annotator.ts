@@ -8,6 +8,7 @@ import { createOverlay } from './ui/highlight.ts';
 import { createFab } from './ui/fab.ts';
 import { createPopover } from './ui/popover.ts';
 import { createMarkerManager } from './ui/markers.ts';
+import { createInspector } from './ui/inspector.ts';
 import { showToast } from './ui/toast.ts';
 
 class UIAnnotator extends HTMLElement {
@@ -15,9 +16,11 @@ class UIAnnotator extends HTMLElement {
   private annotations: Annotation[] = [];
   private active = false;
   private fabCorner: FabCorner;
+  private altHeld = false;
 
   private fab!: ReturnType<typeof createFab>;
   private overlay!: ReturnType<typeof createOverlay>;
+  private inspector!: ReturnType<typeof createInspector>;
   private markers!: ReturnType<typeof createMarkerManager>;
   private activePopover: ReturnType<typeof createPopover> | null = null;
   private activePopoverAnnotationId: string | null = null;
@@ -28,6 +31,9 @@ class UIAnnotator extends HTMLElement {
   private handleMouseOut: () => void;
   private handleClick: (e: MouseEvent) => void;
   private handleGlobalKeydown: (e: KeyboardEvent) => void;
+  private handleAltKeydown: (e: KeyboardEvent) => void;
+  private handleAltKeyup: (e: KeyboardEvent) => void;
+  private handleWindowBlur: () => void;
 
   constructor() {
     super();
@@ -63,6 +69,7 @@ class UIAnnotator extends HTMLElement {
     });
 
     this.overlay = createOverlay(this.shadow);
+    this.inspector = createInspector(this.shadow);
     this.markers = createMarkerManager(
       this.shadow,
       (annotation, markerRect) => {
@@ -88,12 +95,19 @@ class UIAnnotator extends HTMLElement {
       const target = e.target as Element;
       if (target === document.documentElement || target === document.body) return;
       this.hoveredElement = target;
-      this.overlay.show(target);
+      if (this.altHeld) {
+        this.overlay.hide();
+        this.inspector.show(target);
+      } else {
+        this.inspector.hide();
+        this.overlay.show(target);
+      }
     };
 
     this.handleMouseOut = () => {
       this.hoveredElement = null;
       this.overlay.hide();
+      this.inspector.hide();
     };
 
     this.handleClick = (e: MouseEvent) => {
@@ -103,7 +117,8 @@ class UIAnnotator extends HTMLElement {
       const target = this.hoveredElement;
       if (!target) return;
       this.overlay.hide();
-      const markerRect = this.markers.showPreview(target, this.annotations.length + 1);
+      this.inspector.hide();
+      const markerRect = this.markers.showPreview(target);
       this.openPopover(target, markerRect);
     };
 
@@ -114,6 +129,33 @@ class UIAnnotator extends HTMLElement {
       }
       if (e.key === 'Escape' && this.active && !this.activePopover) {
         this.deactivate();
+      }
+    };
+
+    this.handleAltKeydown = (e: KeyboardEvent) => {
+      if (e.key !== 'Alt') return;
+      if (this.altHeld) return;
+      this.altHeld = true;
+      if (this.hoveredElement) {
+        this.overlay.hide();
+        this.inspector.show(this.hoveredElement);
+      }
+    };
+
+    this.handleAltKeyup = (e: KeyboardEvent) => {
+      if (e.key !== 'Alt') return;
+      this.altHeld = false;
+      this.inspector.hide();
+      if (this.hoveredElement) {
+        this.overlay.show(this.hoveredElement);
+      }
+    };
+
+    this.handleWindowBlur = () => {
+      this.altHeld = false;
+      this.inspector.hide();
+      if (this.hoveredElement) {
+        this.overlay.show(this.hoveredElement);
       }
     };
   }
@@ -127,6 +169,7 @@ class UIAnnotator extends HTMLElement {
     document.removeEventListener('keydown', this.handleGlobalKeydown);
     this.markers.destroy();
     this.overlay.destroy();
+    this.inspector.destroy();
     this.fab.destroy();
   }
 
@@ -146,18 +189,26 @@ class UIAnnotator extends HTMLElement {
     document.addEventListener('mouseover', this.handleMouseOver, true);
     document.addEventListener('mouseout', this.handleMouseOut, true);
     document.addEventListener('click', this.handleClick, true);
+    document.addEventListener('keydown', this.handleAltKeydown);
+    document.addEventListener('keyup', this.handleAltKeyup);
+    window.addEventListener('blur', this.handleWindowBlur);
   }
 
   private deactivate() {
     this.active = false;
     this.fab.setActive(false);
     this.markers.setActive(false);
+    this.altHeld = false;
 
     document.removeEventListener('mouseover', this.handleMouseOver, true);
     document.removeEventListener('mouseout', this.handleMouseOut, true);
     document.removeEventListener('click', this.handleClick, true);
+    document.removeEventListener('keydown', this.handleAltKeydown);
+    document.removeEventListener('keyup', this.handleAltKeyup);
+    window.removeEventListener('blur', this.handleWindowBlur);
 
     this.overlay.hide();
+    this.inspector.hide();
     this.hoveredElement = null;
     this.closePopover();
   }

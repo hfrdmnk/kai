@@ -83,7 +83,7 @@ export const createMarkerManager = (
       }
     }
 
-    annotations.forEach((annotation, i) => {
+    annotations.forEach((annotation) => {
       // Marker
       let marker = markerMap.get(annotation.id);
       if (!marker) {
@@ -101,8 +101,8 @@ export const createMarkerManager = (
         shadowRoot.appendChild(marker);
         markerMap.set(annotation.id, marker);
       }
-      marker.textContent = String(i + 1);
-      marker.setAttribute('aria-label', `Annotation ${i + 1}: ${annotation.comment.slice(0, 50)}`);
+      marker.textContent = '*';
+      marker.setAttribute('aria-label', `Annotation: ${annotation.comment.slice(0, 50)}`);
 
       // Box
       let box = boxMap.get(annotation.id);
@@ -123,7 +123,7 @@ export const createMarkerManager = (
     previewTarget = null;
   };
 
-  const showPreview = (element: Element, number: number): DOMRect => {
+  const showPreview = (element: Element): DOMRect => {
     clearPreview();
 
     const rect = element.getBoundingClientRect();
@@ -139,7 +139,7 @@ export const createMarkerManager = (
 
     const marker = document.createElement('div');
     marker.className = 'kai-marker';
-    marker.textContent = String(number);
+    marker.textContent = '*';
     marker.style.pointerEvents = 'none';
     marker.style.top = `${rect.top - 8}px`;
     marker.style.left = `${rect.right - 8}px`;

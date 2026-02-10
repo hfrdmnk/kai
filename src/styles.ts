@@ -15,6 +15,7 @@ export const styles = `
 
   --rose-50: oklch(96.9% 0.015 12.422);
   --rose-100: oklch(94.1% 0.03 12.58);
+  --rose-200: oklch(89.2% 0.058 10.001);
   --rose-600: oklch(58.6% 0.253 17.585);
   --rose-900: oklch(41% 0.159 10.272);
 
@@ -350,6 +351,7 @@ export const styles = `
 .kai-btn--danger {
   background: var(--rose-50);
   color: var(--rose-600);
+  border: 1px solid var(--rose-200);
   padding: 0 8px;
   min-height: 36px;
 }

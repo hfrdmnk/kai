@@ -96,7 +96,11 @@ export const createPopover = (
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'kai-btn kai-btn--danger';
     deleteBtn.textContent = 'Delete';
-    deleteBtn.addEventListener('click', opts.onDelete);
+    deleteBtn.addEventListener('click', () => {
+      if (confirm('Delete this annotation?')) {
+        opts.onDelete!();
+      }
+    });
 
     const spacer = document.createElement('div');
     spacer.style.flex = '1';

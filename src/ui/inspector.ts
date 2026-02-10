@@ -1,5 +1,4 @@
-import { computeBoxModel, computeDistances, computeTextInfo } from '../core/box-model.ts';
-import type { DistanceMeasurement } from '../core/box-model.ts';
+import type { CrosshairData, TextInspectData } from '../core/measure.ts';
 
 const makeDiv = (className: string): HTMLDivElement => {
   const el = document.createElement('div');
@@ -8,232 +7,164 @@ const makeDiv = (className: string): HTMLDivElement => {
   return el;
 };
 
-const positionRect = (
-  el: HTMLElement,
-  top: number,
-  left: number,
-  width: number,
-  height: number,
-) => {
-  el.style.display = 'block';
-  el.style.top = `${top}px`;
-  el.style.left = `${left}px`;
-  el.style.width = `${Math.max(0, width)}px`;
-  el.style.height = `${Math.max(0, height)}px`;
-};
-
 export const createInspector = (shadowRoot: ShadowRoot) => {
-  // Content overlay
-  const content = makeDiv('kai-inspector-content');
+  const lineV = makeDiv('kai-measure-line kai-measure-line--v');
+  const lineH = makeDiv('kai-measure-line kai-measure-line--h');
+  const cross = makeDiv('kai-measure-cross');
+  const tooltip = makeDiv('kai-measure-tooltip');
+  const textTooltip = makeDiv('kai-measure-text-tooltip');
+  const selection = makeDiv('kai-measure-selection');
+  const highlight = makeDiv('kai-measure-highlight');
 
-  // Padding overlays (top, right, bottom, left)
-  const padTop = makeDiv('kai-inspector-padding kai-inspector-padding--top');
-  const padRight = makeDiv('kai-inspector-padding kai-inspector-padding--right');
-  const padBottom = makeDiv('kai-inspector-padding kai-inspector-padding--bottom');
-  const padLeft = makeDiv('kai-inspector-padding kai-inspector-padding--left');
-  const paddings = [padTop, padRight, padBottom, padLeft];
-
-  // Margin overlays (top, right, bottom, left)
-  const marTop = makeDiv('kai-inspector-margin');
-  const marRight = makeDiv('kai-inspector-margin');
-  const marBottom = makeDiv('kai-inspector-margin');
-  const marLeft = makeDiv('kai-inspector-margin');
-  const margins = [marTop, marRight, marBottom, marLeft];
-
-  // Value labels: 4 padding + 4 margin = 8
-  const padLabels = Array.from({ length: 4 }, () => makeDiv('kai-inspector-label'));
-  const marLabels = Array.from({ length: 4 }, () => makeDiv('kai-inspector-label'));
-
-  // Distance lines + labels (4 each)
-  const distLines = Array.from({ length: 4 }, () => makeDiv('kai-inspector-distance-line'));
-  const distLabels = Array.from({ length: 4 }, () => makeDiv('kai-inspector-distance-label'));
-
-  // Text info tooltip
-  const textInfo = makeDiv('kai-inspector-text-info');
-
-  // Append all to shadow root
-  const allEls = [
-    content,
-    ...paddings,
-    ...margins,
-    ...padLabels,
-    ...marLabels,
-    ...distLines,
-    ...distLabels,
-    textInfo,
-  ];
+  const allEls = [lineV, lineH, cross, tooltip, textTooltip, selection, highlight];
   for (const el of allEls) shadowRoot.appendChild(el);
 
   const hideAll = () => {
     for (const el of allEls) el.style.display = 'none';
   };
 
-  const positionLabel = (
-    label: HTMLElement,
-    top: number,
-    left: number,
-    width: number,
-    height: number,
-    value: number,
-  ) => {
-    if (value === 0) {
-      label.style.display = 'none';
-      return;
-    }
-    label.textContent = String(Math.round(value));
-    label.style.display = 'block';
-    label.style.top = `${top + height / 2}px`;
-    label.style.left = `${left + width / 2}px`;
-  };
+  const showCrosshair = (data: CrosshairData) => {
+    const { cx, cy, left, right, top, bottom, width, height } = data;
 
-  const show = (el: Element) => {
-    const bm = computeBoxModel(el);
-
-    // Content
-    positionRect(
-      content,
-      bm.contentRect.top,
-      bm.contentRect.left,
-      bm.contentRect.width,
-      bm.contentRect.height,
-    );
-
-    // Padding: top
-    positionRect(
-      padTop,
-      bm.paddingRect.top,
-      bm.paddingRect.left,
-      bm.paddingRect.width,
-      bm.padding.top,
-    );
-    // Padding: bottom
-    positionRect(
-      padBottom,
-      bm.contentRect.bottom,
-      bm.paddingRect.left,
-      bm.paddingRect.width,
-      bm.padding.bottom,
-    );
-    // Padding: left
-    positionRect(
-      padLeft,
-      bm.contentRect.top,
-      bm.paddingRect.left,
-      bm.padding.left,
-      bm.contentRect.height,
-    );
-    // Padding: right
-    positionRect(
-      padRight,
-      bm.contentRect.top,
-      bm.contentRect.right,
-      bm.padding.right,
-      bm.contentRect.height,
-    );
-
-    // Margin: top (full width of margin box)
-    positionRect(
-      marTop,
-      bm.marginRect.top,
-      bm.marginRect.left,
-      bm.marginRect.width,
-      bm.margin.top,
-    );
-    // Margin: bottom
-    positionRect(
-      marBottom,
-      bm.borderRect.bottom,
-      bm.marginRect.left,
-      bm.marginRect.width,
-      bm.margin.bottom,
-    );
-    // Margin: left
-    positionRect(
-      marLeft,
-      bm.borderRect.top,
-      bm.marginRect.left,
-      bm.margin.left,
-      bm.borderRect.height,
-    );
-    // Margin: right
-    positionRect(
-      marRight,
-      bm.borderRect.top,
-      bm.borderRect.right,
-      bm.margin.right,
-      bm.borderRect.height,
-    );
-
-    // Padding labels (top, right, bottom, left)
-    positionLabel(padLabels[0], bm.paddingRect.top, bm.paddingRect.left, bm.paddingRect.width, bm.padding.top, bm.padding.top);
-    positionLabel(padLabels[1], bm.contentRect.top, bm.contentRect.right, bm.padding.right, bm.contentRect.height, bm.padding.right);
-    positionLabel(padLabels[2], bm.contentRect.bottom, bm.paddingRect.left, bm.paddingRect.width, bm.padding.bottom, bm.padding.bottom);
-    positionLabel(padLabels[3], bm.contentRect.top, bm.paddingRect.left, bm.padding.left, bm.contentRect.height, bm.padding.left);
-
-    // Margin labels (top, right, bottom, left)
-    positionLabel(marLabels[0], bm.marginRect.top, bm.marginRect.left, bm.marginRect.width, bm.margin.top, bm.margin.top);
-    positionLabel(marLabels[1], bm.borderRect.top, bm.borderRect.right, bm.margin.right, bm.borderRect.height, bm.margin.right);
-    positionLabel(marLabels[2], bm.borderRect.bottom, bm.marginRect.left, bm.marginRect.width, bm.margin.bottom, bm.margin.bottom);
-    positionLabel(marLabels[3], bm.borderRect.top, bm.marginRect.left, bm.margin.left, bm.borderRect.height, bm.margin.left);
-
-    // Distances
-    const distances = computeDistances(el);
-    for (let i = 0; i < 4; i++) {
-      const line = distLines[i];
-      const label = distLabels[i];
-      const d: DistanceMeasurement | undefined = distances[i];
-
-      if (!d) {
-        line.style.display = 'none';
-        label.style.display = 'none';
-        continue;
-      }
-
-      const isVertical = d.direction === 'top' || d.direction === 'bottom';
-      line.className = `kai-inspector-distance-line kai-inspector-distance-line--${isVertical ? 'vertical' : 'horizontal'}`;
-
-      if (isVertical) {
-        const minY = Math.min(d.from.y, d.to.y);
-        const h = Math.abs(d.to.y - d.from.y);
-        line.style.display = 'block';
-        line.style.left = `${d.from.x}px`;
-        line.style.top = `${minY}px`;
-        line.style.width = '1px';
-        line.style.height = `${h}px`;
-      } else {
-        const minX = Math.min(d.from.x, d.to.x);
-        const w = Math.abs(d.to.x - d.from.x);
-        line.style.display = 'block';
-        line.style.left = `${minX}px`;
-        line.style.top = `${d.from.y}px`;
-        line.style.width = `${w}px`;
-        line.style.height = '1px';
-      }
-
-      label.textContent = d.label;
-      label.style.display = 'block';
-      label.style.left = `${d.labelPos.x}px`;
-      label.style.top = `${d.labelPos.y}px`;
-    }
-
-    // Text info
-    const ti = computeTextInfo(el);
-    if (ti) {
-      textInfo.textContent = `${ti.fontFamily} · ${ti.fontWeight} · ${ti.fontSize} / ${ti.lineHeight}`;
-      textInfo.style.display = 'block';
-      // Position below the margin box
-      textInfo.style.left = `${bm.marginRect.left}px`;
-      textInfo.style.top = `${bm.marginRect.bottom + 6}px`;
+    // Vertical line (top to bottom)
+    const vHeight = bottom - top;
+    if (vHeight > 0) {
+      lineV.style.display = 'block';
+      lineV.style.left = `${cx}px`;
+      lineV.style.top = `${top}px`;
+      lineV.style.height = `${vHeight}px`;
     } else {
-      textInfo.style.display = 'none';
+      lineV.style.display = 'none';
     }
+
+    // Horizontal line (left to right)
+    const hWidth = right - left;
+    if (hWidth > 0) {
+      lineH.style.display = 'block';
+      lineH.style.left = `${left}px`;
+      lineH.style.top = `${cy}px`;
+      lineH.style.width = `${hWidth}px`;
+    } else {
+      lineH.style.display = 'none';
+    }
+
+    // Cross at cursor
+    cross.style.display = 'block';
+    cross.style.left = `${cx}px`;
+    cross.style.top = `${cy}px`;
+
+    // Tooltip with dimensions
+    tooltip.textContent = `${Math.round(width)}×${Math.round(height)} px`;
+    tooltip.style.display = 'block';
+
+    // Position tooltip near cursor, flipping near edges
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const offsetX = 12;
+    const offsetY = 12;
+
+    const tooltipRight = cx + offsetX + 100 < vw;
+    const tooltipBelow = cy + offsetY + 24 < vh;
+
+    tooltip.style.left = tooltipRight ? `${cx + offsetX}px` : '';
+    tooltip.style.right = tooltipRight ? '' : `${vw - cx + offsetX}px`;
+    tooltip.style.top = tooltipBelow ? `${cy + offsetY}px` : '';
+    tooltip.style.bottom = tooltipBelow ? '' : `${vh - cy + offsetY}px`;
+
+    // Hide non-crosshair elements
+    textTooltip.style.display = 'none';
+    selection.style.display = 'none';
+    highlight.style.display = 'none';
   };
 
-  const hide = () => hideAll();
+  const showTextInfo = (cx: number, cy: number, data: TextInspectData) => {
+    // Hide crosshair elements
+    lineV.style.display = 'none';
+    lineH.style.display = 'none';
+    cross.style.display = 'none';
+    tooltip.style.display = 'none';
+    selection.style.display = 'none';
+    highlight.style.display = 'none';
+
+    const lines = [
+      `Font   ${data.fontFamily}`,
+      `Size   ${data.fontSize}`,
+      `Weight ${data.fontWeight}`,
+      `Line   ${data.lineHeight}`,
+      `Color  ${data.color}`,
+      `Track  ${data.letterSpacing}`,
+    ];
+    textTooltip.textContent = lines.join('\n');
+    textTooltip.style.display = 'block';
+
+    // Position near cursor, flipping near edges
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const offsetX = 14;
+    const offsetY = 14;
+
+    const fitsRight = cx + offsetX + 280 < vw;
+    const fitsBelow = cy + offsetY + 120 < vh;
+
+    textTooltip.style.left = fitsRight ? `${cx + offsetX}px` : '';
+    textTooltip.style.right = fitsRight ? '' : `${vw - cx + offsetX}px`;
+    textTooltip.style.top = fitsBelow ? `${cy + offsetY}px` : '';
+    textTooltip.style.bottom = fitsBelow ? '' : `${vh - cy + offsetY}px`;
+  };
+
+  const showSelection = (x1: number, y1: number, x2: number, y2: number) => {
+    const left = Math.min(x1, x2);
+    const top = Math.min(y1, y2);
+    const w = Math.abs(x2 - x1);
+    const h = Math.abs(y2 - y1);
+
+    selection.style.display = 'block';
+    selection.style.left = `${left}px`;
+    selection.style.top = `${top}px`;
+    selection.style.width = `${w}px`;
+    selection.style.height = `${h}px`;
+
+    // Hide everything else during drag
+    lineV.style.display = 'none';
+    lineH.style.display = 'none';
+    cross.style.display = 'none';
+    tooltip.style.display = 'none';
+    textTooltip.style.display = 'none';
+    highlight.style.display = 'none';
+  };
+
+  const showHighlight = (rect: DOMRect) => {
+    highlight.style.display = 'block';
+    highlight.style.left = `${rect.left}px`;
+    highlight.style.top = `${rect.top}px`;
+    highlight.style.width = `${rect.width}px`;
+    highlight.style.height = `${rect.height}px`;
+
+    // Show dimensions centered in highlight
+    tooltip.textContent = `${Math.round(rect.width)}×${Math.round(rect.height)} px`;
+    tooltip.style.display = 'block';
+    tooltip.style.left = `${rect.left + rect.width / 2}px`;
+    tooltip.style.top = `${rect.top + rect.height / 2}px`;
+    tooltip.style.right = '';
+    tooltip.style.bottom = '';
+    tooltip.className = 'kai-measure-tooltip kai-measure-tooltip--centered';
+
+    // Hide everything else
+    lineV.style.display = 'none';
+    lineH.style.display = 'none';
+    cross.style.display = 'none';
+    textTooltip.style.display = 'none';
+    selection.style.display = 'none';
+  };
+
+  const hide = () => {
+    hideAll();
+    tooltip.className = 'kai-measure-tooltip';
+  };
 
   const destroy = () => {
     for (const el of allEls) el.remove();
   };
 
-  return { show, hide, destroy };
+  return { showCrosshair, showTextInfo, showSelection, showHighlight, hide, destroy };
 };

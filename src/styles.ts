@@ -522,138 +522,125 @@ export const styles = `
   color: var(--gray-200);
 }
 
-/* ── Inspector (Alt-inspect mode) ────────────────── */
+/* ── Measurement tool (Alt-inspect mode) ─────────── */
 
-.kai-inspector-content {
+.kai-measure-line {
   position: fixed;
   pointer-events: none;
-  background: oklch(85% 0.08 220 / 0.35);
-  z-index: var(--z-overlay);
-}
-
-.kai-inspector-padding {
-  position: fixed;
-  pointer-events: none;
-  z-index: var(--z-overlay);
-}
-
-.kai-inspector-padding--top,
-.kai-inspector-padding--bottom {
-  background: repeating-linear-gradient(
-    0deg,
-    oklch(77% 0.1 175 / 0.45) 0px,
-    oklch(77% 0.1 175 / 0.45) 2px,
-    oklch(77% 0.1 175 / 0.15) 2px,
-    oklch(77% 0.1 175 / 0.15) 4px
-  );
-}
-
-.kai-inspector-padding--left,
-.kai-inspector-padding--right {
-  background: repeating-linear-gradient(
-    90deg,
-    oklch(77% 0.1 175 / 0.45) 0px,
-    oklch(77% 0.1 175 / 0.45) 2px,
-    oklch(77% 0.1 175 / 0.15) 2px,
-    oklch(77% 0.1 175 / 0.15) 4px
-  );
-}
-
-.kai-inspector-margin {
-  position: fixed;
-  pointer-events: none;
-  z-index: var(--z-overlay);
-  background: repeating-linear-gradient(
-    45deg,
-    oklch(82% 0.12 70 / 0.4) 0px,
-    oklch(82% 0.12 70 / 0.4) 2px,
-    oklch(82% 0.12 70 / 0.12) 2px,
-    oklch(82% 0.12 70 / 0.12) 4px
-  );
-}
-
-.kai-inspector-label {
-  position: fixed;
-  pointer-events: none;
+  background: var(--color-accent);
   z-index: var(--z-tooltip);
-  background: oklch(20% 0 0 / 0.8);
-  color: var(--white);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  line-height: 1;
-  padding: 2px 4px;
-  border-radius: 2px;
-  white-space: nowrap;
-  transform: translate(-50%, -50%);
 }
 
-.kai-inspector-distance-line {
-  position: fixed;
-  pointer-events: none;
-  z-index: var(--z-tooltip);
-  background: oklch(65% 0.25 330);
-}
-
-.kai-inspector-distance-line--vertical {
+.kai-measure-line--v {
   width: 1px;
 }
 
-.kai-inspector-distance-line--vertical::before,
-.kai-inspector-distance-line--vertical::after {
+.kai-measure-line--v::before,
+.kai-measure-line--v::after {
   content: '';
   position: absolute;
   left: -3px;
   width: 7px;
   height: 1px;
-  background: oklch(65% 0.25 330);
+  background: var(--color-accent);
 }
 
-.kai-inspector-distance-line--vertical::before { top: 0; }
-.kai-inspector-distance-line--vertical::after { bottom: 0; }
+.kai-measure-line--v::before { top: 0; }
+.kai-measure-line--v::after { bottom: 0; }
 
-.kai-inspector-distance-line--horizontal {
+.kai-measure-line--h {
   height: 1px;
 }
 
-.kai-inspector-distance-line--horizontal::before,
-.kai-inspector-distance-line--horizontal::after {
+.kai-measure-line--h::before,
+.kai-measure-line--h::after {
   content: '';
   position: absolute;
   top: -3px;
   width: 1px;
   height: 7px;
-  background: oklch(65% 0.25 330);
+  background: var(--color-accent);
 }
 
-.kai-inspector-distance-line--horizontal::before { left: 0; }
-.kai-inspector-distance-line--horizontal::after { right: 0; }
+.kai-measure-line--h::before { left: 0; }
+.kai-measure-line--h::after { right: 0; }
 
-.kai-inspector-distance-label {
+.kai-measure-cross {
   position: fixed;
   pointer-events: none;
+  width: 0;
+  height: 0;
   z-index: var(--z-tooltip);
-  background: oklch(65% 0.25 330);
+}
+
+.kai-measure-cross::before,
+.kai-measure-cross::after {
+  content: '';
+  position: absolute;
+  background: var(--color-accent);
+}
+
+.kai-measure-cross::before {
+  width: 11px;
+  height: 1px;
+  top: 0;
+  left: -5px;
+}
+
+.kai-measure-cross::after {
+  width: 1px;
+  height: 11px;
+  top: -5px;
+  left: 0;
+}
+
+.kai-measure-tooltip {
+  position: fixed;
+  pointer-events: none;
+  background: var(--gray-900);
   color: var(--white);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1;
-  padding: 2px 5px;
-  border-radius: 2px;
+  padding: 4px 8px;
+  border-radius: var(--radius-full);
   white-space: nowrap;
+  z-index: var(--z-tooltip);
+}
+
+.kai-measure-tooltip--centered {
   transform: translate(-50%, -50%);
 }
 
-.kai-inspector-text-info {
+.kai-measure-text-tooltip {
   position: fixed;
   pointer-events: none;
-  z-index: var(--z-tooltip);
-  background: oklch(20% 0 0 / 0.85);
+  background: var(--gray-900);
   color: var(--white);
   font-family: var(--font-mono);
-  font-size: 10px;
-  line-height: 1.5;
-  padding: 6px 8px;
-  border-radius: 3px;
-  white-space: nowrap;
+  font-size: 11px;
+  line-height: 1.6;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  white-space: pre;
+  max-width: 280px;
+  z-index: var(--z-tooltip);
+}
+
+.kai-measure-selection {
+  position: fixed;
+  pointer-events: none;
+  border: 1.5px dashed var(--color-accent);
+  background: hsl(from var(--color-accent) h s l / 5%);
+  z-index: var(--z-overlay);
+}
+
+.kai-measure-highlight {
+  position: fixed;
+  pointer-events: none;
+  border: 2px solid var(--color-accent);
+  background: hsl(from var(--color-accent) h s l / 8%);
+  border-radius: var(--radius-sm);
+  z-index: var(--z-overlay);
 }
 `;

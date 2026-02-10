@@ -3,6 +3,7 @@ import { styles } from './styles.ts';
 import { generateSelector, generatePath } from './core/selector.ts';
 import { getComputedStyles } from './core/styles.ts';
 import { loadSession, saveSession, clearSession, loadFabCorner, saveFabCorner } from './core/session.ts';
+import { computeCrosshair, computeTextInspectData, findLargestEnclosedElement } from './core/measure.ts';
 import { toMarkdown } from './export/markdown.ts';
 import { createOverlay } from './ui/highlight.ts';
 import { createFab } from './ui/fab.ts';
@@ -11,12 +12,20 @@ import { createMarkerManager } from './ui/markers.ts';
 import { createInspector } from './ui/inspector.ts';
 import { showToast } from './ui/toast.ts';
 
+const DRAG_THRESHOLD = 5;
+
 class UIAnnotator extends HTMLElement {
   private shadow: ShadowRoot;
   private annotations: Annotation[] = [];
   private active = false;
   private fabCorner: FabCorner;
   private altHeld = false;
+  private shiftHeld = false;
+  private dragging = false;
+  private dragStart: { x: number; y: number } | null = null;
+  private lastMousePos: { x: number; y: number } = { x: 0, y: 0 };
+  private measureRafId: number | null = null;
+  private highlightLocked = false;
 
   private fab!: ReturnType<typeof createFab>;
   private overlay!: ReturnType<typeof createOverlay>;
@@ -31,9 +40,12 @@ class UIAnnotator extends HTMLElement {
   private handleMouseOut: () => void;
   private handleClick: (e: MouseEvent) => void;
   private handleGlobalKeydown: (e: KeyboardEvent) => void;
-  private handleAltKeydown: (e: KeyboardEvent) => void;
-  private handleAltKeyup: (e: KeyboardEvent) => void;
+  private handleKeydown: (e: KeyboardEvent) => void;
+  private handleKeyup: (e: KeyboardEvent) => void;
   private handleWindowBlur: () => void;
+  private handleMouseMove: (e: MouseEvent) => void;
+  private handleMouseDown: (e: MouseEvent) => void;
+  private handleMouseUp: (e: MouseEvent) => void;
 
   constructor() {
     super();
@@ -95,29 +107,30 @@ class UIAnnotator extends HTMLElement {
       const target = e.target as Element;
       if (target === document.documentElement || target === document.body) return;
       this.hoveredElement = target;
-      if (this.altHeld) {
-        this.overlay.hide();
-        this.inspector.show(target);
-      } else {
-        this.inspector.hide();
+      if (!this.altHeld) {
         this.overlay.show(target);
       }
     };
 
     this.handleMouseOut = () => {
       this.hoveredElement = null;
-      this.overlay.hide();
-      this.inspector.hide();
+      if (!this.altHeld) {
+        this.overlay.hide();
+      }
     };
 
     this.handleClick = (e: MouseEvent) => {
       if (this.isOwnElement(e)) return;
+      if (this.altHeld) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
       e.preventDefault();
       e.stopImmediatePropagation();
       const target = this.hoveredElement;
       if (!target) return;
       this.overlay.hide();
-      this.inspector.hide();
       const markerRect = this.markers.showPreview(target);
       this.openPopover(target, markerRect);
     };
@@ -132,32 +145,148 @@ class UIAnnotator extends HTMLElement {
       }
     };
 
-    this.handleAltKeydown = (e: KeyboardEvent) => {
-      if (e.key !== 'Alt') return;
-      if (this.altHeld) return;
-      this.altHeld = true;
-      if (this.hoveredElement) {
+    this.handleKeydown = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') {
+        if (this.altHeld) return;
+        this.altHeld = true;
         this.overlay.hide();
-        this.inspector.show(this.hoveredElement);
+        document.body.style.cursor = 'crosshair';
+        this.scheduleMeasureUpdate();
+      }
+      if (e.key === 'Shift') {
+        this.shiftHeld = true;
+        if (this.altHeld && !this.dragging && !this.highlightLocked) {
+          this.scheduleMeasureUpdate();
+        }
       }
     };
 
-    this.handleAltKeyup = (e: KeyboardEvent) => {
-      if (e.key !== 'Alt') return;
-      this.altHeld = false;
-      this.inspector.hide();
-      if (this.hoveredElement) {
-        this.overlay.show(this.hoveredElement);
+    this.handleKeyup = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') {
+        this.exitMeasureMode();
+      }
+      if (e.key === 'Shift') {
+        this.shiftHeld = false;
+        if (this.altHeld && !this.dragging && !this.highlightLocked) {
+          this.scheduleMeasureUpdate();
+        }
       }
     };
 
     this.handleWindowBlur = () => {
-      this.altHeld = false;
-      this.inspector.hide();
-      if (this.hoveredElement) {
-        this.overlay.show(this.hoveredElement);
+      if (this.altHeld) {
+        this.exitMeasureMode();
       }
     };
+
+    this.handleMouseMove = (e: MouseEvent) => {
+      this.lastMousePos = { x: e.clientX, y: e.clientY };
+
+      if (!this.altHeld) return;
+
+      if (this.dragStart && !this.dragging) {
+        const dx = e.clientX - this.dragStart.x;
+        const dy = e.clientY - this.dragStart.y;
+        if (Math.sqrt(dx * dx + dy * dy) >= DRAG_THRESHOLD) {
+          this.dragging = true;
+          this.highlightLocked = false;
+        }
+      }
+
+      this.scheduleMeasureUpdate();
+    };
+
+    this.handleMouseDown = (e: MouseEvent) => {
+      if (!this.altHeld) return;
+      if (e.button !== 0) return;
+      e.preventDefault();
+      this.dragStart = { x: e.clientX, y: e.clientY };
+      this.dragging = false;
+      this.highlightLocked = false;
+    };
+
+    this.handleMouseUp = (e: MouseEvent) => {
+      if (!this.altHeld) return;
+      if (e.button !== 0) return;
+
+      if (this.dragging && this.dragStart) {
+        const x1 = this.dragStart.x;
+        const y1 = this.dragStart.y;
+        const x2 = e.clientX;
+        const y2 = e.clientY;
+
+        const selectionRect = new DOMRect(
+          Math.min(x1, x2),
+          Math.min(y1, y2),
+          Math.abs(x2 - x1),
+          Math.abs(y2 - y1),
+        );
+
+        const largest = findLargestEnclosedElement(selectionRect, this);
+        if (largest) {
+          this.inspector.showHighlight(largest.getBoundingClientRect());
+          this.highlightLocked = true;
+        } else {
+          this.inspector.hide();
+        }
+      }
+
+      this.dragStart = null;
+      this.dragging = false;
+    };
+  }
+
+  private exitMeasureMode() {
+    this.altHeld = false;
+    this.shiftHeld = false;
+    this.dragging = false;
+    this.dragStart = null;
+    this.highlightLocked = false;
+    document.body.style.cursor = '';
+    this.inspector.hide();
+    if (this.measureRafId !== null) {
+      cancelAnimationFrame(this.measureRafId);
+      this.measureRafId = null;
+    }
+    if (this.hoveredElement) {
+      this.overlay.show(this.hoveredElement);
+    }
+  }
+
+  private scheduleMeasureUpdate() {
+    if (this.measureRafId !== null) return;
+    this.measureRafId = requestAnimationFrame(() => {
+      this.measureRafId = null;
+      this.updateMeasure();
+    });
+  }
+
+  private updateMeasure() {
+    if (!this.altHeld) return;
+
+    if (this.highlightLocked) return;
+
+    const { x: cx, y: cy } = this.lastMousePos;
+
+    if (this.dragging && this.dragStart) {
+      this.inspector.showSelection(this.dragStart.x, this.dragStart.y, cx, cy);
+      return;
+    }
+
+    if (this.shiftHeld) {
+      const el = document.elementFromPoint(cx, cy);
+      if (el && el !== this && el !== document.documentElement && el !== document.body) {
+        const textData = computeTextInspectData(el);
+        if (textData) {
+          this.inspector.showTextInfo(cx, cy, textData);
+          return;
+        }
+      }
+      // Fall through to crosshair if not hovering text
+    }
+
+    const data = computeCrosshair(cx, cy, this);
+    this.inspector.showCrosshair(data);
   }
 
   connectedCallback() {
@@ -189,8 +318,11 @@ class UIAnnotator extends HTMLElement {
     document.addEventListener('mouseover', this.handleMouseOver, true);
     document.addEventListener('mouseout', this.handleMouseOut, true);
     document.addEventListener('click', this.handleClick, true);
-    document.addEventListener('keydown', this.handleAltKeydown);
-    document.addEventListener('keyup', this.handleAltKeyup);
+    document.addEventListener('keydown', this.handleKeydown);
+    document.addEventListener('keyup', this.handleKeyup);
+    document.addEventListener('mousemove', this.handleMouseMove, true);
+    document.addEventListener('mousedown', this.handleMouseDown, true);
+    document.addEventListener('mouseup', this.handleMouseUp, true);
     window.addEventListener('blur', this.handleWindowBlur);
   }
 
@@ -198,19 +330,30 @@ class UIAnnotator extends HTMLElement {
     this.active = false;
     this.fab.setActive(false);
     this.markers.setActive(false);
-    this.altHeld = false;
+
+    if (this.altHeld) {
+      this.exitMeasureMode();
+    }
 
     document.removeEventListener('mouseover', this.handleMouseOver, true);
     document.removeEventListener('mouseout', this.handleMouseOut, true);
     document.removeEventListener('click', this.handleClick, true);
-    document.removeEventListener('keydown', this.handleAltKeydown);
-    document.removeEventListener('keyup', this.handleAltKeyup);
+    document.removeEventListener('keydown', this.handleKeydown);
+    document.removeEventListener('keyup', this.handleKeyup);
+    document.removeEventListener('mousemove', this.handleMouseMove, true);
+    document.removeEventListener('mousedown', this.handleMouseDown, true);
+    document.removeEventListener('mouseup', this.handleMouseUp, true);
     window.removeEventListener('blur', this.handleWindowBlur);
 
     this.overlay.hide();
     this.inspector.hide();
     this.hoveredElement = null;
     this.closePopover();
+
+    if (this.measureRafId !== null) {
+      cancelAnimationFrame(this.measureRafId);
+      this.measureRafId = null;
+    }
   }
 
   private isOwnElement(e: MouseEvent): boolean {

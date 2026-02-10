@@ -99,13 +99,45 @@ export const createFab = (
 
   const copyBtn = document.createElement('button');
   copyBtn.className = 'kai-fab-action';
-  copyBtn.setAttribute('aria-label', 'Copy Markdown');
+  copyBtn.setAttribute('aria-label', 'Copy as Markdown');
   setIcon(copyBtn, iconCopy);
 
   const clearBtn = document.createElement('button');
   clearBtn.className = 'kai-fab-action';
-  clearBtn.setAttribute('aria-label', 'Clear all annotations');
+  clearBtn.setAttribute('aria-label', 'Clear all');
   setIcon(clearBtn, iconTrash);
+
+  // ── Tooltips for action buttons ──
+  const tooltip = document.createElement('div');
+  tooltip.className = 'kai-tooltip';
+  tooltip.style.display = 'none';
+  tooltip.style.fontFamily = 'var(--font-sans)';
+  shadowRoot.appendChild(tooltip);
+
+  const showTooltip = (btn: HTMLButtonElement, label: string) => {
+    tooltip.textContent = label;
+    tooltip.style.display = '';
+    const rect = btn.getBoundingClientRect();
+    const isTop = corner === 'top-left' || corner === 'top-right';
+    tooltip.style.left = `${rect.left + rect.width / 2}px`;
+    tooltip.style.transform = 'translateX(-50%)';
+    if (isTop) {
+      tooltip.style.top = `${rect.bottom + 6}px`;
+      tooltip.style.bottom = 'auto';
+    } else {
+      tooltip.style.top = 'auto';
+      tooltip.style.bottom = `${window.innerHeight - rect.top + 6}px`;
+    }
+  };
+
+  const hideTooltip = () => {
+    tooltip.style.display = 'none';
+  };
+
+  copyBtn.addEventListener('mouseenter', () => showTooltip(copyBtn, 'Copy as Markdown'));
+  copyBtn.addEventListener('mouseleave', hideTooltip);
+  clearBtn.addEventListener('mouseenter', () => showTooltip(clearBtn, 'Clear all'));
+  clearBtn.addEventListener('mouseleave', hideTooltip);
 
   actions.appendChild(copyBtn);
   actions.appendChild(clearBtn);
@@ -298,6 +330,7 @@ export const createFab = (
   };
 
   const animateActionsOut = () => {
+    hideTooltip();
     actionAnims.forEach(a => a.cancel());
     actionAnims = [];
 
@@ -343,6 +376,7 @@ export const createFab = (
   const destroy = () => {
     fab.remove();
     actions.remove();
+    tooltip.remove();
   };
 
   return { updateBadge, setActive, updateActionStates, destroy };

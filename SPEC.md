@@ -102,29 +102,20 @@ type ExportPayload = {
 Light/Dark, very clean & minimal. Inspired by Dieter Rams and iA Writer.
 
 ### Typography
-- **UI text**: `-apple-system, BlinkMacSystemFont, system-ui, sans-serif`
-- **Code / selectors**: `ui-monospace, SFMono-Regular, Menlo, monospace`
+- **UI text**: System sans-serif stack
+- **Code / selectors**: System monospace stack
 
 ### Border radius
-- Small elements: `6px`
-- Inputs: `8px`
-- Panels / cards: `12px`
+Three tiers: small, medium, and large — applied consistently by element role.
 
 ### Animations
-Subtle — `0.15s ease` transitions on hover/focus, `0.2s` for panel open/close transforms. No spring physics, no bounce.
+Subtle transitions on hover/focus, slightly longer for panel open/close transforms. No spring physics, no bounce.
 
 ### FAB
-44×44px, bottom-right corner, fixed position. Shows annotation count badge when > 0.
+Touch-target-sized button, corner-positioned, fixed. Shows annotation count badge when > 0.
 
 ### Z-index strategy
-| Element | z-index |
-|---|---|
-| Overlay | `2147483643` |
-| Tooltip | `2147483644` |
-| Shadow DOM host | `2147483645` |
-| FAB | `2147483646` |
-
-Always above everything on the host page.
+All kai UI layers sit at the top of the stacking context, above any host page content. Layers are ordered: overlay < tooltip < shadow DOM host < FAB.
 
 </section>
 

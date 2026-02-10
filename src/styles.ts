@@ -357,7 +357,7 @@ export const styles = `
   background: var(--bg-3);
   color: var(--text-tertiary);
   border: 1px solid var(--border-3);
-  padding: 0 8px;
+  padding: 0 14px;
   min-height: 36px;
 }
 
@@ -490,7 +490,7 @@ export const styles = `
 .kai-toast {
   position: fixed;
   color: var(--white);
-  background: var(--color-accent);
+  background: var(--gray-900);
   font-family: var(--font-sans);
   font-size: 13px;
   padding: 10px 16px;

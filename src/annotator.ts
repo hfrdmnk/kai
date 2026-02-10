@@ -141,6 +141,7 @@ class UIAnnotator extends HTMLElement {
   private activate() {
     this.active = true;
     this.fab.setActive(true);
+    this.markers.setActive(true);
 
     document.addEventListener('mouseover', this.handleMouseOver, true);
     document.addEventListener('mouseout', this.handleMouseOut, true);
@@ -150,6 +151,7 @@ class UIAnnotator extends HTMLElement {
   private deactivate() {
     this.active = false;
     this.fab.setActive(false);
+    this.markers.setActive(false);
 
     document.removeEventListener('mouseover', this.handleMouseOver, true);
     document.removeEventListener('mouseout', this.handleMouseOut, true);

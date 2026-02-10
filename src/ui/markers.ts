@@ -15,6 +15,7 @@ export const createMarkerManager = (
   let previewMarker: HTMLElement | null = null;
   let previewBox: HTMLElement | null = null;
   let previewTarget: Element | null = null;
+  let isActive = true;
 
   const reposition = () => {
     for (const annotation of currentAnnotations) {
@@ -87,7 +88,7 @@ export const createMarkerManager = (
       let marker = markerMap.get(annotation.id);
       if (!marker) {
         marker = document.createElement('div');
-        marker.className = 'kai-marker';
+        marker.className = isActive ? 'kai-marker' : 'kai-marker kai-marker--inactive';
         marker.setAttribute('role', 'button');
         marker.setAttribute('tabindex', '0');
         marker.addEventListener('click', (e) => {
@@ -170,5 +171,12 @@ export const createMarkerManager = (
 
   rafId = requestAnimationFrame(reposition);
 
-  return { update, showPreview, clearPreview, showBox, hideBox, destroy };
+  const setActive = (active: boolean) => {
+    isActive = active;
+    for (const marker of markerMap.values()) {
+      marker.classList.toggle('kai-marker--inactive', !active);
+    }
+  };
+
+  return { update, showPreview, clearPreview, showBox, hideBox, setActive, destroy };
 };

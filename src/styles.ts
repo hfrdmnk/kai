@@ -39,7 +39,7 @@ export const styles = `
   --text-tertiary: var(--gray-500);
 
   --z-overlay: 2147483643;
-  --z-tooltip: 2147483644;
+  --z-tooltip: 2147483647;
   --z-host: 2147483645;
   --z-fab: 2147483646;
 
@@ -111,6 +111,7 @@ export const styles = `
 .kai-fab--active:hover {
   background: var(--color-accent);
   color: var(--white);
+  border-color: var(--color-accent);
 }
 
 .kai-fab--active .kai-fab-badge {
@@ -400,6 +401,13 @@ export const styles = `
   cursor: pointer;
   z-index: var(--z-tooltip);
   border: none;
+}
+
+.kai-marker--inactive {
+  background: var(--gray-400);
+  pointer-events: none;
+  cursor: default;
+  opacity: 0.5;
 }
 
 /* ── Annotation Boxes ───────────────────────────── */

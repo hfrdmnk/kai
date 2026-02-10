@@ -13,14 +13,9 @@ export const styles = `
   --gray-900: oklch(21% 0.034 264.665);
   --gray-950: oklch(13% 0.028 261.692);
 
-  --rose-50: oklch(96.9% 0.015 12.422);
-  --rose-100: oklch(94.1% 0.03 12.58);
-  --rose-200: oklch(89.2% 0.058 10.001);
-  --rose-600: oklch(58.6% 0.253 17.585);
-  --rose-900: oklch(41% 0.159 10.272);
-
   --color-accent: oklch(0.6927 0.2513 38.8022);
   --color-accent-hover: oklch(0.6405 0.2241 38.8022);
+  --color-danger: oklch(0.6338 0.2516 24.17);
 
   --font-sans: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -47,6 +42,25 @@ export const styles = `
   --z-tooltip: 2147483644;
   --z-host: 2147483645;
   --z-fab: 2147483646;
+
+  --shadow-2xs: 0 1px rgb(0 0 0 / 0.05);
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+
+  --inset-shadow-2xs: inset 0 1px rgb(0 0 0 / 0.05);
+  --inset-shadow-xs: inset 0 1px 1px rgb(0 0 0 / 0.05);
+  --inset-shadow-sm: inset 0 2px 4px rgb(0 0 0 / 0.05);
+
+  --drop-shadow-xs: 0 1px 1px rgb(0 0 0 / 0.05);
+  --drop-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.15);
+  --drop-shadow-md: 0 3px 3px rgb(0 0 0 / 0.12);
+  --drop-shadow-lg: 0 4px 4px rgb(0 0 0 / 0.15);
+  --drop-shadow-xl: 0 9px 7px rgb(0 0 0 / 0.1);
+  --drop-shadow-2xl: 0 25px 25px rgb(0 0 0 / 0.15);
 
   position: fixed;
   width: 0;
@@ -86,6 +100,7 @@ export const styles = `
   cursor: grab;
   user-select: none;
   transition: color 0.15s ease, background 0.15s ease;
+  box-shadow: var(--shadow-sm);
 }
 
 .kai-fab:hover {
@@ -187,6 +202,7 @@ export const styles = `
   padding: 4px;
   transition: background 0.15s ease, color 0.15s ease;
   will-change: transform, opacity;
+  box-shadow: var(--shadow-xs);
 }
 
 .kai-fab-action:hover {
@@ -231,6 +247,7 @@ export const styles = `
   border-radius: var(--radius-sm);
   white-space: nowrap;
   z-index: var(--z-tooltip);
+  box-shadow: var(--shadow-sm);
 }
 
 /* ── Popover ─────────────────────────────────────── */
@@ -240,7 +257,8 @@ export const styles = `
   width: 320px;
   background: var(--bg-1);
   color: var(--text-primary);
-  border: 1px solid var(--border-1);
+  border: 1px solid var(--border-2);
+  box-shadow: var(--shadow-md);
   z-index: var(--z-host);
   pointer-events: auto;
   font-family: var(--font-sans);
@@ -348,19 +366,6 @@ export const styles = `
   color: var(--text-primary);
 }
 
-.kai-btn--danger {
-  background: var(--rose-50);
-  color: var(--rose-600);
-  border: 1px solid var(--rose-200);
-  padding: 0 8px;
-  min-height: 36px;
-}
-
-.kai-btn--danger:hover {
-  background: var(--rose-100);
-  color: var(--rose-900);
-}
-
 .kai-btn--icon {
   width: 36px;
   height: 36px;
@@ -402,8 +407,8 @@ export const styles = `
 .kai-annotation-box {
   position: fixed;
   pointer-events: none;
-  border: 1.5px dashed var(--color-accent);
-  background:  hsl(from var(--color-accent) h s l / 10%);
+  border: 1.5px dashed var(--gray-300);
+  background: rgb(0 0 0 / 0.02);
   z-index: var(--z-overlay);
   border-radius: var(--radius-sm);
 }
@@ -414,6 +419,7 @@ export const styles = `
   position: fixed;
   background: var(--bg-1);
   border: 1px solid var(--border-1);
+  box-shadow: var(--shadow-md);
   border-radius: var(--radius-sm);
   max-height: 200px;
   overflow-y: auto;
@@ -489,6 +495,7 @@ export const styles = `
   font-size: 13px;
   padding: 10px 16px;
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
   z-index: var(--z-fab);
   pointer-events: none;
   opacity: 0;

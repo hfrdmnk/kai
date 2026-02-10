@@ -1,5 +1,5 @@
 import type { FabCorner } from '../types.ts';
-import { iconKai, iconCopy, iconTrash } from '../icons.ts';
+import { iconKai, iconCopy, iconTrash, iconCheck } from '../icons.ts';
 
 const parser = new DOMParser();
 
@@ -233,10 +233,31 @@ export const createFab = (
     opts.onCopyMarkdown();
   });
 
+  let clearArmed = false;
+  let clearTimer: ReturnType<typeof setTimeout> | null = null;
+  const resetClear = () => {
+    clearArmed = false;
+    clearBtn.replaceChildren();
+    setIcon(clearBtn, iconTrash);
+    clearBtn.style.background = '';
+    clearBtn.style.color = '';
+    clearBtn.style.borderColor = '';
+    clearTimer = null;
+  };
   clearBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (confirm('Clear all annotations?')) {
+    if (clearArmed) {
+      if (clearTimer) clearTimeout(clearTimer);
+      resetClear();
       opts.onClearAll();
+    } else {
+      clearArmed = true;
+      clearBtn.replaceChildren();
+      setIcon(clearBtn, iconCheck);
+      clearBtn.style.background = 'var(--color-danger)';
+      clearBtn.style.color = 'var(--white)';
+      clearBtn.style.borderColor = 'var(--color-danger)';
+      clearTimer = setTimeout(resetClear, 3000);
     }
   });
 

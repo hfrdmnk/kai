@@ -78,9 +78,9 @@ export const createPopover = (
   textarea.setAttribute('aria-label', 'Annotation comment');
   if (isEdit) textarea.value = opts.existingComment!;
 
+  body.appendChild(textarea);
   body.appendChild(pathEl);
   body.appendChild(descEl);
-  body.appendChild(textarea);
 
   // Footer
   const footer = document.createElement('div');
@@ -94,11 +94,30 @@ export const createPopover = (
 
   if (isEdit && opts.onDelete) {
     const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'kai-btn kai-btn--danger';
+    deleteBtn.className = 'kai-btn kai-btn--secondary';
     deleteBtn.textContent = 'Delete';
+
+    let deleteArmed = false;
+    let deleteTimer: ReturnType<typeof setTimeout> | null = null;
+    const resetDelete = () => {
+      deleteArmed = false;
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.style.background = '';
+      deleteBtn.style.color = '';
+      deleteBtn.style.borderColor = '';
+      deleteTimer = null;
+    };
     deleteBtn.addEventListener('click', () => {
-      if (confirm('Delete this annotation?')) {
+      if (deleteArmed) {
+        if (deleteTimer) clearTimeout(deleteTimer);
         opts.onDelete!();
+      } else {
+        deleteArmed = true;
+        deleteBtn.textContent = 'Sure?';
+        deleteBtn.style.background = 'var(--color-danger)';
+        deleteBtn.style.color = 'var(--white)';
+        deleteBtn.style.borderColor = 'var(--color-danger)';
+        deleteTimer = setTimeout(resetDelete, 3000);
       }
     });
 

@@ -20,6 +20,7 @@ class UIAnnotator extends HTMLElement {
   private overlay!: ReturnType<typeof createOverlay>;
   private markers!: ReturnType<typeof createMarkerManager>;
   private activePopover: ReturnType<typeof createPopover> | null = null;
+  private activePopoverAnnotationId: string | null = null;
 
   private hoveredElement: Element | null = null;
 
@@ -62,9 +63,18 @@ class UIAnnotator extends HTMLElement {
     });
 
     this.overlay = createOverlay(this.shadow);
-    this.markers = createMarkerManager(this.shadow, (annotation, markerRect) => {
-      this.openEditPopover(annotation, markerRect);
-    });
+    this.markers = createMarkerManager(
+      this.shadow,
+      (annotation, markerRect) => {
+        this.openEditPopover(annotation, markerRect);
+      },
+      (id) => this.markers.showBox(id),
+      (id) => {
+        if (this.activePopoverAnnotationId !== id) {
+          this.markers.hideBox(id);
+        }
+      },
+    );
 
     if (this.annotations.length) {
       this.markers.update(this.annotations);
@@ -194,6 +204,8 @@ class UIAnnotator extends HTMLElement {
 
   private openEditPopover(annotation: Annotation, markerRect?: DOMRect) {
     this.closePopover();
+    this.activePopoverAnnotationId = annotation.id;
+    this.markers.showBox(annotation.id);
 
     const target = document.querySelector(annotation.selector);
     if (!target) return;
@@ -223,6 +235,10 @@ class UIAnnotator extends HTMLElement {
   }
 
   private closePopover() {
+    if (this.activePopoverAnnotationId) {
+      this.markers.hideBox(this.activePopoverAnnotationId);
+      this.activePopoverAnnotationId = null;
+    }
     this.activePopover?.destroy();
     this.activePopover = null;
   }

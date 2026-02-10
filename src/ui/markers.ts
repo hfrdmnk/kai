@@ -3,9 +3,12 @@ import type { Annotation } from '../types.ts';
 export const createMarkerManager = (
   shadowRoot: ShadowRoot,
   onMarkerClick: (annotation: Annotation, markerRect: DOMRect) => void,
+  onMarkerEnter?: (annotationId: string) => void,
+  onMarkerLeave?: (annotationId: string) => void,
 ) => {
   const markerMap = new Map<string, HTMLElement>();
   const boxMap = new Map<string, HTMLElement>();
+  const visibleBoxes = new Set<string>();
   let currentAnnotations: Annotation[] = [];
   let rafId = 0;
 
@@ -33,12 +36,16 @@ export const createMarkerManager = (
 
       const box = boxMap.get(annotation.id);
       if (box) {
-        const gap = 4;
-        box.style.display = 'block';
-        box.style.top = `${rect.top - gap}px`;
-        box.style.left = `${rect.left - gap}px`;
-        box.style.width = `${rect.width + gap * 2}px`;
-        box.style.height = `${rect.height + gap * 2}px`;
+        if (!visibleBoxes.has(annotation.id)) {
+          box.style.display = 'none';
+        } else {
+          const gap = 4;
+          box.style.display = 'block';
+          box.style.top = `${rect.top - gap}px`;
+          box.style.left = `${rect.left - gap}px`;
+          box.style.width = `${rect.width + gap * 2}px`;
+          box.style.height = `${rect.height + gap * 2}px`;
+        }
       }
     }
 
@@ -88,6 +95,8 @@ export const createMarkerManager = (
           const el = e.currentTarget as HTMLElement;
           onMarkerClick(annotation, el.getBoundingClientRect());
         });
+        marker.addEventListener('mouseenter', () => onMarkerEnter?.(annotation.id));
+        marker.addEventListener('mouseleave', () => onMarkerLeave?.(annotation.id));
         shadowRoot.appendChild(marker);
         markerMap.set(annotation.id, marker);
       }
@@ -142,6 +151,14 @@ export const createMarkerManager = (
     return new DOMRect(rect.right - 8, rect.top - 8, 22, 22);
   };
 
+  const showBox = (id: string) => {
+    visibleBoxes.add(id);
+  };
+
+  const hideBox = (id: string) => {
+    visibleBoxes.delete(id);
+  };
+
   const destroy = () => {
     cancelAnimationFrame(rafId);
     clearPreview();
@@ -153,5 +170,5 @@ export const createMarkerManager = (
 
   rafId = requestAnimationFrame(reposition);
 
-  return { update, showPreview, clearPreview, destroy };
+  return { update, showPreview, clearPreview, showBox, hideBox, destroy };
 };

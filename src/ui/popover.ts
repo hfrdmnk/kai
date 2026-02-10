@@ -94,16 +94,15 @@ export const createPopover = (
 
   if (isEdit && opts.onDelete) {
     const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'kai-btn kai-btn--ghost';
+    deleteBtn.className = 'kai-btn kai-btn--danger';
     deleteBtn.textContent = 'Delete';
-    deleteBtn.style.color = 'oklch(0.577 0.245 27.325)';
     deleteBtn.addEventListener('click', opts.onDelete);
 
     const spacer = document.createElement('div');
     spacer.style.flex = '1';
 
     const cancelBtn = document.createElement('button');
-    cancelBtn.className = 'kai-btn kai-btn--ghost';
+    cancelBtn.className = 'kai-btn kai-btn--secondary';
     cancelBtn.textContent = 'Cancel';
     cancelBtn.addEventListener('click', opts.onClose);
 
@@ -118,7 +117,7 @@ export const createPopover = (
     footer.appendChild(saveBtn);
   } else {
     const cancelBtn = document.createElement('button');
-    cancelBtn.className = 'kai-btn kai-btn--ghost';
+    cancelBtn.className = 'kai-btn kai-btn--secondary';
     cancelBtn.textContent = 'Cancel';
     cancelBtn.addEventListener('click', opts.onClose);
 

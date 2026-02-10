@@ -1,5 +1,6 @@
 export const styles = `
 :host {
+  --white: oklch(100% 0 0);
   --gray-50: oklch(98.5% 0.002 247.839);
   --gray-100: oklch(96.7% 0.003 264.542);
   --gray-200: oklch(92.8% 0.006 264.531);
@@ -12,11 +13,34 @@ export const styles = `
   --gray-900: oklch(21% 0.034 264.665);
   --gray-950: oklch(13% 0.028 261.692);
 
+  --rose-50: oklch(96.9% 0.015 12.422);
+  --rose-100: oklch(94.1% 0.03 12.58);
+  --rose-600: oklch(58.6% 0.253 17.585);
+  --rose-900: oklch(41% 0.159 10.272);
+
   --color-accent: oklch(0.6927 0.2513 38.8022);
   --color-accent-hover: oklch(0.6405 0.2241 38.8022);
 
   --font-sans: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-full: 9999px;
+
+  --bg-1: var(--white);
+  --bg-2: var(--gray-50);
+  --bg-3: var(--gray-100);
+  --bg-4: var(--gray-200);
+
+  --border-1: var(--gray-50);
+  --border-2: var(--gray-100);
+  --border-3: var(--gray-200);
+  --border-4: var(--gray-300);
+
+  --text-primary: var(--gray-900);
+  --text-secondary: var(--gray-600);
+  --text-tertiary: var(--gray-500);
 
   --z-overlay: 2147483643;
   --z-tooltip: 2147483644;
@@ -47,8 +71,8 @@ export const styles = `
   position: fixed;
   width: 44px;
   height: 44px;
-  border: 1px solid var(--gray-100);
-  background: white;
+  border: 1px solid var(--border-1);
+  background: var(--bg-1);
   color: var(--gray-700);
   display: flex;
   align-items: center;
@@ -56,7 +80,7 @@ export const styles = `
   z-index: var(--z-fab);
   pointer-events: auto;
   font-family: var(--font-sans);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   padding: 0;
   cursor: grab;
   user-select: none;
@@ -64,17 +88,17 @@ export const styles = `
 }
 
 .kai-fab:hover {
-  color: var(--gray-900);
+  color: var(--text-primary);
 }
 
 .kai-fab--active,
 .kai-fab--active:hover {
   background: var(--color-accent);
-  color: hsl(0, 0%, 100%);
+  color: var(--white);
 }
 
 .kai-fab--active .kai-fab-badge {
-  background: hsl(0, 0%, 100%);
+  background: var(--white);
   color: var(--color-accent);
 }
 
@@ -97,7 +121,7 @@ export const styles = `
   min-width: 18px;
   height: 18px;
   background: var(--color-accent);
-  color: hsl(0, 0%, 100%);
+  color: var(--white);
   font-size: 12px;
   font-weight: 600;
   font-family: var(--font-sans);
@@ -106,7 +130,7 @@ export const styles = `
   justify-content: center;
   padding: 0 4px;
   line-height: 1;
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
 }
 
 /* Badge position per corner — centered on the inward corner point, 2px outward gap */
@@ -151,22 +175,22 @@ export const styles = `
 .kai-fab-action {
   width: 32px;
   height: 32px;
-  border: 1px solid var(--gray-100);
-  background: white;
-  color: var(--gray-600);
+  border: 1px solid var(--border-2);
+  background: var(--bg-2);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   padding: 4px;
   transition: background 0.15s ease, color 0.15s ease;
   will-change: transform, opacity;
 }
 
 .kai-fab-action:hover {
-  background: var(--gray-50);
-  color: var(--gray-900);
+  background: var(--bg-3);
+  color: var(--text-primary);
 }
 
 .kai-fab-action:disabled {
@@ -187,7 +211,7 @@ export const styles = `
   pointer-events: none;
   border: 1.5px dashed var(--color-accent);
   background: hsl(from var(--color-accent) h s l / 5%);
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
   z-index: var(--z-overlay);
   transition: all 0.08s ease;
 }
@@ -198,12 +222,12 @@ export const styles = `
   position: fixed;
   pointer-events: none;
   background: var(--gray-900);
-  color: white;
+  color: var(--white);
   font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1;
   padding: 4px 8px;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
   white-space: nowrap;
   z-index: var(--z-tooltip);
 }
@@ -213,13 +237,13 @@ export const styles = `
 .kai-popover {
   position: fixed;
   width: 320px;
-  background: hsl(0, 0%, 100%);
-  color: var(--gray-900);
-  border: 1px solid var(--gray-100);
+  background: var(--bg-1);
+  color: var(--text-primary);
+  border: 1px solid var(--border-1);
   z-index: var(--z-host);
   pointer-events: auto;
   font-family: var(--font-sans);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -235,14 +259,14 @@ export const styles = `
 .kai-popover-path {
   font-family: var(--font-mono);
   font-size: 12px;
-  color: var(--gray-500);
+  color: var(--text-tertiary);
   line-height: 1.5;
   word-break: break-all;
 }
 
 .kai-popover-desc {
   font-size: 12px;
-  color: var(--gray-600);
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -251,15 +275,15 @@ export const styles = `
 .kai-popover-textarea {
   width: 100%;
   min-height: 72px;
-  border: 1px solid var(--gray-100);
-  background: var(--gray-50);
+  border: 1px solid var(--border-2);
+  background: var(--bg-2);
   color: var(--gray-900);
   padding: 10px 12px;
   font-family: var(--font-sans);
   font-size: 13px;
   resize: vertical;
   line-height: 1.5;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
   transition: border-color 0.15s ease;
 }
 
@@ -291,7 +315,7 @@ export const styles = `
   min-height: 36px;
   padding: 0 14px;
   border: none;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 500;
@@ -302,7 +326,7 @@ export const styles = `
 
 .kai-btn--primary {
   background: var(--color-accent);
-  color: hsl(0, 0%, 100%);
+  color: var(--white);
   font-weight: 600;
 }
 
@@ -310,16 +334,29 @@ export const styles = `
   background: var(--color-accent-hover);
 }
 
-.kai-btn--ghost {
-  background: var(--gray-100);
-  color: var(--gray-500);
+.kai-btn--secondary {
+  background: var(--bg-3);
+  color: var(--text-tertiary);
+  border: 1px solid var(--border-3);
   padding: 0 8px;
   min-height: 36px;
 }
 
-.kai-btn--ghost:hover {
-  background: var(--gray-200);
-  color: var(--gray-900);
+.kai-btn--secondary:hover {
+  background: var(--bg-4);
+  color: var(--text-primary);
+}
+
+.kai-btn--danger {
+  background: var(--rose-50);
+  color: var(--rose-600);
+  padding: 0 8px;
+  min-height: 36px;
+}
+
+.kai-btn--danger:hover {
+  background: var(--rose-100);
+  color: var(--rose-900);
 }
 
 .kai-btn--icon {
@@ -327,13 +364,13 @@ export const styles = `
   height: 36px;
   min-height: 36px;
   padding: 0;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--gray-500);
+  color: var(--text-tertiary);
 }
 
 .kai-btn--icon:hover {
-  background: var(--gray-100);
+  background: var(--bg-3);
   color: var(--gray-700);
 }
 
@@ -345,7 +382,7 @@ export const styles = `
   height: 22px;
   border-radius: 9999px 9999px 9999px 4px;
   background: var(--color-accent);
-  color: hsl(0, 0%, 100%);
+  color: var(--white);
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 600;
@@ -366,16 +403,16 @@ export const styles = `
   border: 1.5px dashed var(--color-accent);
   background:  hsl(from var(--color-accent) h s l / 10%);
   z-index: var(--z-overlay);
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
 }
 
 /* ── Autocomplete ────────────────────────────────── */
 
 .kai-autocomplete {
   position: fixed;
-  background: white;
-  border: 1px solid var(--gray-100);
-  border-radius: 0.25rem;
+  background: var(--bg-1);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-sm);
   max-height: 200px;
   overflow-y: auto;
   z-index: var(--z-fab);
@@ -392,12 +429,12 @@ export const styles = `
   padding: 6px 10px;
   cursor: pointer;
   transition: background 0.08s ease;
-  color: var(--gray-900);
+  color: var(--text-primary);
 }
 
 .kai-autocomplete-item:hover,
 .kai-autocomplete-item[aria-selected="true"] {
-  background: var(--gray-50);
+  background: var(--bg-2);
 }
 
 .kai-autocomplete-item-name {
@@ -410,7 +447,7 @@ export const styles = `
 }
 
 .kai-autocomplete-item-value {
-  color: var(--gray-500);
+  color: var(--text-tertiary);
   font-size: 12px;
   max-width: 100px;
   overflow: hidden;
@@ -421,8 +458,8 @@ export const styles = `
 .kai-autocomplete-swatch {
   width: 12px;
   height: 12px;
-  border-radius: 0.25rem;
-  border: 1px solid var(--gray-100);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-2);
   flex-shrink: 0;
 }
 
@@ -432,25 +469,24 @@ export const styles = `
   gap: 6px;
   padding: 6px 10px;
   cursor: pointer;
-  color: var(--gray-600);
+  color: var(--text-secondary);
 }
 
 .kai-autocomplete-rem:hover,
 .kai-autocomplete-rem[aria-selected="true"] {
-  background: var(--gray-50);
+  background: var(--bg-2);
 }
 
 /* ── Toast ───────────────────────────────────────── */
 
 .kai-toast {
   position: fixed;
-  background: white;
-  color: hsl(0, 0%, 100%);
+  color: var(--white);
   background: var(--color-accent);
   font-family: var(--font-sans);
   font-size: 13px;
   padding: 10px 16px;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-md);
   z-index: var(--z-fab);
   pointer-events: none;
   opacity: 0;
@@ -474,7 +510,7 @@ export const styles = `
 /* ── Syntax highlighting ─────────────────────────── */
 
 .kai-style-prop {
-  color: var(--gray-500);
+  color: var(--text-tertiary);
 }
 
 .kai-style-value {

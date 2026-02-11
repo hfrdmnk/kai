@@ -157,6 +157,7 @@ export const findLargestEnclosedElement = (
   shadowHost: Element,
 ): Element | null => {
   const candidates = new Set<Element>();
+  const hitCounts = new Map<Element, number>();
   const step = 20;
 
   // Sample grid points inside selection rect
@@ -164,6 +165,8 @@ export const findLargestEnclosedElement = (
     for (let y = selectionRect.top + step / 2; y < selectionRect.bottom; y += step) {
       const el = document.elementFromPoint(x, y);
       if (!el || el === shadowHost || el === document.documentElement || el === document.body) continue;
+
+      hitCounts.set(el, (hitCounts.get(el) || 0) + 1);
 
       // Add element and its ancestors
       let current: Element | null = el;
@@ -196,5 +199,18 @@ export const findLargestEnclosedElement = (
     }
   }
 
-  return largest;
+  if (largest) return largest;
+
+  // Fallback: element with the most sample-point hits
+  let bestMatch: Element | null = null;
+  let maxHits = 0;
+
+  for (const [el, count] of hitCounts) {
+    if (count > maxHits) {
+      maxHits = count;
+      bestMatch = el;
+    }
+  }
+
+  return bestMatch;
 };

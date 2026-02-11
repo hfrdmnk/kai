@@ -50,8 +50,7 @@ src/
 │   ├── panel.ts          # Annotation input panel
 │   ├── drawer.ts         # Annotation list sidebar
 │   ├── markers.ts        # Numbered badges on annotated elements
-│   ├── autocomplete.ts   # CSS var dropdown
-│   └── toast.ts          # Copy confirmation toast
+│   └── autocomplete.ts   # CSS var dropdown
 └── export/               # Serializers
     ├── json.ts           # JSON export formatter
     └── markdown.ts       # Markdown export formatter

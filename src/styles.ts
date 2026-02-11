@@ -16,6 +16,7 @@ export const styles = `
   --color-accent: oklch(0.6927 0.2513 38.8022);
   --color-accent-hover: oklch(0.6405 0.2241 38.8022);
   --color-danger: oklch(0.6338 0.2516 24.17);
+  --color-success: oklch(72.3% 0.219 149.579);
 
   --font-sans: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -479,37 +480,6 @@ export const styles = `
 .kai-autocomplete-rem:hover,
 .kai-autocomplete-rem[aria-selected="true"] {
   background: var(--bg-2);
-}
-
-/* ── Toast ───────────────────────────────────────── */
-
-.kai-toast {
-  position: fixed;
-  color: var(--white);
-  background: var(--gray-900);
-  font-family: var(--font-sans);
-  font-size: 13px;
-  padding: 10px 16px;
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-  z-index: var(--z-fab);
-  pointer-events: none;
-  opacity: 0;
-  transform: translateX(-50%) translateY(8px);
-  animation: kai-toast-in 0.15s ease forwards;
-}
-
-.kai-toast--out {
-  animation: kai-toast-out 0.15s ease forwards;
-}
-
-@keyframes kai-toast-in {
-  to { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
-
-@keyframes kai-toast-out {
-  from { opacity: 1; transform: translateX(-50%) translateY(0); }
-  to { opacity: 0; transform: translateX(-50%) translateY(8px); }
 }
 
 /* ── Syntax highlighting ─────────────────────────── */

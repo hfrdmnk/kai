@@ -60,7 +60,7 @@ No React, no Svelte, no Vue. Pure vanilla TypeScript compiled to a single IIFE b
 ### Export
 - **JSON**: Structured object with url, viewport dimensions, timestamp, and annotation array (each with selector, path, intent, styles, rect, comment)
 - **Markdown**: Formatted for pasting into AI coding agents — headings per annotation with selector as code, styles listed, feedback quoted
-- Copy to clipboard with visual toast confirmation
+- Copy to clipboard with inline button feedback (icon swap + color change, auto-reset)
 
 ### Session Persistence
 - Annotations saved to `localStorage` under key `ui-annotator:{origin}{pathname}`

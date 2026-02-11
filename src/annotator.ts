@@ -10,7 +10,6 @@ import { createFab } from './ui/fab.ts';
 import { createPopover } from './ui/popover.ts';
 import { createMarkerManager } from './ui/markers.ts';
 import { createInspector } from './ui/inspector.ts';
-import { showToast } from './ui/toast.ts';
 
 const DRAG_THRESHOLD = 5;
 
@@ -63,7 +62,7 @@ class UIAnnotator extends HTMLElement {
       onToggle: () => this.toggle(),
       onCopyMarkdown: () => {
         navigator.clipboard.writeText(toMarkdown(this.annotations)).then(() => {
-          showToast(this.shadow, 'Markdown copied to clipboard');
+          this.fab.confirmCopy();
         });
       },
       onClearAll: () => {

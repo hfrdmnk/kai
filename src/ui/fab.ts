@@ -260,6 +260,36 @@ export const createFab = (
     });
   }
 
+  // ── Aria-live region for copy confirmation ──
+  const copyStatus = document.createElement('span');
+  copyStatus.setAttribute('aria-live', 'polite');
+  copyStatus.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;';
+  shadowRoot.appendChild(copyStatus);
+
+  let copyTimer: ReturnType<typeof setTimeout> | null = null;
+  const resetCopy = () => {
+    copyBtn.replaceChildren();
+    setIcon(copyBtn, iconCopy);
+    copyBtn.style.background = '';
+    copyBtn.style.color = '';
+    copyBtn.style.borderColor = '';
+    copyTimer = null;
+  };
+
+  const confirmCopy = () => {
+    if (copyTimer) clearTimeout(copyTimer);
+    copyBtn.replaceChildren();
+    setIcon(copyBtn, iconCheck);
+    copyBtn.style.background = 'var(--color-success)';
+    copyBtn.style.color = 'var(--white)';
+    copyBtn.style.borderColor = 'var(--color-success)';
+    copyStatus.textContent = 'Copied';
+    copyTimer = setTimeout(() => {
+      resetCopy();
+      copyStatus.textContent = '';
+    }, 2000);
+  };
+
   copyBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     opts.onCopyMarkdown();
@@ -377,7 +407,8 @@ export const createFab = (
     fab.remove();
     actions.remove();
     tooltip.remove();
+    copyStatus.remove();
   };
 
-  return { updateBadge, setActive, updateActionStates, destroy };
+  return { updateBadge, setActive, updateActionStates, confirmCopy, destroy };
 };

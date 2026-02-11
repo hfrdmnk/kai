@@ -39,6 +39,10 @@ export const styles = `
   --text-secondary: var(--gray-600);
   --text-tertiary: var(--gray-500);
 
+  --inv-bg: var(--gray-900);
+  --inv-text: var(--white);
+  --inv-text-muted: var(--gray-400);
+
   --z-overlay: 2147483643;
   --z-tooltip: 2147483647;
   --z-host: 2147483645;
@@ -227,8 +231,8 @@ export const styles = `
 .kai-tooltip {
   position: fixed;
   pointer-events: none;
-  background: var(--gray-900);
-  color: var(--white);
+  background: var(--inv-bg);
+  color: var(--inv-text);
   font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1;
@@ -567,8 +571,8 @@ export const styles = `
 .kai-measure-tooltip {
   position: fixed;
   pointer-events: none;
-  background: var(--gray-900);
-  color: var(--white);
+  background: var(--inv-bg);
+  color: var(--inv-text);
   font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1;
@@ -585,8 +589,8 @@ export const styles = `
 .kai-measure-text-tooltip {
   position: fixed;
   pointer-events: none;
-  background: var(--gray-900);
-  color: var(--white);
+  background: var(--inv-bg);
+  color: var(--inv-text);
   font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1.6;
@@ -595,6 +599,14 @@ export const styles = `
   white-space: pre;
   max-width: 280px;
   z-index: var(--z-tooltip);
+}
+
+.kai-measure-text-tooltip .kai-tt-label {
+  display: inline-block;
+  width: 6ch;
+  text-align: right;
+  margin-right: 2ch;
+  color: var(--inv-text-muted);
 }
 
 .kai-measure-selection {

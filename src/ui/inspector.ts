@@ -78,23 +78,24 @@ export const createInspector = (shadowRoot: ShadowRoot) => {
   };
 
   const showTextInfo = (cx: number, cy: number, data: TextInspectData) => {
-    // Hide crosshair elements
-    lineV.style.display = 'none';
-    lineH.style.display = 'none';
-    cross.style.display = 'none';
-    tooltip.style.display = 'none';
-    selection.style.display = 'none';
-    highlight.style.display = 'none';
-
-    const lines = [
-      `Font   ${data.fontFamily}`,
-      `Size   ${data.fontSize}`,
-      `Weight ${data.fontWeight}`,
-      `Line   ${data.lineHeight}`,
-      `Color  ${data.color}`,
-      `Track  ${data.letterSpacing}`,
+    hideAll();
+    textTooltip.textContent = '';
+    const entries: [string, string][] = [
+      ['Font', data.fontFamily],
+      ['Size', data.fontSize],
+      ['Weight', data.fontWeight],
+      ['Line', data.lineHeight],
+      ['Color', data.color],
+      ['Track', data.letterSpacing],
     ];
-    textTooltip.textContent = lines.join('\n');
+    entries.forEach(([label, value], i) => {
+      if (i > 0) textTooltip.appendChild(document.createTextNode('\n'));
+      const span = document.createElement('span');
+      span.className = 'kai-tt-label';
+      span.textContent = label;
+      textTooltip.appendChild(span);
+      textTooltip.appendChild(document.createTextNode(value));
+    });
     textTooltip.style.display = 'block';
 
     // Position near cursor, flipping near edges

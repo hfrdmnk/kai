@@ -281,7 +281,8 @@ class UIAnnotator extends HTMLElement {
           return;
         }
       }
-      // Fall through to crosshair if not hovering text
+      this.inspector.hide();
+      return;
     }
 
     const data = computeCrosshair(cx, cy, this);

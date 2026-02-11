@@ -163,8 +163,8 @@ export const styles = `
 /* Corner-shape scoop follows badge (diagonally opposite pointy corner) */
 .kai-fab--has-badge[data-corner="bottom-right"] { corner-shape: round scoop round round; border-top-right-radius: 12px; }
 .kai-fab--has-badge[data-corner="bottom-left"]  { corner-shape: scoop round round round; border-top-left-radius: 12px; }
-.kai-fab--has-badge[data-corner="top-right"]    { corner-shape: round round round scoop; border-bottom-right-radius: 12px; }
-.kai-fab--has-badge[data-corner="top-left"]     { corner-shape: round round scoop round; border-bottom-left-radius: 12px; }
+.kai-fab--has-badge[data-corner="top-right"]    { corner-shape: round round scoop round; border-bottom-right-radius: 12px; }
+.kai-fab--has-badge[data-corner="top-left"]     { corner-shape: round round round scoop; border-bottom-left-radius: 12px; }
 
 /* ── FAB Actions ─────────────────────────────────── */
 

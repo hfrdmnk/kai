@@ -64,6 +64,47 @@ const positionActions = (
 
 const SPRING = 'linear(0, 0.008 1.1%, 0.034 2.3%, 0.134 4.9%, 0.264 7.3%, 0.683 14.3%, 0.797 16.5%, 0.89 18.6%, 0.967 20.7%, 1.027 22.8%, 1.073 25%, 1.104 27.3%, 1.123 30.6%, 1.119 34.3%, 1.018 49.5%, 0.988 58.6%, 0.985 65.2%, 1 84.5%, 1)';
 
+const SWAP = {
+  shrinkMs:  120,
+  expandMs:  400,
+  blurPx:    4,
+  scaleDown: 0.3,
+};
+
+const animateStateSwap = async (
+  el: HTMLElement,
+  icon: string,
+  accent = '',
+) => {
+  const svg = el.querySelector('svg');
+  if (svg) {
+    await svg.animate(
+      [
+        { transform: 'scale(1)', filter: 'blur(0)' },
+        { transform: `scale(${SWAP.scaleDown})`, filter: `blur(${SWAP.blurPx}px)` },
+      ],
+      { duration: SWAP.shrinkMs, easing: 'ease-in', fill: 'forwards' },
+    ).finished;
+  }
+
+  el.replaceChildren();
+  setIcon(el, icon);
+  el.style.background = accent;
+  el.style.color = accent ? 'var(--white)' : '';
+  el.style.borderColor = accent;
+
+  const newSvg = el.querySelector('svg');
+  if (newSvg) {
+    newSvg.animate(
+      [
+        { transform: `scale(${SWAP.scaleDown})`, filter: `blur(${SWAP.blurPx}px)` },
+        { transform: 'scale(1)', filter: 'blur(0)' },
+      ],
+      { duration: SWAP.expandMs, easing: SPRING },
+    );
+  }
+};
+
 const DRAG_THRESHOLD = 5;
 
 export const createFab = (
@@ -268,21 +309,13 @@ export const createFab = (
 
   let copyTimer: ReturnType<typeof setTimeout> | null = null;
   const resetCopy = () => {
-    copyBtn.replaceChildren();
-    setIcon(copyBtn, iconCopy);
-    copyBtn.style.background = '';
-    copyBtn.style.color = '';
-    copyBtn.style.borderColor = '';
+    animateStateSwap(copyBtn, iconCopy);
     copyTimer = null;
   };
 
   const confirmCopy = () => {
     if (copyTimer) clearTimeout(copyTimer);
-    copyBtn.replaceChildren();
-    setIcon(copyBtn, iconCheck);
-    copyBtn.style.background = 'var(--color-success)';
-    copyBtn.style.color = 'var(--white)';
-    copyBtn.style.borderColor = 'var(--color-success)';
+    animateStateSwap(copyBtn, iconCheck, 'var(--color-success)');
     copyStatus.textContent = 'Copied';
     copyTimer = setTimeout(() => {
       resetCopy();
@@ -299,11 +332,7 @@ export const createFab = (
   let clearTimer: ReturnType<typeof setTimeout> | null = null;
   const resetClear = () => {
     clearArmed = false;
-    clearBtn.replaceChildren();
-    setIcon(clearBtn, iconTrash);
-    clearBtn.style.background = '';
-    clearBtn.style.color = '';
-    clearBtn.style.borderColor = '';
+    animateStateSwap(clearBtn, iconTrash);
     clearTimer = null;
   };
   clearBtn.addEventListener('click', (e) => {
@@ -314,11 +343,7 @@ export const createFab = (
       opts.onClearAll();
     } else {
       clearArmed = true;
-      clearBtn.replaceChildren();
-      setIcon(clearBtn, iconHelp);
-      clearBtn.style.background = 'var(--color-danger)';
-      clearBtn.style.color = 'var(--white)';
-      clearBtn.style.borderColor = 'var(--color-danger)';
+      animateStateSwap(clearBtn, iconHelp, 'var(--color-danger)');
       clearTimer = setTimeout(resetClear, 3000);
     }
   });

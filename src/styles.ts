@@ -189,7 +189,7 @@ export const styles = `
   cursor: pointer;
   border-radius: var(--radius-full);
   padding: 4px;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   will-change: transform, opacity;
   box-shadow: var(--shadow-xs);
 }

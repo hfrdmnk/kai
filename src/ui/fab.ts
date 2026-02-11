@@ -1,5 +1,5 @@
 import type { FabCorner } from '../types.ts';
-import { iconKai, iconCopy, iconTrash, iconCheck } from '../icons.ts';
+import { iconKai, iconCopy, iconTrash, iconCheck, iconHelp } from '../icons.ts';
 
 const parser = new DOMParser();
 
@@ -315,7 +315,7 @@ export const createFab = (
     } else {
       clearArmed = true;
       clearBtn.replaceChildren();
-      setIcon(clearBtn, iconCheck);
+      setIcon(clearBtn, iconHelp);
       clearBtn.style.background = 'var(--color-danger)';
       clearBtn.style.color = 'var(--white)';
       clearBtn.style.borderColor = 'var(--color-danger)';

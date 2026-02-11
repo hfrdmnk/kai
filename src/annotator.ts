@@ -120,18 +120,25 @@ class UIAnnotator extends HTMLElement {
 
     this.handleClick = (e: MouseEvent) => {
       if (this.isOwnElement(e)) return;
-      if (this.altHeld) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        return;
-      }
       e.preventDefault();
       e.stopImmediatePropagation();
+      if (this.altHeld) return;
       const target = this.hoveredElement;
       if (!target) return;
       this.overlay.hide();
-      const markerRect = this.markers.showPreview(target);
-      this.openPopover(target, markerRect);
+
+      const existing = this.annotations.find(a => {
+        try { return document.querySelector(a.selector) === target; }
+        catch { return false; }
+      });
+
+      if (existing) {
+        const markerRect = this.markers.getMarkerRect(existing.id);
+        this.openEditPopover(existing, markerRect);
+      } else {
+        const markerRect = this.markers.showPreview(target);
+        this.openPopover(target, markerRect);
+      }
     };
 
     this.handleGlobalKeydown = (e: KeyboardEvent) => {
@@ -196,15 +203,20 @@ class UIAnnotator extends HTMLElement {
     };
 
     this.handleMouseDown = (e: MouseEvent) => {
+      if (this.isOwnElement(e)) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
       if (!this.altHeld) return;
       if (e.button !== 0) return;
-      e.preventDefault();
       this.dragStart = { x: e.clientX, y: e.clientY };
       this.dragging = false;
       this.highlightLocked = false;
     };
 
     this.handleMouseUp = (e: MouseEvent) => {
+      if (this.isOwnElement(e)) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
       if (!this.altHeld) return;
       if (e.button !== 0) return;
 

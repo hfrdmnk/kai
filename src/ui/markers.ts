@@ -190,5 +190,9 @@ export const createMarkerManager = (
     }
   };
 
-  return { update, showPreview, clearPreview, showBox, hideBox, setActive, destroy };
+  const getMarkerRect = (id: string): DOMRect | undefined => {
+    return markerMap.get(id)?.getBoundingClientRect();
+  };
+
+  return { update, showPreview, clearPreview, showBox, hideBox, setActive, destroy, getMarkerRect };
 };

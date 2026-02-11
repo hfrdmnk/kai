@@ -107,6 +107,22 @@ const animateStateSwap = async (
 
 const DRAG_THRESHOLD = 5;
 
+const clamp = (v: number, lo: number, hi: number) =>
+  Math.max(lo, Math.min(hi, v));
+
+const computeDragRadii = (cx: number, cy: number): string => {
+  const nx = clamp(cx / window.innerWidth, 0, 1);
+  const ny = clamp(cy / window.innerHeight, 0, 1);
+
+  const wTL = nx * (1 - ny);
+  const wTR = (1 - nx) * (1 - ny);
+  const wBR = (1 - nx) * ny;
+  const wBL = nx * ny;
+
+  const r = (w: number) => `${22 - 18 * w * w}px`;
+  return `${r(wTL)} ${r(wTR)} ${r(wBR)} ${r(wBL)}`;
+};
+
 export const createFab = (
   shadowRoot: ShadowRoot,
   opts: FabOptions,
@@ -114,6 +130,7 @@ export const createFab = (
   let corner = opts.initialCorner;
   let active = false;
   let fabAnim: Animation | null = null;
+  let badgeHidden = false;
 
   let actionAnims: Animation[] = [];
 
@@ -229,6 +246,18 @@ export const createFab = (
       fab.style.right = 'auto';
       fab.style.bottom = 'auto';
       fab.classList.add('kai-fab--dragging');
+
+      // Hide badge with scale animation
+      if (badge.style.display !== 'none' && !badgeHidden) {
+        badgeHidden = true;
+        badge.animate(
+          [{ scale: '1' }, { scale: '0' }],
+          { duration: 200, easing: 'ease-out', fill: 'forwards' },
+        );
+        fab.classList.remove('kai-fab--has-badge');
+      }
+
+      fab.style.borderRadius = computeDragRadii(fabStartX + 22, fabStartY + 22);
     }
 
     if (dragging) {
@@ -236,6 +265,7 @@ export const createFab = (
       const newY = Math.max(0, Math.min(window.innerHeight - 44, fabStartY + dy));
       fab.style.left = `${newX}px`;
       fab.style.top = `${newY}px`;
+      fab.style.borderRadius = computeDragRadii(newX + 22, newY + 22);
     }
   };
 
@@ -246,15 +276,20 @@ export const createFab = (
 
     if (dragging) {
       dragging = false;
-      // Snap to nearest corner
       const newCorner = snapToCorner(e.clientX, e.clientY);
 
-      // Reset inline positioning, let data-corner drive it
+      // FLIP: capture current position
+      const fromLeft = parseFloat(fab.style.left);
+      const fromTop = parseFloat(fab.style.top);
+      const fromRadius = fab.style.borderRadius;
+
+      // Clear inline styles — CSS takes over immediately
       fab.style.left = '';
       fab.style.top = '';
       fab.style.right = '';
       fab.style.bottom = '';
       fab.style.position = '';
+      fab.style.borderRadius = '';
 
       corner = newCorner;
       fab.setAttribute('data-corner', corner);
@@ -263,16 +298,44 @@ export const createFab = (
       if (active) {
         positionActions(actions, fab, corner);
       }
+
+      // FLIP: measure CSS target
+      // Temporarily apply badge class so scoop corner-shape radius is included in target
+      const hasBadge = badge.style.display !== 'none';
+      if (hasBadge) fab.classList.add('kai-fab--has-badge');
+      const targetRect = fab.getBoundingClientRect();
+      const targetRadius = getComputedStyle(fab).borderRadius;
+      if (hasBadge) fab.classList.remove('kai-fab--has-badge');
+      const flipDx = fromLeft - targetRect.left;
+      const flipDy = fromTop - targetRect.top;
+
+      fabAnim?.cancel();
+      fabAnim = fab.animate(
+        [
+          { transform: `translate(${flipDx}px, ${flipDy}px) scale(0.95)`, borderRadius: fromRadius },
+          { transform: 'translate(0, 0) scale(1)', borderRadius: targetRadius },
+        ],
+        { duration: 600, easing: SPRING },
+      );
+      setTimeout(() => {
+        badgeHidden = false;
+        if (badge.style.display !== 'none') {
+          fab.classList.add('kai-fab--has-badge');
+          badge.animate(
+            [{ scale: '0' }, { scale: '1' }],
+            { duration: 400, easing: SPRING, fill: 'forwards' },
+          );
+        }
+      }, 200);
     } else {
       // Click — toggle
       opts.onToggle();
+      fabAnim?.cancel();
+      fabAnim = fab.animate(
+        [{ transform: 'scale(0.9)' }, { transform: 'scale(1)' }],
+        { duration: 600, easing: SPRING },
+      );
     }
-
-    fabAnim?.cancel();
-    fabAnim = fab.animate(
-      [{ transform: 'scale(0.9)' }, { transform: 'scale(1)' }],
-      { duration: 600, easing: SPRING },
-    );
   };
 
   if (supportsAnchor) {
@@ -353,9 +416,10 @@ export const createFab = (
     if (n > 0) {
       badge.textContent = String(n);
       badge.style.display = 'flex';
-      fab.classList.add('kai-fab--has-badge');
+      if (!badgeHidden) fab.classList.add('kai-fab--has-badge');
     } else {
       badge.style.display = 'none';
+      badgeHidden = false;
       fab.classList.remove('kai-fab--has-badge');
     }
   };

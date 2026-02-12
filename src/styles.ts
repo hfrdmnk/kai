@@ -247,7 +247,7 @@ export const styles = `
   color: var(--text-primary);
   border: 1px solid var(--border-2);
   box-shadow: var(--shadow-md);
-  z-index: var(--z-host);
+  z-index: var(--z-tooltip);
   pointer-events: auto;
   font-family: var(--font-sans);
   border-radius: var(--radius-md);
@@ -386,7 +386,7 @@ export const styles = `
   justify-content: center;
   pointer-events: auto;
   cursor: pointer;
-  z-index: var(--z-tooltip);
+  z-index: var(--z-host);
   border: none;
 }
 
@@ -413,13 +413,12 @@ export const styles = `
 
 .kai-autocomplete {
   position: fixed;
-  background: var(--bg-1);
-  border: 1px solid var(--border-1);
-  box-shadow: var(--shadow-md);
+  background: var(--bg-3);
+  border: 1px solid var(--border-3);
   border-radius: var(--radius-sm);
   max-height: 200px;
   overflow-y: auto;
-  z-index: var(--z-fab);
+  z-index: var(--z-tooltip);
   pointer-events: auto;
   font-family: var(--font-mono);
   font-size: 12px;

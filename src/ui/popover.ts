@@ -168,6 +168,24 @@ export const createPopover = (
   const rect = opts.element.getBoundingClientRect();
   positionPopover(popover, rect, opts.anchorRect);
 
+  // Close on scroll (except internal shadow DOM scrolls like autocomplete/textarea)
+  const onScroll = (e: Event) => {
+    if (e.target === shadowRoot.host) return;
+    opts.onClose();
+  };
+  window.addEventListener('scroll', onScroll, { capture: true, passive: true });
+
+  // Close on click outside
+  const onPointerDown = (e: PointerEvent) => {
+    if (e.composedPath().includes(shadowRoot.host)) return;
+    opts.onClose();
+  };
+  document.addEventListener('pointerdown', onPointerDown, { capture: true });
+
+  // Close on resize
+  const onResize = () => opts.onClose();
+  window.addEventListener('resize', onResize);
+
   // Store prior focus for restoration
   const previousFocus = shadowRoot.activeElement ?? document.activeElement;
 
@@ -186,6 +204,9 @@ export const createPopover = (
   popover.addEventListener('keydown', onKeydown);
 
   const destroy = () => {
+    window.removeEventListener('scroll', onScroll, { capture: true });
+    document.removeEventListener('pointerdown', onPointerDown, { capture: true });
+    window.removeEventListener('resize', onResize);
     ac.destroy();
     popover.remove();
     if (previousFocus instanceof HTMLElement) previousFocus.focus();

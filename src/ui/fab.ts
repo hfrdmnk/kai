@@ -258,6 +258,10 @@ export const createFab = (
       }
 
       fab.style.borderRadius = computeDragRadii(fabStartX + 22, fabStartY + 22);
+
+      if (active) {
+        animateActionsOut();
+      }
     }
 
     if (dragging) {
@@ -266,6 +270,10 @@ export const createFab = (
       fab.style.left = `${newX}px`;
       fab.style.top = `${newY}px`;
       fab.style.borderRadius = computeDragRadii(newX + 22, newY + 22);
+
+      if (active && actions.style.display !== 'none') {
+        positionActions(actions, fab, corner);
+      }
     }
   };
 
@@ -295,10 +303,6 @@ export const createFab = (
       fab.setAttribute('data-corner', corner);
       opts.onCornerChange(corner);
 
-      if (active) {
-        positionActions(actions, fab, corner);
-      }
-
       // FLIP: measure CSS target
       // Temporarily apply badge class so scoop corner-shape radius is included in target
       const hasBadge = badge.style.display !== 'none';
@@ -317,6 +321,11 @@ export const createFab = (
         ],
         { duration: 600, easing: SPRING },
       );
+
+      if (active) {
+        fabAnim!.finished.then(() => animateActionsIn()).catch(() => {});
+      }
+
       setTimeout(() => {
         badgeHidden = false;
         if (badge.style.display !== 'none') {

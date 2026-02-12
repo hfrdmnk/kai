@@ -176,11 +176,6 @@ export const styles = `
   pointer-events: auto;
 }
 
-.kai-fab--dragging ~ .kai-fab-actions {
-  opacity: 0;
-  pointer-events: none;
-}
-
 .kai-fab-action {
   width: 32px;
   height: 32px;

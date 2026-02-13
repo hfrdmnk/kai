@@ -268,15 +268,13 @@ export const styles = `
   font-size: 12px;
   color: var(--text-tertiary);
   line-height: 1.5;
-  word-break: break-all;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 .kai-popover-desc {
   font-size: 12px;
   color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .kai-popover-textarea {

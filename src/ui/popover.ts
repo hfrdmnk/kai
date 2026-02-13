@@ -1,4 +1,5 @@
 import { attachAutocomplete } from './autocomplete.ts';
+import { getDirectText } from '../core/text.ts';
 
 const POPOVER_WIDTH = 320;
 const EDGE_GAP = 12;
@@ -13,12 +14,6 @@ type PopoverOptions = {
   existingComment?: string;
   onDelete?: () => void;
   anchorRect?: DOMRect;
-};
-
-const describeElement = (el: Element): string => {
-  const tag = el.tagName.toLowerCase();
-  const text = el.textContent?.trim().slice(0, 40) || '';
-  return text ? `${tag}: "${text}${el.textContent!.trim().length > 40 ? '…' : ''}"` : tag;
 };
 
 const positionPopover = (popover: HTMLElement, targetRect: DOMRect, anchorRect?: DOMRect) => {
@@ -64,12 +59,28 @@ export const createPopover = (
   // Breadcrumb path
   const pathEl = document.createElement('div');
   pathEl.className = 'kai-popover-path';
-  pathEl.textContent = opts.path;
+  const segments = opts.path.split(' › ');
+  segments.forEach((seg, i) => {
+    if (i > 0) {
+      pathEl.appendChild(document.createElement('wbr'));
+      pathEl.appendChild(document.createTextNode(' › '));
+    }
+    const parts = seg.split(/(?=[.#])/);
+    parts.forEach((part, j) => {
+      if (j > 0) pathEl.appendChild(document.createElement('wbr'));
+      pathEl.appendChild(document.createTextNode(part));
+    });
+  });
 
   // Element description
   const descEl = document.createElement('div');
   descEl.className = 'kai-popover-desc';
-  descEl.textContent = describeElement(opts.element);
+  const text = getDirectText(opts.element);
+  if (text) {
+    descEl.textContent = `"${text}"`;
+  } else {
+    descEl.style.display = 'none';
+  }
 
   // Textarea
   const textarea = document.createElement('textarea');

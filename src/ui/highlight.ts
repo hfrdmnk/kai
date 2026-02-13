@@ -1,3 +1,5 @@
+import { getDirectText } from '../core/text.ts';
+
 export const createOverlay = (shadowRoot: ShadowRoot) => {
   const overlay = document.createElement('div');
   overlay.className = 'kai-overlay';
@@ -18,11 +20,9 @@ export const createOverlay = (shadowRoot: ShadowRoot) => {
     const classes = Array.from(el.classList).filter(c => !c.startsWith('kai-')).slice(0, 3);
     if (classes.length) label += `.${classes.join('.')}`;
 
-    const fullText = el.textContent?.trim() ?? '';
-    if (fullText) {
-      const preview = fullText.slice(0, 40);
-      const ellipsis = fullText.length > 40 ? '…' : '';
-      label += `: "${preview}${ellipsis}"`;
+    const textPreview = getDirectText(el);
+    if (textPreview) {
+      label += `: "${textPreview}"`;
     }
     return label;
   };

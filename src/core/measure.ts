@@ -1,4 +1,5 @@
 import { pxToRem } from './styles.ts';
+import { getDirectText } from './text.ts';
 
 export type CrosshairData = {
   cx: number;
@@ -127,10 +128,7 @@ const rgbToHex = (rgb: string): string => {
 };
 
 export const computeTextInspectData = (el: Element): TextInspectData | null => {
-  const hasDirectText = Array.from(el.childNodes).some(
-    n => n.nodeType === Node.TEXT_NODE && n.textContent?.trim()
-  );
-  if (!hasDirectText) return null;
+  if (!getDirectText(el)) return null;
 
   const cs = window.getComputedStyle(el);
 

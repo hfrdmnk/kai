@@ -44,13 +44,13 @@ const positionActions = (
     actionsEl.style.bottom = 'auto';
   } else {
     actionsEl.style.top = 'auto';
-    actionsEl.style.bottom = `${window.innerHeight - rect.bottom}px`;
+    actionsEl.style.bottom = `${document.documentElement.clientHeight - rect.bottom}px`;
   }
 
   if (corner === 'bottom-right' || corner === 'top-right') {
     // Extend left — anchor from right edge
     actionsEl.style.left = 'auto';
-    actionsEl.style.right = `${window.innerWidth - rect.left + gap}px`;
+    actionsEl.style.right = `${document.documentElement.clientWidth - rect.left + gap}px`;
     actionsEl.style.flexDirection = 'row-reverse';
     actionsEl.style.transformOrigin = 'right center';
   } else {
@@ -184,7 +184,7 @@ export const createFab = (
       tooltip.style.bottom = 'auto';
     } else {
       tooltip.style.top = 'auto';
-      tooltip.style.bottom = `${window.innerHeight - rect.top + 6}px`;
+      tooltip.style.bottom = `${document.documentElement.clientHeight - rect.top + 6}px`;
     }
   };
 

@@ -42,8 +42,8 @@ export const createOverlay = (shadowRoot: ShadowRoot) => {
 
     const tw = tooltip.offsetWidth;
     const th = tooltip.offsetHeight;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
+    const vw = document.documentElement.clientWidth;
+    const vh = document.documentElement.clientHeight;
     const pad = 4;
 
     let left = Math.max(pad, Math.min(rect.left, vw - tw - pad));

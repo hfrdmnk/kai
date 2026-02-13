@@ -20,9 +20,9 @@ const positionPopover = (popover: HTMLElement, targetRect: DOMRect, anchorRect?:
   const ref = anchorRect ?? targetRect;
   const gap = anchorRect ? 4 : 8;
 
-  const spaceBelow = window.innerHeight - ref.bottom;
+  const spaceBelow = document.documentElement.clientHeight - ref.bottom;
   const spaceAbove = ref.top;
-  const vh = window.innerHeight;
+  const vh = document.documentElement.clientHeight;
   const below = spaceBelow >= 200 || spaceBelow >= spaceAbove;
 
   const top = below ? ref.bottom + gap : ref.top - gap;
@@ -33,8 +33,7 @@ const positionPopover = (popover: HTMLElement, targetRect: DOMRect, anchorRect?:
     popover.style.top = `${Math.max(EDGE_GAP, Math.min(raw, vh - h - EDGE_GAP))}px`;
   });
 
-  let left = ref.left;
-  left = Math.max(EDGE_GAP, Math.min(left, window.innerWidth - POPOVER_WIDTH - EDGE_GAP));
+  const left = Math.max(EDGE_GAP, Math.min(ref.left, document.documentElement.clientWidth - POPOVER_WIDTH - EDGE_GAP));
 
   popover.style.top = `${top}px`;
   popover.style.left = `${left}px`;

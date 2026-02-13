@@ -8,8 +8,8 @@ const MARKER_PAD = 4;
 const MARKER_OFFSET = 8;
 
 const clampMarker = (top: number, left: number): { top: number; left: number } => ({
-  top: Math.max(MARKER_PAD, Math.min(top, window.innerHeight - MARKER_SIZE - MARKER_PAD)),
-  left: Math.max(MARKER_PAD, Math.min(left, window.innerWidth - MARKER_SIZE - MARKER_PAD)),
+  top: Math.max(MARKER_PAD, Math.min(top, document.documentElement.clientHeight - MARKER_SIZE - MARKER_PAD)),
+  left: Math.max(MARKER_PAD, Math.min(left, document.documentElement.clientWidth - MARKER_SIZE - MARKER_PAD)),
 });
 
 const createMarkerIcon = (): SVGElement => {

@@ -3,6 +3,15 @@ import { iconKai } from '../icons.ts';
 
 const parser = new DOMParser();
 
+const MARKER_SIZE = 22;
+const MARKER_PAD = 4;
+const MARKER_OFFSET = 8;
+
+const clampMarker = (top: number, left: number): { top: number; left: number } => ({
+  top: Math.max(MARKER_PAD, Math.min(top, window.innerHeight - MARKER_SIZE - MARKER_PAD)),
+  left: Math.max(MARKER_PAD, Math.min(left, window.innerWidth - MARKER_SIZE - MARKER_PAD)),
+});
+
 const createMarkerIcon = (): SVGElement => {
   const doc = parser.parseFromString(iconKai, 'image/svg+xml');
   const svg = document.importNode(doc.documentElement, true) as unknown as SVGElement;
@@ -43,9 +52,10 @@ export const createMarkerManager = (
       }
 
       const rect = target.getBoundingClientRect();
+      const clamped = clampMarker(rect.top - MARKER_OFFSET, rect.right - MARKER_OFFSET);
       marker.style.display = 'flex';
-      marker.style.top = `${rect.top - 8}px`;
-      marker.style.left = `${rect.right - 8}px`;
+      marker.style.top = `${clamped.top}px`;
+      marker.style.left = `${clamped.left}px`;
 
       const box = boxMap.get(annotation.id);
       if (box) {
@@ -64,9 +74,10 @@ export const createMarkerManager = (
 
     if (previewTarget && previewMarker && previewBox) {
       const pRect = previewTarget.getBoundingClientRect();
+      const pClamped = clampMarker(pRect.top - MARKER_OFFSET, pRect.right - MARKER_OFFSET);
       const gap = 4;
-      previewMarker.style.top = `${pRect.top - 8}px`;
-      previewMarker.style.left = `${pRect.right - 8}px`;
+      previewMarker.style.top = `${pClamped.top}px`;
+      previewMarker.style.left = `${pClamped.left}px`;
       previewBox.style.top = `${pRect.top - gap}px`;
       previewBox.style.left = `${pRect.left - gap}px`;
       previewBox.style.width = `${pRect.width + gap * 2}px`;
@@ -153,15 +164,16 @@ export const createMarkerManager = (
     marker.className = 'kai-marker';
     marker.appendChild(createMarkerIcon());
     marker.style.pointerEvents = 'none';
-    marker.style.top = `${rect.top - 8}px`;
-    marker.style.left = `${rect.right - 8}px`;
+    const previewClamped = clampMarker(rect.top - MARKER_OFFSET, rect.right - MARKER_OFFSET);
+    marker.style.top = `${previewClamped.top}px`;
+    marker.style.left = `${previewClamped.left}px`;
     shadowRoot.appendChild(marker);
 
     previewMarker = marker;
     previewBox = box;
     previewTarget = element;
 
-    return new DOMRect(rect.right - 8, rect.top - 8, 22, 22);
+    return new DOMRect(previewClamped.left, previewClamped.top, MARKER_SIZE, MARKER_SIZE);
   };
 
   const showBox = (id: string) => {

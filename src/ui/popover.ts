@@ -22,17 +22,16 @@ const positionPopover = (popover: HTMLElement, targetRect: DOMRect, anchorRect?:
 
   const spaceBelow = window.innerHeight - ref.bottom;
   const spaceAbove = ref.top;
+  const vh = window.innerHeight;
+  const below = spaceBelow >= 200 || spaceBelow >= spaceAbove;
 
-  let top: number;
-  if (spaceBelow >= 200 || spaceBelow >= spaceAbove) {
-    top = ref.bottom + gap;
-  } else {
-    top = ref.top - gap;
-    requestAnimationFrame(() => {
-      const h = popover.getBoundingClientRect().height;
-      popover.style.top = `${ref.top - h - gap}px`;
-    });
-  }
+  const top = below ? ref.bottom + gap : ref.top - gap;
+
+  requestAnimationFrame(() => {
+    const h = popover.getBoundingClientRect().height;
+    const raw = below ? top : ref.top - h - gap;
+    popover.style.top = `${Math.max(EDGE_GAP, Math.min(raw, vh - h - EDGE_GAP))}px`;
+  });
 
   let left = ref.left;
   left = Math.max(EDGE_GAP, Math.min(left, window.innerWidth - POPOVER_WIDTH - EDGE_GAP));

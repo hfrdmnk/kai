@@ -104,7 +104,6 @@ class UIAnnotator extends HTMLElement {
     this.handleMouseOver = (e: MouseEvent) => {
       if (this.isOwnElement(e)) return;
       const target = e.target as Element;
-      if (target === document.documentElement || target === document.body) return;
       this.hoveredElement = target;
       if (!this.altHeld) {
         this.overlay.show(target);
@@ -286,7 +285,7 @@ class UIAnnotator extends HTMLElement {
 
     if (this.shiftHeld) {
       const el = document.elementFromPoint(cx, cy);
-      if (el && el !== this && el !== document.documentElement && el !== document.body) {
+      if (el && el !== this) {
         const textData = computeTextInspectData(el);
         if (textData) {
           this.inspector.showTextInfo(cx, cy, textData);

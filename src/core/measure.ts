@@ -127,9 +127,10 @@ const rgbToHex = (rgb: string): string => {
 };
 
 export const computeTextInspectData = (el: Element): TextInspectData | null => {
-  if (el.children.length > 0) return null;
-  const text = el.textContent?.trim();
-  if (!text) return null;
+  const hasDirectText = Array.from(el.childNodes).some(
+    n => n.nodeType === Node.TEXT_NODE && n.textContent?.trim()
+  );
+  if (!hasDirectText) return null;
 
   const cs = window.getComputedStyle(el);
 

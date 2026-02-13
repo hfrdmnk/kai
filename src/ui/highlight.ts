@@ -17,6 +17,13 @@ export const createOverlay = (shadowRoot: ShadowRoot) => {
     if (el.id) label += `#${el.id}`;
     const classes = Array.from(el.classList).filter(c => !c.startsWith('kai-')).slice(0, 3);
     if (classes.length) label += `.${classes.join('.')}`;
+
+    const fullText = el.textContent?.trim() ?? '';
+    if (fullText) {
+      const preview = fullText.slice(0, 40);
+      const ellipsis = fullText.length > 40 ? '…' : '';
+      label += `: "${preview}${ellipsis}"`;
+    }
     return label;
   };
 
@@ -32,14 +39,26 @@ export const createOverlay = (shadowRoot: ShadowRoot) => {
 
     tooltip.textContent = describeElement(el);
     tooltip.style.display = 'block';
-    tooltip.style.left = `${rect.left}px`;
 
-    const tooltipAbove = rect.top > 30;
-    if (tooltipAbove) {
-      tooltip.style.top = `${rect.top - 26}px`;
+    const tw = tooltip.offsetWidth;
+    const th = tooltip.offsetHeight;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const pad = 4;
+
+    let left = Math.max(pad, Math.min(rect.left, vw - tw - pad));
+
+    let top: number;
+    if (rect.top > th + pad + 2) {
+      top = rect.top - th - 2;
+    } else if (rect.bottom + th + 6 < vh - pad) {
+      top = rect.bottom + 6;
     } else {
-      tooltip.style.top = `${rect.bottom + 6}px`;
+      top = pad;
     }
+
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
   };
 
   const hide = () => {

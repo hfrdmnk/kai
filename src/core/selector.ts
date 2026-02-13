@@ -1,4 +1,6 @@
 export const generateSelector = (el: Element): string => {
+  if (el === document.body) return 'body';
+  if (el === document.documentElement) return 'html';
   if (el.id) {
     return `#${el.id}`;
   }
@@ -47,6 +49,8 @@ export const generateSelector = (el: Element): string => {
 };
 
 export const generatePath = (el: Element): string => {
+  if (el === document.documentElement) return 'html';
+  if (el === document.body) return 'html › body';
   const parts: string[] = [];
   let current: Element | null = el;
 

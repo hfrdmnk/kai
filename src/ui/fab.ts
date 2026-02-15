@@ -1,5 +1,6 @@
 import type { FabCorner } from '../types.ts';
 import { iconKai, iconCopy, iconTrash, iconCheck, iconHelp } from '../icons.ts';
+import { SPRING } from '../core/easing.ts';
 
 const parser = new DOMParser();
 
@@ -61,8 +62,6 @@ const positionActions = (
     actionsEl.style.transformOrigin = 'left center';
   }
 };
-
-const SPRING = 'linear(0, 0.008 1.1%, 0.034 2.3%, 0.134 4.9%, 0.264 7.3%, 0.683 14.3%, 0.797 16.5%, 0.89 18.6%, 0.967 20.7%, 1.027 22.8%, 1.073 25%, 1.104 27.3%, 1.123 30.6%, 1.119 34.3%, 1.018 49.5%, 0.988 58.6%, 0.985 65.2%, 1 84.5%, 1)';
 
 const SWAP = {
   shrinkMs:  120,

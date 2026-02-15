@@ -369,11 +369,11 @@ export const styles = `
 
 /* ── Markers ─────────────────────────────────────── */
 
-.kai-marker {
+.kai-marker,
+.kai-marker-stack {
   position: fixed;
   width: 22px;
   height: 22px;
-  border-radius: 9999px 9999px 9999px var(--radius-sm);
   background: var(--color-accent);
   color: var(--white);
   font-family: var(--font-sans);
@@ -385,15 +385,83 @@ export const styles = `
   pointer-events: auto;
   cursor: pointer;
   z-index: var(--z-host);
-  border: none;
+  border: 1px solid var(--color-accent);
 }
 
-.kai-marker--inactive {
+.kai-marker {
+  border-radius: 9999px 9999px 9999px var(--radius-sm);
+}
+
+.kai-marker-stack {
+  border-radius: 11px 11px 11px 0;
+}
+
+.kai-marker-stack--has-badge {
+  corner-shape: round scoop round round;
+  border-top-right-radius: 6px;
+}
+
+.kai-marker--inactive,
+.kai-marker-stack--inactive {
   background: var(--bg-3);
-  border: 1.5px solid var(--border-3);
+  border: 1px solid var(--border-3);
   color: var(--text-tertiary);
   pointer-events: none;
   cursor: default;
+}
+
+.kai-marker-stack-badge {
+  position: absolute;
+  min-width: 14px;
+  height: 14px;
+  background: var(--white);
+  color: var(--color-accent);
+  font-size: 9px;
+  font-weight: 700;
+  font-family: var(--font-sans);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  line-height: 1;
+  border-radius: var(--radius-full);
+  top: -2px;
+  right: -2px;
+  transform: translate(50%, -50%);
+}
+
+.kai-marker-stack--inactive .kai-marker-stack-badge {
+  background: var(--border-3);
+  color: var(--text-tertiary);
+}
+
+.kai-stack-expanded {
+  position: fixed;
+  display: flex;
+  gap: 6px;
+  z-index: var(--z-tooltip);
+  pointer-events: auto;
+  align-items: center;
+}
+
+.kai-stack-expanded-marker {
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px 9999px 9999px var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  will-change: transform, opacity;
+  box-shadow: var(--shadow-xs);
+}
+
+.kai-stack-expanded-marker svg {
+  width: 12px;
+  height: 12px;
 }
 
 /* ── Annotation Boxes ───────────────────────────── */

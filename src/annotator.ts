@@ -159,11 +159,12 @@ class UIAnnotator extends HTMLElement {
         this.altHeld = true;
         this.overlay.hide();
         document.body.style.cursor = 'crosshair';
-        this.guideBar.show('measure');
+        this.guideBar.show('measure', ['alt']);
         this.scheduleMeasureUpdate();
       }
       if (e.key === 'Shift') {
         this.shiftHeld = true;
+        if (this.altHeld) this.guideBar.updateKeys(['alt', 'shift']);
         if (this.altHeld && !this.dragging && !this.highlightLocked) {
           this.scheduleMeasureUpdate();
         }
@@ -176,6 +177,7 @@ class UIAnnotator extends HTMLElement {
       }
       if (e.key === 'Shift') {
         this.shiftHeld = false;
+        if (this.altHeld) this.guideBar.updateKeys(['alt']);
         if (this.altHeld && !this.dragging && !this.highlightLocked) {
           this.scheduleMeasureUpdate();
         }

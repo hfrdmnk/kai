@@ -1,15 +1,23 @@
-import { SPRING } from '../core/easing.ts';
+import { SPRING, GLIDE } from '../core/easing.ts';
 
+export type KeyId = 'alt' | 'shift';
 type GuideMode = 'annotate' | 'measure';
 
-const CONTENT: Record<GuideMode, { text: string; key: string; hint: string }> = {
-  annotate: { text: 'Click elements to annotate', key: '⌥', hint: 'inspect mode' },
-  measure:  { text: 'Drag to measure',           key: '⇧', hint: 'text info' },
+const isMac = /Mac|iPhone|iPad/.test(navigator.platform ?? navigator.userAgent);
+
+const KEY_LABELS: Record<KeyId, string> = {
+  alt: isMac ? '⌥' : 'Alt',
+  shift: isMac ? '⇧' : 'Shift',
 };
 
-const renderContent = (mode: GuideMode): DocumentFragment => {
+const CONTENT: Record<GuideMode, { text: string; keys: KeyId[]; hint: string }> = {
+  annotate: { text: 'Click elements to annotate', keys: ['alt'],          hint: 'inspect mode' },
+  measure:  { text: 'Drag to measure',            keys: ['alt', 'shift'], hint: 'text info' },
+};
+
+const renderContent = (mode: GuideMode, pressedKeys: KeyId[] = []): DocumentFragment => {
   const frag = document.createDocumentFragment();
-  const { text, key, hint } = CONTENT[mode];
+  const { text, keys, hint } = CONTENT[mode];
 
   const span = document.createElement('span');
   span.textContent = text;
@@ -20,10 +28,14 @@ const renderContent = (mode: GuideMode): DocumentFragment => {
   sep.textContent = '·';
   frag.appendChild(sep);
 
-  const kbd = document.createElement('span');
-  kbd.className = 'kai-guide-bar-kbd';
-  kbd.textContent = key;
-  frag.appendChild(kbd);
+  for (const k of keys) {
+    const kbd = document.createElement('span');
+    kbd.className = 'kai-guide-bar-kbd';
+    kbd.setAttribute('data-key', k);
+    if (pressedKeys.includes(k)) kbd.setAttribute('data-pressed', '');
+    kbd.textContent = KEY_LABELS[k];
+    frag.appendChild(kbd);
+  }
 
   const hintEl = document.createElement('span');
   hintEl.className = 'kai-guide-bar-hint';
@@ -37,6 +49,7 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
   let currentMode: GuideMode | null = null;
   let barAnim: Animation | null = null;
   let contentAnim: Animation | null = null;
+  let widthAnim: Animation | null = null;
   let visible = false;
 
   const bar = document.createElement('div');
@@ -50,18 +63,40 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
 
   shadowRoot.appendChild(bar);
 
-  const show = (mode: GuideMode) => {
-    if (visible && currentMode === mode) return;
+  let pressedKeys: KeyId[] = [];
+
+  const updateKeys = (pressed: KeyId[]) => {
+    if (!visible) return;
+    pressedKeys = pressed;
+    const kbds = content.querySelectorAll<HTMLElement>('.kai-guide-bar-kbd');
+    for (const kbd of kbds) {
+      const key = kbd.getAttribute('data-key') as KeyId;
+      if (pressed.includes(key)) {
+        kbd.setAttribute('data-pressed', '');
+      } else {
+        kbd.removeAttribute('data-pressed');
+      }
+    }
+  };
+
+  const show = (mode: GuideMode, pressed: KeyId[] = []) => {
+    pressedKeys = pressed;
+
+    if (visible && currentMode === mode) {
+      updateKeys(pressed);
+      return;
+    }
 
     barAnim?.cancel();
     contentAnim?.cancel();
+    widthAnim?.cancel();
 
     if (!visible) {
       // First show — appear animation
       visible = true;
       currentMode = mode;
       bar.style.display = '';
-      content.replaceChildren(renderContent(mode));
+      content.replaceChildren(renderContent(mode, pressedKeys));
 
       barAnim = bar.animate(
         [
@@ -83,7 +118,23 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
       );
 
       contentAnim.finished.then(() => {
-        content.replaceChildren(renderContent(mode));
+        const oldWidth = bar.getBoundingClientRect().width;
+
+        content.replaceChildren(renderContent(mode, pressedKeys));
+
+        const newWidth = bar.getBoundingClientRect().width;
+
+        if (oldWidth !== newWidth) {
+          widthAnim?.cancel();
+          widthAnim = bar.animate(
+            [{ width: `${oldWidth}px` }, { width: `${newWidth}px` }],
+            { duration: 250, easing: GLIDE, fill: 'forwards' },
+          );
+          widthAnim.finished.then(() => {
+            widthAnim?.cancel();
+            widthAnim = null;
+          }).catch(() => {});
+        }
 
         contentAnim = content.animate(
           [
@@ -103,6 +154,7 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
 
     barAnim?.cancel();
     contentAnim?.cancel();
+    widthAnim?.cancel();
 
     barAnim = bar.animate(
       [
@@ -120,8 +172,9 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
   const destroy = () => {
     barAnim?.cancel();
     contentAnim?.cancel();
+    widthAnim?.cancel();
     bar.remove();
   };
 
-  return { show, hide, destroy };
+  return { show, hide, updateKeys, destroy };
 };

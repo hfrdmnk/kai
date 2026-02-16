@@ -729,6 +729,11 @@ export const styles = `
   font-size: 11px;
   font-weight: 700;
   line-height: 1;
+  transition: background 0.15s ease;
+}
+
+.kai-guide-bar-kbd[data-pressed] {
+  background: var(--color-accent);
 }
 
 .kai-guide-bar-hint {

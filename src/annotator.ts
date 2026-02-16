@@ -10,6 +10,7 @@ import { createFab } from './ui/fab.ts';
 import { createPopover } from './ui/popover.ts';
 import { createMarkerManager } from './ui/markers.ts';
 import { createInspector } from './ui/inspector.ts';
+import { createGuideBar } from './ui/guide-bar.ts';
 
 const DRAG_THRESHOLD = 5;
 
@@ -30,6 +31,7 @@ class UIAnnotator extends HTMLElement {
   private overlay!: ReturnType<typeof createOverlay>;
   private inspector!: ReturnType<typeof createInspector>;
   private markers!: ReturnType<typeof createMarkerManager>;
+  private guideBar!: ReturnType<typeof createGuideBar>;
   private activePopover: ReturnType<typeof createPopover> | null = null;
   private activePopoverAnnotationId: string | null = null;
 
@@ -81,6 +83,7 @@ class UIAnnotator extends HTMLElement {
 
     this.overlay = createOverlay(this.shadow);
     this.inspector = createInspector(this.shadow);
+    this.guideBar = createGuideBar(this.shadow);
     this.markers = createMarkerManager(
       this.shadow,
       (annotation, markerRect) => {
@@ -156,6 +159,7 @@ class UIAnnotator extends HTMLElement {
         this.altHeld = true;
         this.overlay.hide();
         document.body.style.cursor = 'crosshair';
+        this.guideBar.show('measure');
         this.scheduleMeasureUpdate();
       }
       if (e.key === 'Shift') {
@@ -254,6 +258,7 @@ class UIAnnotator extends HTMLElement {
     this.highlightLocked = false;
     document.body.style.cursor = '';
     this.inspector.hide();
+    if (this.active) this.guideBar.show('annotate');
     if (this.measureRafId !== null) {
       cancelAnimationFrame(this.measureRafId);
       this.measureRafId = null;
@@ -310,6 +315,7 @@ class UIAnnotator extends HTMLElement {
     this.markers.destroy();
     this.overlay.destroy();
     this.inspector.destroy();
+    this.guideBar.destroy();
     this.fab.destroy();
   }
 
@@ -325,6 +331,7 @@ class UIAnnotator extends HTMLElement {
     this.active = true;
     this.fab.setActive(true);
     this.markers.setActive(true);
+    this.guideBar.show('annotate');
 
     document.addEventListener('mouseover', this.handleMouseOver, true);
     document.addEventListener('mouseout', this.handleMouseOut, true);
@@ -341,6 +348,7 @@ class UIAnnotator extends HTMLElement {
     this.active = false;
     this.fab.setActive(false);
     this.markers.setActive(false);
+    this.guideBar.hide();
 
     if (this.altHeld) {
       this.exitMeasureMode();

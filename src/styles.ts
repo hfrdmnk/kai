@@ -685,4 +685,53 @@ export const styles = `
   border-radius: var(--radius-sm);
   z-index: var(--z-overlay);
 }
+
+/* ── Guide Bar ──────────────────────────────────── */
+
+.kai-guide-bar {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  background: var(--inv-bg);
+  color: var(--inv-text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-fab);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.kai-guide-bar-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kai-guide-bar-sep {
+  color: var(--inv-text-muted);
+}
+
+.kai-guide-bar-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  background: var(--gray-700);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.kai-guide-bar-hint {
+  color: var(--inv-text-muted);
+}
 `;

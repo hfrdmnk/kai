@@ -272,7 +272,7 @@
 							</p>
 							<a
 								class="bookmarklet"
-								href="javascript:void((()=>{if(document.querySelector('ui-annotator')){document.querySelector('ui-annotator').toggle();return}const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/gh/hfrdmnk/kai@latest/dist/kai.min.js';document.head.appendChild(s)})())"
+								href="javascript:void((async()=>{if(document.querySelector('ui-annotator')){document.querySelector('ui-annotator').toggle();return}try{const r=await fetch('https://cdn.jsdelivr.net/gh/hfrdmnk/kai@latest/dist/kai.min.js');const t=await r.text();const s=document.createElement('script');s.textContent=t;document.head.appendChild(s)}catch(e){alert('kai: Could not load — this site may block external requests.')}})())"
 								>kai</a
 							>
 							<p class="bookmarklet-hint">

@@ -14,11 +14,13 @@ import { createGuideBar } from './ui/guide-bar.ts';
 
 const DRAG_THRESHOLD = 5;
 
+let instance: UIAnnotator | null = null;
+
 class UIAnnotator extends HTMLElement {
-  private shadow: ShadowRoot;
+  private shadow!: ShadowRoot;
   private annotations: Annotation[] = [];
   private active = false;
-  private fabCorner: FabCorner;
+  private fabCorner!: FabCorner;
   private altHeld = false;
   private shiftHeld = false;
   private dragging = false;
@@ -37,19 +39,26 @@ class UIAnnotator extends HTMLElement {
 
   private hoveredElement: Element | null = null;
 
-  private handleMouseOver: (e: MouseEvent) => void;
-  private handleMouseOut: () => void;
-  private handleClick: (e: MouseEvent) => void;
-  private handleGlobalKeydown: (e: KeyboardEvent) => void;
-  private handleKeydown: (e: KeyboardEvent) => void;
-  private handleKeyup: (e: KeyboardEvent) => void;
-  private handleWindowBlur: () => void;
-  private handleMouseMove: (e: MouseEvent) => void;
-  private handleMouseDown: (e: MouseEvent) => void;
-  private handleMouseUp: (e: MouseEvent) => void;
+  private handleMouseOver!: (e: MouseEvent) => void;
+  private handleMouseOut!: () => void;
+  private handleClick!: (e: MouseEvent) => void;
+  private handleGlobalKeydown!: (e: KeyboardEvent) => void;
+  private handleKeydown!: (e: KeyboardEvent) => void;
+  private handleKeyup!: (e: KeyboardEvent) => void;
+  private handleWindowBlur!: () => void;
+  private handleMouseMove!: (e: MouseEvent) => void;
+  private handleMouseDown!: (e: MouseEvent) => void;
+  private handleMouseUp!: (e: MouseEvent) => void;
 
   constructor() {
     super();
+
+    if (instance) {
+      console.warn('<ui-annotator> is a singleton — only one instance is allowed per page.');
+      return;
+    }
+    instance = this;
+
     this.shadow = this.attachShadow({ mode: 'closed' });
 
     const style = document.createElement('style');
@@ -312,6 +321,7 @@ class UIAnnotator extends HTMLElement {
   }
 
   disconnectedCallback() {
+    if (instance === this) instance = null;
     this.deactivate();
     document.removeEventListener('keydown', this.handleGlobalKeydown);
     this.markers.destroy();

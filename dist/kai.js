@@ -2642,6 +2642,7 @@
 		};
 	};
 	var DRAG_THRESHOLD = 5;
+	var instance = null;
 	var UIAnnotator = class extends HTMLElement {
 		shadow;
 		annotations = [];
@@ -2677,6 +2678,11 @@
 		handleMouseUp;
 		constructor() {
 			super();
+			if (instance) {
+				console.warn("<ui-annotator> is a singleton — only one instance is allowed per page.");
+				return;
+			}
+			instance = this;
 			this.shadow = this.attachShadow({ mode: "closed" });
 			const style = document.createElement("style");
 			style.textContent = styles;
@@ -2882,6 +2888,7 @@
 			document.addEventListener("keydown", this.handleGlobalKeydown);
 		}
 		disconnectedCallback() {
+			if (instance === this) instance = null;
 			this.deactivate();
 			document.removeEventListener("keydown", this.handleGlobalKeydown);
 			this.markers.destroy();

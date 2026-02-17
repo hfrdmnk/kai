@@ -825,6 +825,21 @@
 		}
 		return result;
 	};
+	const getDirectText = (el) => {
+		const text = Array.from(el.childNodes).filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent?.trim()).filter(Boolean).join(" ").trim();
+		if (!text) return "";
+		return text.slice(0, 40) + (text.length > 40 ? "…" : "");
+	};
+	const getNearbyText = (el) => {
+		const texts = [];
+		const prev = el.previousElementSibling;
+		if (prev) texts.push(prev.textContent?.trim() ?? "");
+		texts.push(el.textContent?.trim() ?? "");
+		const next = el.nextElementSibling;
+		if (next) texts.push(next.textContent?.trim() ?? "");
+		const combined = texts.filter(Boolean).join(" ").trim();
+		return combined.length > 80 ? combined.slice(0, 80) + "…" : combined;
+	};
 	var getKey = () => `ui-annotator:${location.origin}${location.pathname}`;
 	var FAB_CORNER_KEY = "ui-annotator:fab-corner";
 	const loadSession = () => {
@@ -859,11 +874,6 @@
 		try {
 			localStorage.setItem(FAB_CORNER_KEY, corner);
 		} catch {}
-	};
-	const getDirectText = (el) => {
-		const text = Array.from(el.childNodes).filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent?.trim()).filter(Boolean).join(" ").trim();
-		if (!text) return "";
-		return text.slice(0, 40) + (text.length > 40 ? "…" : "");
 	};
 	const computeCrosshair = (cx, cy, shadowHost) => {
 		const vw = window.innerWidth;
@@ -979,29 +989,50 @@
 		}
 		return bestMatch;
 	};
+	var formatHeading = (a) => {
+		return `${a.element ?? "element"}${a.classes?.length ? "." + a.classes.join(".") : ""}`;
+	};
 	const toMarkdown = (annotations) => {
+		const url = annotations[0]?.url ?? location.href;
 		const lines = [
-			"# UI Annotations",
-			"",
-			`**URL:** ${location.href}`,
-			`**Exported:** ${(/* @__PURE__ */ new Date()).toISOString()}`,
+			`# Page Feedback: ${(() => {
+				try {
+					return new URL(url).pathname;
+				} catch {
+					return url;
+				}
+			})()}`,
+			`**URL:** ${url}`,
 			`**Viewport:** ${window.innerWidth}×${window.innerHeight}`,
+			`**Exported:** ${(/* @__PURE__ */ new Date()).toISOString()}`,
 			""
 		];
 		annotations.forEach((a, i) => {
-			lines.push(`## ${i + 1}. \`${a.selector}\``);
+			lines.push("---");
 			lines.push("");
+			lines.push(`### ${i + 1}. ${formatHeading(a)}`);
+			lines.push("");
+			lines.push(`**Selector:** \`${a.selector}\``);
 			lines.push(`**Path:** ${a.path}`);
+			if (a.classes?.length) lines.push(`**Classes:** ${a.classes.map((c) => "`." + c + "`").join(", ")}`);
+			lines.push(`**Bounding box:** x:${Math.round(a.rect.x)}, y:${Math.round(a.rect.y)}, ${Math.round(a.rect.w)}×${Math.round(a.rect.h)}px`);
+			if (a.nearbyText) lines.push(`**Nearby text:** "${a.nearbyText}"`);
 			lines.push("");
 			const styleEntries = Object.entries(a.styles);
 			if (styleEntries.length) {
+				lines.push("**Computed CSS:**");
 				lines.push("```css");
 				for (const [prop, value] of styleEntries) lines.push(`${prop}: ${value};`);
 				lines.push("```");
 				lines.push("");
 			}
+			const ariaEntries = Object.entries(a.ariaAttributes ?? {});
+			if (ariaEntries.length) lines.push(`**Accessibility:** ${ariaEntries.map(([k, v]) => `${k}="${v}"`).join(", ")}`);
+			const dataEntries = Object.entries(a.dataAttributes ?? {});
+			if (dataEntries.length) lines.push(`**Data attributes:** ${dataEntries.map(([k, v]) => `${k}="${v}"`).join(", ")}`);
+			if (ariaEntries.length || dataEntries.length) lines.push("");
 			if (a.comment) {
-				lines.push(`> ${a.comment.replace(/\n/g, "\n> ")}`);
+				lines.push(`**Annotation:** ${a.comment}`);
 				lines.push("");
 			}
 		});
@@ -2956,6 +2987,10 @@
 				styles: computedStyles,
 				anchorRect,
 				onSubmit: (comment) => {
+					const ariaAttrs = {};
+					const dataAttrs = {};
+					for (const attr of Array.from(element.attributes)) if (attr.name === "role" || attr.name.startsWith("aria-")) ariaAttrs[attr.name] = attr.value;
+					else if (attr.name.startsWith("data-")) dataAttrs[attr.name] = attr.value;
 					const annotation = {
 						id: crypto.randomUUID(),
 						selector,
@@ -2968,7 +3003,13 @@
 							w: rect.width,
 							h: rect.height
 						},
-						createdAt: (/* @__PURE__ */ new Date()).toISOString()
+						createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+						element: element.tagName.toLowerCase(),
+						classes: Array.from(element.classList).filter((c) => !c.startsWith("kai-")),
+						nearbyText: getNearbyText(element),
+						url: location.href,
+						ariaAttributes: ariaAttrs,
+						dataAttributes: dataAttrs
 					};
 					this.annotations.push(annotation);
 					this.markers.clearPreview();

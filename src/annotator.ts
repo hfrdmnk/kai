@@ -2,6 +2,7 @@ import type { Annotation, FabCorner } from './types.ts';
 import { styles } from './styles.ts';
 import { generateSelector, generatePath } from './core/selector.ts';
 import { getComputedStyles } from './core/styles.ts';
+import { getNearbyText } from './core/text.ts';
 import { loadSession, saveSession, clearSession, loadFabCorner, saveFabCorner } from './core/session.ts';
 import { computeCrosshair, computeTextInspectData, findLargestEnclosedElement } from './core/measure.ts';
 import { toMarkdown } from './export/markdown.ts';
@@ -408,6 +409,16 @@ class UIAnnotator extends HTMLElement {
       styles: computedStyles,
       anchorRect,
       onSubmit: (comment) => {
+        const ariaAttrs: Record<string, string> = {};
+        const dataAttrs: Record<string, string> = {};
+        for (const attr of Array.from(element.attributes)) {
+          if (attr.name === 'role' || attr.name.startsWith('aria-')) {
+            ariaAttrs[attr.name] = attr.value;
+          } else if (attr.name.startsWith('data-')) {
+            dataAttrs[attr.name] = attr.value;
+          }
+        }
+
         const annotation: Annotation = {
           id: crypto.randomUUID(),
           selector,
@@ -416,6 +427,12 @@ class UIAnnotator extends HTMLElement {
           styles: computedStyles,
           rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height },
           createdAt: new Date().toISOString(),
+          element: element.tagName.toLowerCase(),
+          classes: Array.from(element.classList).filter(c => !c.startsWith('kai-')),
+          nearbyText: getNearbyText(element),
+          url: location.href,
+          ariaAttributes: ariaAttrs,
+          dataAttributes: dataAttrs,
         };
         this.annotations.push(annotation);
         this.markers.clearPreview();

@@ -25,11 +25,18 @@ The name 回 (kai) is Japanese for "turn," as in a turn in a cycle. Annotate wha
 
 ### Bookmarklet
 
-Drag this link to your bookmark bar:
+[![Add kai bookmarklet](https://img.shields.io/badge/kai-Add_Bookmarklet-ff5500?style=for-the-badge)](https://hfrdmnk.github.io/kai/)
+
+> Visit the link above and drag the **kai** button to your bookmark bar.
+
+<details>
+<summary>Raw bookmarklet code</summary>
 
 ```
 javascript:void((()=>{if(document.querySelector('ui-annotator')){document.querySelector('ui-annotator').toggle();return}const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/gh/hfrdmnk/kai@latest/dist/kai.min.js';document.head.appendChild(s)})())
 ```
+
+</details>
 
 ### Script tag
 

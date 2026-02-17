@@ -5,6 +5,7 @@
 Initial pre-release of kai — a zero-dependency web component for visual UI annotation directly in the browser.
 
 ### Added
+
 - `<ui-annotator>` web component with closed Shadow DOM
 - Click-to-annotate workflow with CSS selector generation
 - Draggable FAB with animated action buttons and badge count
@@ -18,7 +19,3 @@ Initial pre-release of kai — a zero-dependency web component for visual UI ann
 - CSS custom property autocomplete in annotation panel
 - Singleton guard to prevent multiple instances
 - Automated release workflow via GitHub Actions
-
-### Improved
-- Redesigned landing page as product showcase
-- Annotation schema aligned with agentation format

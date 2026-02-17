@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>kai — UI annotation tool</title>
+		<link
+			rel="icon"
+			href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='80'>回</text></svg>" />
+		<style>
+			:root {
+				--white: oklch(100% 0 0);
+				--gray-50: oklch(98.5% 0.002 247.839);
+				--gray-100: oklch(96.7% 0.003 264.542);
+				--gray-200: oklch(92.8% 0.006 264.531);
+				--gray-300: oklch(87.2% 0.01 258.338);
+				--gray-400: oklch(70.7% 0.022 261.325);
+				--gray-500: oklch(55.1% 0.027 264.364);
+				--gray-600: oklch(44.6% 0.03 256.802);
+				--gray-700: oklch(37.3% 0.034 259.733);
+				--gray-800: oklch(27.8% 0.033 256.848);
+				--gray-900: oklch(21% 0.034 264.665);
+				--gray-950: oklch(13% 0.028 261.692);
+
+				--color-accent: oklch(0.6927 0.2513 38.8022);
+				--color-accent-hover: oklch(0.6405 0.2241 38.8022);
+
+				--font-sans: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+				--font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+				--text-primary: var(--gray-900);
+				--text-secondary: var(--gray-600);
+				--text-tertiary: var(--gray-500);
+			}
+
+			*,
+			*::before,
+			*::after {
+				box-sizing: border-box;
+				margin: 0;
+				padding: 0;
+			}
+
+			body {
+				font-family: var(--font-sans);
+				color: var(--text-primary);
+				background: var(--white);
+				line-height: 1.6;
+				-webkit-font-smoothing: antialiased;
+				-moz-osx-font-smoothing: grayscale;
+			}
+
+			.page {
+				max-width: 640px;
+				margin: 0 auto;
+				padding: 120px 24px 80px;
+			}
+
+			/* -- Header ------------------------------------------------- */
+
+			.header {
+				margin-bottom: 80px;
+			}
+
+			.logo {
+				font-size: 96px;
+				line-height: 1;
+				margin-bottom: 16px;
+			}
+
+			.name {
+				font-size: 28px;
+				font-weight: 600;
+				margin-bottom: 8px;
+			}
+
+			.tagline {
+				font-size: 18px;
+				color: var(--text-secondary);
+			}
+
+			/* -- Sections ----------------------------------------------- */
+
+			section {
+				margin-bottom: 80px;
+			}
+
+			.section-label {
+				font-size: 14px;
+				font-weight: 600;
+				color: var(--text-tertiary);
+				text-transform: uppercase;
+				letter-spacing: 0.05em;
+				margin-bottom: 16px;
+			}
+
+			.prose {
+				font-size: 16px;
+				color: var(--text-secondary);
+				line-height: 1.7;
+			}
+
+			/* -- Get started -------------------------------------------- */
+
+			.card {
+				background: var(--gray-50);
+				border: 1px solid var(--gray-200);
+				border-radius: 12px;
+				padding: 32px;
+				transition: box-shadow 150ms ease;
+			}
+
+			.card:hover {
+				box-shadow:
+					0 1px 3px oklch(0% 0 0 / 0.08),
+					0 1px 2px oklch(0% 0 0 / 0.06);
+			}
+
+			.install-methods {
+				display: flex;
+				flex-direction: column;
+				gap: 0;
+			}
+
+			.divider {
+				display: flex;
+				align-items: center;
+				gap: 16px;
+				margin: 24px 0;
+			}
+
+			.divider::before,
+			.divider::after {
+				content: '';
+				flex: 1;
+				height: 1px;
+				background: var(--gray-300);
+			}
+
+			.divider span {
+				font-size: 13px;
+				color: var(--text-tertiary);
+			}
+
+			.install-method-label {
+				font-size: 13px;
+				color: var(--text-tertiary);
+				margin-bottom: 10px;
+			}
+
+			.bookmarklet {
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				height: 44px;
+				padding: 0 24px;
+				background: var(--color-accent);
+				color: var(--white);
+				font-size: 14px;
+				font-weight: 600;
+				text-decoration: none;
+				border-radius: 8px;
+				cursor: grab;
+				transition: background 150ms ease;
+			}
+
+			.bookmarklet:hover {
+				background: var(--color-accent-hover);
+			}
+
+			.bookmarklet:active {
+				cursor: grabbing;
+			}
+
+			.bookmarklet-hint {
+				font-size: 13px;
+				color: var(--text-tertiary);
+				margin-top: 8px;
+			}
+
+			.code-block {
+				background: var(--white);
+				border: 1px solid var(--gray-200);
+				border-radius: 8px;
+				padding: 16px 20px;
+				overflow-x: auto;
+			}
+
+			.code-block code {
+				font-family: var(--font-mono);
+				font-size: 14px;
+				color: var(--text-primary);
+				line-height: 1.6;
+				white-space: pre;
+			}
+
+			/* -- Etymology ---------------------------------------------- */
+
+			.etymology {
+				font-size: 14px;
+				color: var(--text-tertiary);
+				line-height: 1.7;
+			}
+
+			/* -- Footer ------------------------------------------------- */
+
+			footer {
+				padding-top: 40px;
+				border-top: 1px solid var(--gray-100);
+				font-family: var(--font-mono);
+				font-size: 13px;
+				color: var(--text-tertiary);
+				display: flex;
+				flex-wrap: wrap;
+				gap: 6px;
+				align-items: center;
+			}
+
+			footer a {
+				color: var(--text-tertiary);
+				text-decoration: none;
+				transition: color 150ms ease;
+			}
+
+			footer a:hover {
+				color: var(--color-accent);
+			}
+
+			.footer-sep {
+				color: var(--gray-300);
+			}
+
+			/* -- Responsive --------------------------------------------- */
+
+			@media (max-width: 480px) {
+				.page {
+					padding: 80px 20px 60px;
+				}
+
+				.logo {
+					font-size: 64px;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<div class="page">
+			<header class="header">
+				<div class="logo">回</div>
+				<div class="name">kai</div>
+				<p class="tagline">
+					A UI annotation tool for developers and AI agents.
+				</p>
+			</header>
+
+			<section>
+				<p class="prose">
+					Click any element on a web page, describe what should change, and
+					export structured feedback as JSON or Markdown. kai runs entirely
+					client-side as a single Web Component — zero dependencies, nothing to
+					install on the server.
+				</p>
+			</section>
+
+			<section>
+				<p class="section-label">Get started</p>
+				<div class="card">
+					<div class="install-methods">
+						<div>
+							<p class="install-method-label">
+								Bookmarklet — drag to your bookmark bar
+							</p>
+							<a
+								class="bookmarklet"
+								href="javascript:void((()=>{if(document.querySelector('ui-annotator')){document.querySelector('ui-annotator').toggle();return}const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/gh/hfrdmnk/kai@latest/dist/kai.min.js';document.head.appendChild(s)})())"
+								>kai</a
+							>
+							<p class="bookmarklet-hint">
+								Works on any page. Click once to activate, again to toggle.
+							</p>
+						</div>
+						<div class="divider"><span>or</span></div>
+						<div>
+							<p class="install-method-label">
+								Script tag — add to your project
+							</p>
+							<pre
+								class="code-block"><code>&lt;script src="https://cdn.jsdelivr.net/gh/hfrdmnk/kai@latest/dist/kai.min.js"&gt;&lt;/script&gt;</code></pre>
+						</div>
+					</div>
+				</div>
+			</section>
+
+			<section>
+				<p class="etymology">
+					回 kai — Japanese for "turn," as in a turn in a cycle. Annotate what
+					needs to change, hand it to your coding agent, and move on to the next
+					iteration. Fewer rounds, tighter loops.
+				</p>
+			</section>
+
+			<footer>
+				<a href="https://github.com/hfrdmnk/kai">GitHub</a>
+				<span class="footer-sep">·</span>
+				<span>zero deps · ~58 kB · MIT</span>
+			</footer>
+		</div>
+	</body>
+</html>

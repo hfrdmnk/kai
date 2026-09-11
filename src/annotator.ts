@@ -1,9 +1,9 @@
 import type { AccentId, Annotation, FabCorner, Theme } from './types.ts';
 import { styles } from './styles.ts';
-import { generateSelector, generatePath, resolveSelector, composedParent, composedChildren, composedContains } from './core/selector.ts';
+import { generateSelector, generateLocator, generatePath, resolveAnnotation, composedParent, composedChildren, composedContains } from './core/selector.ts';
 import { getComputedStyles } from './core/styles.ts';
 import { getNearbyText } from './core/text.ts';
-import { isMac, PASS_THROUGH_KEY } from './core/platform.ts';
+import { isMac, PASS_THROUGH_KEY, SHORTCUTS, type ShortcutAction } from './core/platform.ts';
 import { loadSession, saveSession, clearSession, loadFabCorner, saveFabCorner, loadTheme, saveTheme, loadAccent, saveAccent } from './core/session.ts';
 import { applyAccent } from './core/accents.ts';
 import { computeCrosshair, computeTextInspectData, findLargestEnclosedElement } from './core/measure.ts';
@@ -210,10 +210,7 @@ class UIAnnotator extends HTMLElement {
         return;
       }
 
-      const existing = this.annotations.find(a => {
-        try { return resolveSelector(a.selector) === target; }
-        catch { return false; }
-      });
+      const existing = this.annotations.find(a => resolveAnnotation(a) === target);
 
       if (existing) {
         const markerRect = this.markers.getMarkerRect(existing.id);
@@ -249,6 +246,14 @@ class UIAnnotator extends HTMLElement {
     };
 
     this.handleKeydown = (e: KeyboardEvent) => {
+      const action = this.shortcutFor(e);
+      if (action) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (action !== 'settings') this.fab.closeSettings();
+        this.fab.pressAction(action);
+        return;
+      }
       if (e.key === PASS_THROUGH_KEY) {
         // Cmd+Enter in the popover textarea must not flip modes
         if (this.passThrough || this.altHeld || isEditable(this.shadow.activeElement)) return;
@@ -571,7 +576,7 @@ class UIAnnotator extends HTMLElement {
     document.addEventListener('dblclick', this.handleBlockedPointer, true);
     document.addEventListener('pointerdown', this.handleBlockedPointer, true);
     document.addEventListener('pointerup', this.handleBlockedPointer, true);
-    document.addEventListener('keydown', this.handleKeydown);
+    document.addEventListener('keydown', this.handleKeydown, true);
     document.addEventListener('keyup', this.handleKeyup);
     document.addEventListener('mousemove', this.handleMouseMove, true);
     document.addEventListener('mousedown', this.handleMouseDown, true);
@@ -601,7 +606,7 @@ class UIAnnotator extends HTMLElement {
     document.removeEventListener('dblclick', this.handleBlockedPointer, true);
     document.removeEventListener('pointerdown', this.handleBlockedPointer, true);
     document.removeEventListener('pointerup', this.handleBlockedPointer, true);
-    document.removeEventListener('keydown', this.handleKeydown);
+    document.removeEventListener('keydown', this.handleKeydown, true);
     document.removeEventListener('keyup', this.handleKeyup);
     document.removeEventListener('mousemove', this.handleMouseMove, true);
     document.removeEventListener('mousedown', this.handleMouseDown, true);
@@ -627,6 +632,17 @@ class UIAnnotator extends HTMLElement {
     }
   }
 
+  /** Runs in the capture phase so the host page's own single-key shortcuts never see the keystroke. */
+  private shortcutFor(e: KeyboardEvent): ShortcutAction | null {
+    if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return null;
+    if (isEditable(e.target) || isEditable(this.shadow.activeElement)) return null;
+    const key = e.key.length === 1 ? e.key.toUpperCase() : e.key;
+    for (const action of Object.keys(SHORTCUTS) as ShortcutAction[]) {
+      if ((SHORTCUTS[action].keys as readonly string[]).includes(key)) return action;
+    }
+    return null;
+  }
+
   private isOwnElement(e: Event): boolean {
     return e.composedPath().some(
       el => el === this || el === this.shadow
@@ -637,6 +653,7 @@ class UIAnnotator extends HTMLElement {
     this.closePopover();
 
     const selector = generateSelector(element);
+    const locator = generateLocator(element);
     const path = generatePath(element);
     const computedStyles = getComputedStyles(element);
     const rect = element.getBoundingClientRect();
@@ -661,6 +678,7 @@ class UIAnnotator extends HTMLElement {
         const annotation: Annotation = {
           id: crypto.randomUUID(),
           selector,
+          locator,
           path,
           comment,
           styles: computedStyles,
@@ -690,7 +708,7 @@ class UIAnnotator extends HTMLElement {
     this.activePopoverAnnotationId = annotation.id;
     this.markers.showBox(annotation.id);
 
-    const target = resolveSelector(annotation.selector);
+    const target = resolveAnnotation(annotation);
     if (!target) return;
 
     const path = annotation.path;

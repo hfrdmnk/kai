@@ -1,6 +1,7 @@
 import type { AccentId, FabCorner, Theme } from '../types.ts';
 import { iconKai, iconCopy, iconTrash, iconCheck, iconHelp, iconCursor, iconSettings } from '../icons.ts';
 import { SPRING, SNAP, EASE_OUT } from '../core/easing.ts';
+import { SHORTCUTS, type ShortcutAction } from '../core/platform.ts';
 import { createSettingsPanel } from './settings.ts';
 
 const parser = new DOMParser();
@@ -234,8 +235,14 @@ export const createFab = (
   tooltip.style.fontFamily = 'var(--font-sans)';
   shadowRoot.appendChild(tooltip);
 
-  const showTooltip = (btn: HTMLButtonElement, label: string) => {
+  const showTooltip = (btn: HTMLButtonElement, label: string, key?: string) => {
     tooltip.textContent = label;
+    if (key) {
+      const kbd = document.createElement('span');
+      kbd.className = 'kai-tooltip-kbd';
+      kbd.textContent = key;
+      tooltip.appendChild(kbd);
+    }
     tooltip.style.display = '';
     const rect = btn.getBoundingClientRect();
     const isTop = corner === 'top-left' || corner === 'top-right';
@@ -254,13 +261,13 @@ export const createFab = (
     tooltip.style.display = 'none';
   };
 
-  pickBtn.addEventListener('mouseenter', () => showTooltip(pickBtn, 'Copy selector'));
+  pickBtn.addEventListener('mouseenter', () => showTooltip(pickBtn, 'Copy selector', SHORTCUTS.pick.label));
   pickBtn.addEventListener('mouseleave', hideTooltip);
-  copyBtn.addEventListener('mouseenter', () => showTooltip(copyBtn, 'Copy as Markdown'));
+  copyBtn.addEventListener('mouseenter', () => showTooltip(copyBtn, 'Copy as Markdown', SHORTCUTS.copy.label));
   copyBtn.addEventListener('mouseleave', hideTooltip);
-  clearBtn.addEventListener('mouseenter', () => showTooltip(clearBtn, 'Clear all'));
+  clearBtn.addEventListener('mouseenter', () => showTooltip(clearBtn, 'Clear all', SHORTCUTS.clear.label));
   clearBtn.addEventListener('mouseleave', hideTooltip);
-  settingsBtn.addEventListener('mouseenter', () => { if (!settingsOpen) showTooltip(settingsBtn, 'Settings'); });
+  settingsBtn.addEventListener('mouseenter', () => { if (!settingsOpen) showTooltip(settingsBtn, 'Settings', SHORTCUTS.settings.label); });
   settingsBtn.addEventListener('mouseleave', hideTooltip);
 
   const actionBtns = [pickBtn, copyBtn, clearBtn, settingsBtn];
@@ -352,6 +359,41 @@ export const createFab = (
   shadowRoot.appendChild(actions);
   shadowRoot.appendChild(panel);
 
+  // The scoop must match the circular badge, whose size follows its digit count. Observed
+  // rather than measured in updateBadge because the host is not connected yet on first call.
+  const scoopObserver = new ResizeObserver(() => {
+    if (badge.offsetWidth) fab.style.setProperty('--kai-scoop', `${badge.offsetWidth / 2 + 2}px`);
+  });
+  scoopObserver.observe(badge);
+
+  /**
+   * Squishes the FAB while the badge keeps its screen size and position: the badge is a
+   * child, so it gets the inverse scale plus a translate that undoes its drift toward the
+   * FAB centre. Geometry: badge centre sits on the FAB corner, half the FAB size from centre.
+   */
+  let badgePressAnim: Animation | null = null;
+  const pressFab = (from: number, to: number, timing: KeyframeAnimationOptions) => {
+    fabAnim?.cancel();
+    fabAnim = fab.animate(
+      [{ transform: `scale(${from})` }, { transform: `scale(${to})` }],
+      timing,
+    );
+    badgePressAnim?.cancel();
+    badgePressAnim = null;
+    if (badge.style.display === 'none' || badgeHidden) return;
+    const sx = isRightCorner() ? 1 : -1;
+    const sy = corner.startsWith('bottom') ? -1 : 1;
+    const half = fab.offsetWidth / 2;
+    const drift = (s: number) => ((1 - s) / s) * half;
+    badgePressAnim = badge.animate(
+      [
+        { scale: `${1 / from}`, translate: `${drift(from) * sx}px ${drift(from) * sy}px` },
+        { scale: `${1 / to}`, translate: `${drift(to) * sx}px ${drift(to) * sy}px` },
+      ],
+      timing,
+    );
+  };
+
   // ── Click/drag disambiguation via pointer events ──
   let dragging = false;
   let pointerDown = false;
@@ -371,12 +413,7 @@ export const createFab = (
     fabStartY = rect.top;
 
     fab.setPointerCapture(e.pointerId);
-
-    fabAnim?.cancel();
-    fabAnim = fab.animate(
-      [{ transform: 'scale(1)' }, { transform: 'scale(0.9)' }],
-      { duration: 120, easing: 'ease-out', fill: 'forwards' },
-    );
+    pressFab(1, 0.9, { duration: 120, easing: 'ease-out', fill: 'forwards' });
   };
 
   const onPointerMove = (e: PointerEvent) => {
@@ -396,7 +433,9 @@ export const createFab = (
       fab.style.bottom = 'auto';
       fab.classList.add('kai-fab--dragging');
 
-      // Hide badge with scale animation
+      // Hide badge with scale animation; the held press counter-transform must not outlive it
+      badgePressAnim?.cancel();
+      badgePressAnim = null;
       if (badge.style.display !== 'none' && !badgeHidden) {
         badgeHidden = true;
         badge.animate(
@@ -488,11 +527,7 @@ export const createFab = (
     } else {
       // Click — toggle
       opts.onToggle();
-      fabAnim?.cancel();
-      fabAnim = fab.animate(
-        [{ transform: 'scale(0.9)' }, { transform: 'scale(1)' }],
-        { duration: 600, easing: SPRING },
-      );
+      pressFab(0.9, 1, { duration: 600, easing: SPRING });
     }
   };
 
@@ -502,20 +537,8 @@ export const createFab = (
     fab.addEventListener('pointerup', onPointerUp);
   } else {
     // No anchor support — just handle click + press effect
-    fab.addEventListener('pointerdown', () => {
-      fabAnim?.cancel();
-      fabAnim = fab.animate(
-        [{ transform: 'scale(1)' }, { transform: 'scale(0.9)' }],
-        { duration: 120, easing: 'ease-out', fill: 'forwards' },
-      );
-    });
-    fab.addEventListener('pointerup', () => {
-      fabAnim?.cancel();
-      fabAnim = fab.animate(
-        [{ transform: 'scale(0.9)' }, { transform: 'scale(1)' }],
-        { duration: 600, easing: SPRING },
-      );
-    });
+    fab.addEventListener('pointerdown', () => pressFab(1, 0.9, { duration: 120, easing: 'ease-out', fill: 'forwards' }));
+    fab.addEventListener('pointerup', () => pressFab(0.9, 1, { duration: 600, easing: SPRING }));
     fab.addEventListener('click', (e) => {
       e.stopPropagation();
       opts.onToggle();
@@ -598,6 +621,13 @@ export const createFab = (
   });
 
   // ── API ──
+  /** Keyboard path to an action button; runs the same click handler, so disabled and armed states are respected. */
+  const pressAction = (action: ShortcutAction) => {
+    const btn = { pick: pickBtn, copy: copyBtn, clear: clearBtn, settings: settingsBtn }[action];
+    if (btn.disabled) return;
+    btn.click();
+  };
+
   const updateBadge = (n: number) => {
     if (n > 0) {
       badge.textContent = String(n);
@@ -739,6 +769,7 @@ export const createFab = (
 
   const destroy = () => {
     closeSettings();
+    scoopObserver.disconnect();
     fab.remove();
     actions.remove();
     panel.remove();
@@ -746,5 +777,5 @@ export const createFab = (
     copyStatus.remove();
   };
 
-  return { updateBadge, setActive, updateActionStates, confirmCopy, confirmPick, setPickArmed, closeSettings, destroy };
+  return { updateBadge, setActive, updateActionStates, confirmCopy, confirmPick, setPickArmed, closeSettings, pressAction, destroy };
 };

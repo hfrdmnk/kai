@@ -72,6 +72,27 @@ When a child fills its parent (a link wrapping a card, a span filling a button),
 
 Click the cursor bubble next to the FAB, then click any element. Its selector lands on the clipboard and the bubble shows a check.
 
+## Keyboard shortcuts
+
+Every action has a keyboard path. The single-key shortcuts apply while kai is active and no text field has focus; the FAB button tooltips show them too.
+
+| Shortcut | Context | Action |
+|---|---|---|
+| <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> | Anywhere | Toggle kai on / off |
+| <kbd>Esc</kbd> | Active | Close settings → cancel pick mode → deactivate, whichever applies first |
+| <kbd>S</kbd> | Active | Toggle copy-selector pick mode |
+| <kbd>M</kbd> | Active, has annotations | Copy all annotations as Markdown |
+| <kbd>⌫</kbd> / <kbd>Del</kbd> | Active, has annotations | Clear all: first press arms, second press within 3 s confirms |
+| <kbd>,</kbd> | Active | Toggle settings |
+| <kbd>Cmd</kbd> / <kbd>Ctrl</kbd> (hold) | Active | Pass-through: interact with the page |
+| <kbd>Alt</kbd> (hold) | Active | Measurement mode |
+| <kbd>Alt</kbd>+<kbd>Shift</kbd> (hold) | Active | Measurement mode with text metrics |
+| <kbd>↑</kbd> / <kbd>↓</kbd> | Element hovered | Move highlight to parent / back down |
+| <kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>Enter</kbd> | Annotation popover | Save annotation |
+| <kbd>Esc</kbd> | Annotation popover | Close popover |
+| <kbd>Tab</kbd> / <kbd>Enter</kbd> | Autocomplete open | Accept suggestion |
+| <kbd>Arrow keys</kbd> | Settings open | Move between theme and accent options |
+
 ## FAQ
 
 **What inspired kai?**

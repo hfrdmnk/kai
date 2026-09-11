@@ -37,11 +37,6 @@ export const styles = `
   --bg-3: var(--gray-100);
   --bg-4: var(--gray-200);
 
-  --border-1: var(--gray-50);
-  --border-2: var(--gray-100);
-  --border-3: var(--gray-200);
-  --border-4: var(--gray-300);
-
   --text-primary: var(--gray-900);
   --text-secondary: var(--gray-600);
   --text-tertiary: var(--gray-500);
@@ -50,11 +45,6 @@ export const styles = `
   --inv-bg-2: var(--gray-800);
   --inv-bg-3: var(--gray-700);
   --inv-bg-4: var(--gray-600);
-
-  --inv-border-1: var(--gray-800);
-  --inv-border-2: var(--gray-700);
-  --inv-border-3: var(--gray-600);
-  --inv-border-4: var(--gray-500);
 
   --inv-text-primary: var(--white);
   --inv-text-secondary: var(--gray-400);
@@ -101,11 +91,6 @@ export const styles = `
   --bg-3: var(--gray-700);
   --bg-4: var(--gray-600);
 
-  --border-1: var(--gray-800);
-  --border-2: var(--gray-700);
-  --border-3: var(--gray-600);
-  --border-4: var(--gray-500);
-
   --text-primary: var(--white);
   --text-secondary: var(--gray-400);
   --text-tertiary: var(--gray-500);
@@ -114,11 +99,6 @@ export const styles = `
   --inv-bg-2: var(--gray-50);
   --inv-bg-3: var(--gray-100);
   --inv-bg-4: var(--gray-200);
-
-  --inv-border-1: var(--gray-50);
-  --inv-border-2: var(--gray-100);
-  --inv-border-3: var(--gray-200);
-  --inv-border-4: var(--gray-300);
 
   --inv-text-primary: var(--gray-900);
   --inv-text-secondary: var(--gray-600);
@@ -150,9 +130,9 @@ export const styles = `
   position: fixed;
   width: 44px;
   height: 44px;
-  border: 1px solid var(--border-1);
-  background: var(--bg-1);
-  color: var(--text-secondary);
+  border: none;
+  background: var(--inv-bg);
+  color: var(--inv-text-muted);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -167,19 +147,19 @@ export const styles = `
 }
 
 .kai-fab:hover {
-  color: var(--text-primary);
+  color: var(--inv-text);
 }
 
 .kai-fab--active,
 .kai-fab--active:hover {
   background: var(--color-accent);
   color: var(--white);
-  border-color: var(--color-accent);
 }
 
+/* Badge always takes the palette the FAB is not using */
 .kai-fab--active .kai-fab-badge {
-  background: var(--white);
-  color: var(--color-accent);
+  background: var(--inv-bg);
+  color: var(--inv-text);
 }
 
 .kai-fab--dragging {
@@ -199,7 +179,8 @@ export const styles = `
 .kai-fab-badge {
   position: absolute;
   min-width: 18px;
-  height: 18px;
+  min-height: 18px;
+  aspect-ratio: 1;
   background: var(--color-accent);
   color: var(--white);
   font-size: 12px;
@@ -213,17 +194,18 @@ export const styles = `
   border-radius: var(--radius-full);
 }
 
-/* Badge position per corner — diagonally opposite the pointy corner */
-.kai-fab[data-corner="bottom-right"] .kai-fab-badge { top: -2px; right: -2px; transform: translate(50%, -50%); }
-.kai-fab[data-corner="bottom-left"]  .kai-fab-badge { top: -2px; left: -2px; transform: translate(-50%, -50%); }
-.kai-fab[data-corner="top-right"]    .kai-fab-badge { bottom: -2px; right: -2px; transform: translate(50%, 50%); }
-.kai-fab[data-corner="top-left"]     .kai-fab-badge { bottom: -2px; left: -2px; transform: translate(-50%, 50%); }
+/* Badge centred on the corner diagonally opposite the pointy one; transform-origin sits on
+   that visual centre so scale animations grow from where the badge actually is */
+.kai-fab[data-corner="bottom-right"] .kai-fab-badge { top: 0; right: 0; transform: translate(50%, -50%); transform-origin: 100% 0; }
+.kai-fab[data-corner="bottom-left"]  .kai-fab-badge { top: 0; left: 0; transform: translate(-50%, -50%); transform-origin: 0 0; }
+.kai-fab[data-corner="top-right"]    .kai-fab-badge { bottom: 0; right: 0; transform: translate(50%, 50%); transform-origin: 100% 100%; }
+.kai-fab[data-corner="top-left"]     .kai-fab-badge { bottom: 0; left: 0; transform: translate(-50%, 50%); transform-origin: 0 100%; }
 
-/* Corner-shape scoop follows badge (diagonally opposite pointy corner) */
-.kai-fab--has-badge[data-corner="bottom-right"] { corner-shape: round scoop round round; border-top-right-radius: 12px; }
-.kai-fab--has-badge[data-corner="bottom-left"]  { corner-shape: scoop round round round; border-top-left-radius: 12px; }
-.kai-fab--has-badge[data-corner="top-right"]    { corner-shape: round round scoop round; border-bottom-right-radius: 12px; }
-.kai-fab--has-badge[data-corner="top-left"]     { corner-shape: round round round scoop; border-bottom-left-radius: 12px; }
+/* Scoop concentric with the circular badge; --kai-scoop is badge radius + 2px, set by updateBadge */
+.kai-fab--has-badge[data-corner="bottom-right"] { corner-shape: round scoop round round; border-top-right-radius: var(--kai-scoop, 11px); }
+.kai-fab--has-badge[data-corner="bottom-left"]  { corner-shape: scoop round round round; border-top-left-radius: var(--kai-scoop, 11px); }
+.kai-fab--has-badge[data-corner="top-right"]    { corner-shape: round round scoop round; border-bottom-right-radius: var(--kai-scoop, 11px); }
+.kai-fab--has-badge[data-corner="top-left"]     { corner-shape: round round round scoop; border-bottom-left-radius: var(--kai-scoop, 11px); }
 
 /* ── FAB Actions ─────────────────────────────────── */
 
@@ -238,7 +220,7 @@ export const styles = `
 .kai-fab-action {
   width: 32px;
   height: 32px;
-  border: 1px solid var(--border-2);
+  border: none;
   background: var(--bg-2);
   color: var(--text-secondary);
   display: flex;
@@ -247,7 +229,7 @@ export const styles = `
   cursor: pointer;
   border-radius: var(--radius-full);
   padding: 4px;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
   will-change: transform, opacity;
   box-shadow: var(--shadow-xs);
 }
@@ -265,7 +247,6 @@ export const styles = `
 .kai-fab-action--armed:hover {
   background: var(--color-accent);
   color: var(--white);
-  border-color: var(--color-accent);
 }
 
 .kai-fab-action svg {
@@ -280,7 +261,6 @@ export const styles = `
   width: 240px;
   background: var(--bg-1);
   color: var(--text-primary);
-  border: 1px solid var(--border-2);
   box-shadow: var(--shadow-md);
   border-radius: var(--radius-xl);
   padding: 14px 16px;
@@ -393,6 +373,19 @@ export const styles = `
   box-shadow: var(--shadow-sm);
 }
 
+.kai-tooltip-kbd {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 4px;
+  background: var(--gray-700);
+  color: var(--white);
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: 1px;
+}
+
 /* ── Popover ─────────────────────────────────────── */
 
 /* Overlays sit on the opposite palette of the page theme */
@@ -404,10 +397,6 @@ export const styles = `
   --bg-2: var(--inv-bg-2);
   --bg-3: var(--inv-bg-3);
   --bg-4: var(--inv-bg-4);
-  --border-1: var(--inv-border-1);
-  --border-2: var(--inv-border-2);
-  --border-3: var(--inv-border-3);
-  --border-4: var(--inv-border-4);
   --text-primary: var(--inv-text-primary);
   --text-secondary: var(--inv-text-secondary);
   --text-tertiary: var(--inv-text-tertiary);
@@ -418,7 +407,6 @@ export const styles = `
   width: 320px;
   background: var(--bg-1);
   color: var(--text-primary);
-  border: 1px solid var(--border-2);
   box-shadow: var(--shadow-md);
   z-index: var(--z-tooltip);
   pointer-events: auto;
@@ -453,7 +441,7 @@ export const styles = `
 .kai-popover-textarea {
   width: 100%;
   min-height: 72px;
-  border: 1px solid var(--border-2);
+  border: none;
   background: var(--bg-2);
   color: var(--text-primary);
   padding: 10px 12px;
@@ -462,13 +450,11 @@ export const styles = `
   resize: vertical;
   line-height: 1.5;
   border-radius: var(--radius-lg);
-  transition: border-color 0.15s ease;
 }
 
 .kai-popover-textarea:focus {
   outline: 2px solid var(--color-accent);
   outline-offset: -2px;
-  border-color: var(--color-accent);
 }
 
 .kai-popover-textarea::placeholder {
@@ -577,7 +563,7 @@ export const styles = `
   pointer-events: auto;
   cursor: pointer;
   z-index: var(--z-host);
-  border: 1px solid var(--color-accent);
+  border: none;
 }
 
 .kai-marker {
@@ -591,15 +577,6 @@ export const styles = `
 .kai-marker-stack--has-badge {
   corner-shape: round scoop round round;
   border-top-right-radius: 6px;
-}
-
-.kai-marker--inactive,
-.kai-marker-stack--inactive {
-  background: var(--bg-3);
-  border-color: var(--bg-3);
-  color: var(--text-tertiary);
-  pointer-events: none;
-  cursor: default;
 }
 
 .kai-marker-stack-badge {
@@ -620,11 +597,6 @@ export const styles = `
   top: -2px;
   right: -2px;
   transform: translate(50%, -50%);
-}
-
-.kai-marker-stack--inactive .kai-marker-stack-badge {
-  background: var(--border-3);
-  color: var(--text-tertiary);
 }
 
 .kai-stack-expanded {
@@ -720,7 +692,6 @@ export const styles = `
   width: 12px;
   height: 12px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border-2);
   flex-shrink: 0;
 }
 

@@ -1,3 +1,5 @@
+import type { Annotation } from '../types.ts';
+
 /** Separator between a shadow host's selector and the selector scoped to its shadow tree. */
 const SHADOW_SEP = ' >>> ';
 
@@ -84,6 +86,33 @@ export const generateSelector = (el: Element): string => {
   return scopedSelector(el, document);
 };
 
+const scopedLocator = (el: Element, root: Document | ShadowRoot): string => {
+  const parts: string[] = [];
+  let current: Element | null = el;
+  while (current && current !== document.body && current !== document.documentElement) {
+    // parentNode, not parentElement: a shadow root's top-level children still need their index
+    const parent: ParentNode | null = current.parentNode;
+    const index = parent ? Array.from(parent.children).indexOf(current) + 1 : 0;
+    parts.unshift(index ? `${current.tagName.toLowerCase()}:nth-child(${index})` : current.tagName.toLowerCase());
+    current = current.parentElement;
+  }
+  if (root === document) parts.unshift(current === document.documentElement ? 'html' : 'body');
+  return parts.join(' > ');
+};
+
+/**
+ * Pure positional chain from the root to the element. Unlike generateSelector it
+ * ignores classes and ids, so it is unreadable but matches exactly one element
+ * as long as the tree shape is unchanged.
+ */
+export const generateLocator = (el: Element): string => {
+  const root = el.getRootNode();
+  if (root instanceof ShadowRoot) {
+    return generateLocator(root.host) + SHADOW_SEP + scopedLocator(el, root);
+  }
+  return scopedLocator(el, document);
+};
+
 /** Inverse of generateSelector: follows each `>>>` hop into the host's open shadow root. */
 export const resolveSelector = (selector: string): Element | null => {
   let scope: Document | ShadowRoot = document;
@@ -95,6 +124,22 @@ export const resolveSelector = (selector: string): Element | null => {
     scope = el.shadowRoot;
   }
   return el;
+};
+
+/**
+ * The locator wins while it still lands on the same kind of element; a shifted
+ * tree falls back to the readable selector, which may hit an earlier sibling.
+ */
+export const resolveAnnotation = (a: Pick<Annotation, 'selector' | 'locator' | 'element'>): Element | null => {
+  try {
+    if (a.locator) {
+      const hit = resolveSelector(a.locator);
+      if (hit && hit.tagName.toLowerCase() === a.element) return hit;
+    }
+    return resolveSelector(a.selector);
+  } catch {
+    return null;
+  }
 };
 
 export const generatePath = (el: Element): string => {

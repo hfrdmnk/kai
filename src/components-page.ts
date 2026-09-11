@@ -107,7 +107,7 @@ mountSpecimen('colors', '', (shadow) => {
       const item = document.createElement('div');
 
       const swatch = document.createElement('div');
-      swatch.style.cssText = `width:100%;height:48px;border-radius:var(--radius-sm);border:1px solid var(--border-3);background:var(${cssVar});`;
+      swatch.style.cssText = `width:100%;height:48px;border-radius:var(--radius-sm);background:var(${cssVar});`;
       item.appendChild(swatch);
 
       const lbl = document.createElement('div');
@@ -134,10 +134,6 @@ mountSpecimen('colors', '', (shadow) => {
 
   makeSwatchGroup('Backgrounds', [
     ['bg-1', '--bg-1'], ['bg-2', '--bg-2'], ['bg-3', '--bg-3'], ['bg-4', '--bg-4'],
-  ]);
-
-  makeSwatchGroup('Borders', [
-    ['border-1', '--border-1'], ['border-2', '--border-2'], ['border-3', '--border-3'], ['border-4', '--border-4'],
   ]);
 
   makeSwatchGroup('Text', [

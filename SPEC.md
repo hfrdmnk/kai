@@ -44,7 +44,7 @@ No React, no Svelte, no Vue. Pure vanilla TypeScript compiled to a single IIFE b
 - Page interactions (click, pointerdown, dblclick) are swallowed while active; hold `Cmd`/`Ctrl` to pass them through, e.g. to open a modal before annotating it
 - Click any element to open the annotation panel
 - Panel displays:
-  - CSS selector (minimal, unique)
+  - CSS selector (short, readable) plus a hidden positional locator so markers stay on the exact element in repeated lists (see `resolveAnnotation` in `src/core/selector.ts`)
   - Element path breadcrumb (e.g. `div.wrapper › section.hero › h1`)
   - Computed styles (font-size, color, padding, margin, border-radius, etc.) with px→rem conversion shown inline
 
@@ -81,7 +81,8 @@ No React, no Svelte, no Vue. Pure vanilla TypeScript compiled to a single IIFE b
 ```typescript
 type Annotation = {
   id: string;
-  selector: string;                    // Minimal unique CSS selector
+  selector: string;                    // Short, readable CSS selector; may match several elements
+  locator?: string;                    // Positional nth-child chain that pins the exact element; not exported
   path: string;                        // Human-readable breadcrumb (tag.class › tag.class)
   comment: string;                     // User's feedback text
   styles: Record<string, string>;      // Relevant computed styles
@@ -132,8 +133,13 @@ All kai UI layers sit at the top of the stacking context, above any host page co
 |---|---|---|
 | `Ctrl+Shift+A` | Global | Toggle annotator on/off |
 | `Escape` | Panel open | Close panel |
+| `Escape` | Settings open | Close settings |
 | `Escape` | Pick mode armed | Cancel pick mode |
 | `Escape` | Annotator active, no panel | Deactivate annotator |
+| `S` | Annotator active, no text field focused | Toggle copy-selector pick mode |
+| `M` | Annotator active, no text field focused | Copy all annotations as Markdown |
+| `Backspace` / `Delete` | Annotator active, no text field focused | Clear all (second press within 3 s confirms) |
+| `,` | Annotator active, no text field focused | Toggle settings |
 | `Cmd` (Mac) / `Ctrl` (Win), held | Annotator active | Pass-through: interact with the page normally |
 | `↑` / `↓` | Element hovered | Move the highlight to the parent / back toward the hovered element |
 | `Cmd/Ctrl+Enter` | Panel textarea focused | Submit annotation |
@@ -142,6 +148,8 @@ All kai UI layers sit at the top of the stacking context, above any host page co
 | `↑` / `↓` | Autocomplete visible | Navigate suggestions |
 | `Enter` | Annotation list item focused | Scroll to element |
 | `Delete` / `Backspace` | Annotation list item focused | Remove annotation |
+
+Single-key shortcuts are the keys in `SHORTCUTS` (`src/core/platform.ts`). They are handled in the capture phase and swallowed so the host page's own shortcuts never fire; they are ignored while any text field (page or kai) has focus and while a modifier is held. The FAB tooltips show the key next to the label. The README table is the user-facing list and must stay in sync.
 
 </section>
 

@@ -1,6 +1,8 @@
 export type Annotation = {
   id: string;
   selector: string;
+  /** Positional chain that pins the exact element; see generateLocator. Absent on sessions saved before it existed. */
+  locator?: string;
   path: string;
   comment: string;
   styles: Record<string, string>;

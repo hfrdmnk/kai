@@ -1,6 +1,6 @@
 import type { Annotation } from '../types.ts';
 import { iconKai } from '../icons.ts';
-import { resolveSelector } from '../core/selector.ts';
+import { resolveAnnotation } from '../core/selector.ts';
 import { SPRING } from '../core/easing.ts';
 
 const parser = new DOMParser();
@@ -82,6 +82,7 @@ export const createMarkerManager = (
   let previewBox: HTMLElement | null = null;
   let previewTarget: Element | null = null;
   let isActive = false;
+  let pendingEntrance = false;
 
   // Stack state
   const stackElements = new Map<string, HTMLElement>();
@@ -324,9 +325,7 @@ export const createMarkerManager = (
     }
 
     const el = document.createElement('div');
-    el.className = isActive
-      ? 'kai-marker-stack kai-marker-stack--has-badge'
-      : 'kai-marker-stack kai-marker-stack--has-badge kai-marker-stack--inactive';
+    el.className = 'kai-marker-stack kai-marker-stack--has-badge';
     el.appendChild(createMarkerIcon());
 
     const badge = document.createElement('span');
@@ -367,7 +366,31 @@ export const createMarkerManager = (
     return el;
   };
 
+  const hideAll = () => {
+    for (const marker of markerMap.values()) marker.style.display = 'none';
+    for (const stack of stackElements.values()) stack.style.display = 'none';
+    for (const box of boxMap.values()) box.style.display = 'none';
+  };
+
+  /** Same spring as the FAB badge, staggered left to right so a dense page reads as one sweep. */
+  const animateEntrance = (els: HTMLElement[]) => {
+    els
+      .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left)
+      .forEach((el, i) => {
+        el.animate(
+          [{ scale: '0' }, { scale: '1' }],
+          { duration: 400, easing: SPRING, delay: i * 30, fill: 'backwards' },
+        );
+      });
+  };
+
   const reposition = () => {
+    if (!isActive) {
+      hideAll();
+      rafId = requestAnimationFrame(reposition);
+      return;
+    }
+
     // Phase 1: compute clamped positions, update annotation boxes
     const positioned: PositionedMarker[] = [];
 
@@ -375,7 +398,7 @@ export const createMarkerManager = (
       const marker = markerMap.get(annotation.id);
       if (!marker) continue;
 
-      const target = resolveSelector(annotation.selector);
+      const target = resolveAnnotation(annotation);
       if (!target) {
         marker.style.display = 'none';
         const box = boxMap.get(annotation.id);
@@ -433,9 +456,18 @@ export const createMarkerManager = (
 
         const stackEl = ensureStackElement(key, cluster.length);
         stackEl.dataset.annotationIds = key;
+        stackEl.style.display = '';
         stackEl.style.top = `${clamped.top}px`;
         stackEl.style.left = `${clamped.left}px`;
       }
+    }
+
+    if (pendingEntrance) {
+      pendingEntrance = false;
+      animateEntrance([
+        ...clusters.filter(c => c.length === 1).map(c => c[0].marker),
+        ...Array.from(activeStackKeys, k => stackElements.get(k)!),
+      ]);
     }
 
     // Phase 3: remove stale stack elements
@@ -487,7 +519,7 @@ export const createMarkerManager = (
       let marker = markerMap.get(annotation.id);
       if (!marker) {
         marker = document.createElement('div');
-        marker.className = isActive ? 'kai-marker' : 'kai-marker kai-marker--inactive';
+        marker.className = 'kai-marker';
         marker.setAttribute('role', 'button');
         marker.setAttribute('tabindex', '0');
         marker.addEventListener('click', (e) => {
@@ -577,12 +609,7 @@ export const createMarkerManager = (
 
   const setActive = (active: boolean) => {
     isActive = active;
-    for (const marker of markerMap.values()) {
-      marker.classList.toggle('kai-marker--inactive', !active);
-    }
-    for (const stack of stackElements.values()) {
-      stack.classList.toggle('kai-marker-stack--inactive', !active);
-    }
+    pendingEntrance = active;
     if (!active) closeStackMenu();
   };
 

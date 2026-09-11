@@ -1,10 +1,10 @@
-import type { Annotation } from '../types.ts';
-import type { FabCorner } from '../types.ts';
+import type { Annotation, FabCorner, Theme } from '../types.ts';
 
 const getKey = (): string =>
   `ui-annotator:${location.origin}${location.pathname}`;
 
 const FAB_CORNER_KEY = 'ui-annotator:fab-corner';
+const THEME_KEY = 'ui-annotator:theme';
 
 export const loadSession = (): Annotation[] => {
   try {
@@ -47,6 +47,24 @@ export const loadFabCorner = (): FabCorner => {
 export const saveFabCorner = (corner: FabCorner): void => {
   try {
     localStorage.setItem(FAB_CORNER_KEY, corner);
+  } catch {
+    // unavailable
+  }
+};
+
+export const loadTheme = (): Theme => {
+  try {
+    const raw = localStorage.getItem(THEME_KEY);
+    if (raw === 'light' || raw === 'dark') return raw;
+    return 'dark';
+  } catch {
+    return 'dark';
+  }
+};
+
+export const saveTheme = (theme: Theme): void => {
+  try {
+    localStorage.setItem(THEME_KEY, theme);
   } catch {
     // unavailable
   }

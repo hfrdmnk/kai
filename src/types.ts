@@ -15,3 +15,5 @@ export type Annotation = {
 };
 
 export type FabCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+
+export type Theme = 'light' | 'dark';

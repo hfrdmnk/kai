@@ -74,6 +74,34 @@ export const styles = `
   z-index: var(--z-host);
 }
 
+:host([data-theme="dark"]) {
+  --bg-1: var(--gray-900);
+  --bg-2: var(--gray-800);
+  --bg-3: var(--gray-700);
+  --bg-4: var(--gray-600);
+
+  --border-1: var(--gray-800);
+  --border-2: var(--gray-700);
+  --border-3: var(--gray-600);
+  --border-4: var(--gray-500);
+
+  --text-primary: var(--white);
+  --text-secondary: var(--gray-400);
+  --text-tertiary: var(--gray-500);
+
+  --inv-bg: var(--white);
+  --inv-text: var(--gray-900);
+  --inv-text-muted: var(--gray-600);
+
+  --shadow-2xs: 0 1px rgb(0 0 0 / 0.15);
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.2);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.3), 0 1px 2px -1px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.35), 0 4px 6px -4px rgb(0 0 0 / 0.35);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.35), 0 8px 10px -6px rgb(0 0 0 / 0.35);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.5);
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -93,7 +121,7 @@ export const styles = `
   height: 44px;
   border: 1px solid var(--border-1);
   background: var(--bg-1);
-  color: var(--gray-700);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -232,7 +260,7 @@ export const styles = `
   font-size: 12px;
   line-height: 1;
   padding: 4px 8px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-full);
   white-space: nowrap;
   z-index: var(--z-tooltip);
   box-shadow: var(--shadow-sm);
@@ -282,7 +310,7 @@ export const styles = `
   min-height: 72px;
   border: 1px solid var(--border-2);
   background: var(--bg-2);
-  color: var(--gray-900);
+  color: var(--text-primary);
   padding: 10px 12px;
   font-family: var(--font-sans);
   font-size: 13px;
@@ -299,7 +327,7 @@ export const styles = `
 }
 
 .kai-popover-textarea::placeholder {
-  color: var(--gray-400);
+  color: var(--text-tertiary);
 }
 
 .kai-popover-footer {
@@ -364,7 +392,7 @@ export const styles = `
 
 .kai-btn--icon:hover {
   background: var(--bg-3);
-  color: var(--gray-700);
+  color: var(--text-secondary);
 }
 
 /* ── Markers ─────────────────────────────────────── */
@@ -469,8 +497,8 @@ export const styles = `
 .kai-annotation-box {
   position: fixed;
   pointer-events: none;
-  border: 1.5px dashed var(--gray-300);
-  background: rgb(0 0 0 / 0.02);
+  border: 1.5px dashed hsl(from var(--color-accent) h s l / 50%);
+  background: hsl(from var(--color-accent) h s l / 3%);
   z-index: var(--z-overlay);
   border-radius: var(--radius-sm);
 }
@@ -512,7 +540,7 @@ export const styles = `
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--gray-700);
+  color: var(--text-primary);
 }
 
 .kai-autocomplete-item-value {
@@ -655,7 +683,7 @@ export const styles = `
   font-size: 11px;
   line-height: 1.6;
   padding: 8px 12px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   white-space: pre;
   max-width: 280px;
   z-index: var(--z-tooltip);

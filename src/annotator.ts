@@ -3,7 +3,7 @@ import { styles } from './styles.ts';
 import { generateSelector, generatePath } from './core/selector.ts';
 import { getComputedStyles } from './core/styles.ts';
 import { getNearbyText } from './core/text.ts';
-import { loadSession, saveSession, clearSession, loadFabCorner, saveFabCorner } from './core/session.ts';
+import { loadSession, saveSession, clearSession, loadFabCorner, saveFabCorner, loadTheme } from './core/session.ts';
 import { computeCrosshair, computeTextInspectData, findLargestEnclosedElement } from './core/measure.ts';
 import { toMarkdown } from './export/markdown.ts';
 import { createOverlay } from './ui/highlight.ts';
@@ -68,6 +68,7 @@ class UIAnnotator extends HTMLElement {
 
     this.annotations = loadSession();
     this.fabCorner = loadFabCorner();
+    this.setAttribute('data-theme', loadTheme());
 
     this.fab = createFab(this.shadow, {
       initialCorner: this.fabCorner,

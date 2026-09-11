@@ -87,8 +87,8 @@ export const createPopover = (
   textarea.setAttribute('aria-label', 'Annotation comment');
   if (isEdit) textarea.value = opts.existingComment!;
 
-  body.appendChild(textarea);
   body.appendChild(pathEl);
+  body.appendChild(textarea);
   body.appendChild(descEl);
 
   // Footer
@@ -105,6 +105,7 @@ export const createPopover = (
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'kai-btn kai-btn--secondary';
     deleteBtn.textContent = 'Delete';
+    deleteBtn.style.color = 'var(--color-danger)';
 
     let deleteArmed = false;
     let deleteTimer: ReturnType<typeof setTimeout> | null = null;

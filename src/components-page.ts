@@ -48,6 +48,7 @@ const overrideCSS = `
 
 const createShadow = (mountId: string, extraCSS = ''): ShadowRoot => {
   const host = document.createElement('div');
+  host.setAttribute('data-theme', 'dark');
   document.getElementById(mountId)!.appendChild(host);
   const shadow = host.attachShadow({ mode: 'open' });
 
@@ -256,7 +257,7 @@ const makeSpacer = (h = 24): HTMLElement => {
   iconBtnHover.className = 'kai-btn kai-btn--icon';
   setIcon(iconBtnHover, iconTrash, 16);
   iconBtnHover.style.background = 'var(--bg-3)';
-  iconBtnHover.style.color = 'var(--gray-700)';
+  iconBtnHover.style.color = 'var(--text-secondary)';
 
   shadow.appendChild(makeRow(iconBtn, iconBtnHover));
 
@@ -264,6 +265,7 @@ const makeSpacer = (h = 24): HTMLElement => {
   const deleteBtn = document.createElement('button');
   deleteBtn.className = 'kai-btn kai-btn--secondary';
   deleteBtn.textContent = 'Delete';
+  deleteBtn.style.color = 'var(--color-danger)';
 
   const deleteSure = document.createElement('button');
   deleteSure.className = 'kai-btn kai-btn--secondary';
@@ -461,6 +463,11 @@ const makeSpacer = (h = 24): HTMLElement => {
     const body = document.createElement('div');
     body.className = 'kai-popover-body';
 
+    const path = document.createElement('div');
+    path.className = 'kai-popover-path';
+    path.textContent = 'body › main.content › div.card › h2.title';
+    body.appendChild(path);
+
     const textarea = document.createElement('textarea');
     textarea.className = 'kai-popover-textarea';
     textarea.placeholder = 'What should change?';
@@ -468,11 +475,6 @@ const makeSpacer = (h = 24): HTMLElement => {
       textarea.value = 'Increase font-size to 16px and use --font-mono';
     }
     body.appendChild(textarea);
-
-    const path = document.createElement('div');
-    path.className = 'kai-popover-path';
-    path.textContent = 'body › main.content › div.card › h2.title';
-    body.appendChild(path);
 
     popover.appendChild(body);
 
@@ -499,6 +501,7 @@ const makeSpacer = (h = 24): HTMLElement => {
         deleteBtn.style.borderColor = 'var(--color-danger)';
       } else {
         deleteBtn.textContent = 'Delete';
+        deleteBtn.style.color = 'var(--color-danger)';
       }
       footer.appendChild(deleteBtn);
 

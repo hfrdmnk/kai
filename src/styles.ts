@@ -23,6 +23,8 @@ export const styles = `
 
   --radius-sm: 0.25rem;
   --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
   --radius-full: 9999px;
 
   --bg-1: var(--white);
@@ -39,9 +41,23 @@ export const styles = `
   --text-secondary: var(--gray-600);
   --text-tertiary: var(--gray-500);
 
-  --inv-bg: var(--gray-900);
-  --inv-text: var(--white);
-  --inv-text-muted: var(--gray-400);
+  --inv-bg-1: var(--gray-900);
+  --inv-bg-2: var(--gray-800);
+  --inv-bg-3: var(--gray-700);
+  --inv-bg-4: var(--gray-600);
+
+  --inv-border-1: var(--gray-800);
+  --inv-border-2: var(--gray-700);
+  --inv-border-3: var(--gray-600);
+  --inv-border-4: var(--gray-500);
+
+  --inv-text-primary: var(--white);
+  --inv-text-secondary: var(--gray-400);
+  --inv-text-tertiary: var(--gray-500);
+
+  --inv-bg: var(--inv-bg-1);
+  --inv-text: var(--inv-text-primary);
+  --inv-text-muted: var(--inv-text-secondary);
 
   --z-overlay: 2147483643;
   --z-tooltip: 2147483647;
@@ -89,9 +105,19 @@ export const styles = `
   --text-secondary: var(--gray-400);
   --text-tertiary: var(--gray-500);
 
-  --inv-bg: var(--white);
-  --inv-text: var(--gray-900);
-  --inv-text-muted: var(--gray-600);
+  --inv-bg-1: var(--white);
+  --inv-bg-2: var(--gray-50);
+  --inv-bg-3: var(--gray-100);
+  --inv-bg-4: var(--gray-200);
+
+  --inv-border-1: var(--gray-50);
+  --inv-border-2: var(--gray-100);
+  --inv-border-3: var(--gray-200);
+  --inv-border-4: var(--gray-300);
+
+  --inv-text-primary: var(--gray-900);
+  --inv-text-secondary: var(--gray-600);
+  --inv-text-tertiary: var(--gray-500);
 
   --shadow-2xs: 0 1px rgb(0 0 0 / 0.15);
   --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.2);
@@ -268,6 +294,22 @@ export const styles = `
 
 /* ── Popover ─────────────────────────────────────── */
 
+/* Overlays sit on the opposite palette of the page theme */
+.kai-popover,
+.kai-autocomplete {
+  --bg-1: var(--inv-bg-1);
+  --bg-2: var(--inv-bg-2);
+  --bg-3: var(--inv-bg-3);
+  --bg-4: var(--inv-bg-4);
+  --border-1: var(--inv-border-1);
+  --border-2: var(--inv-border-2);
+  --border-3: var(--inv-border-3);
+  --border-4: var(--inv-border-4);
+  --text-primary: var(--inv-text-primary);
+  --text-secondary: var(--inv-text-secondary);
+  --text-tertiary: var(--inv-text-tertiary);
+}
+
 .kai-popover {
   position: fixed;
   width: 320px;
@@ -278,7 +320,7 @@ export const styles = `
   z-index: var(--z-tooltip);
   pointer-events: auto;
   font-family: var(--font-sans);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xl);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -316,7 +358,7 @@ export const styles = `
   font-size: 13px;
   resize: vertical;
   line-height: 1.5;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-lg);
   transition: border-color 0.15s ease;
 }
 
@@ -348,7 +390,7 @@ export const styles = `
   min-height: 36px;
   padding: 0 14px;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-full);
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 500;
@@ -370,9 +412,6 @@ export const styles = `
 .kai-btn--secondary {
   background: var(--bg-3);
   color: var(--text-tertiary);
-  border: 1px solid var(--border-3);
-  padding: 0 14px;
-  min-height: 36px;
 }
 
 .kai-btn--secondary:hover {
@@ -380,12 +419,27 @@ export const styles = `
   color: var(--text-primary);
 }
 
+.kai-btn--danger {
+  background: hsl(from var(--color-danger) h s l / 12%);
+  color: var(--color-danger);
+}
+
+.kai-btn--danger:hover {
+  background: hsl(from var(--color-danger) h s l / 20%);
+}
+
+.kai-btn--danger[data-armed],
+.kai-btn--danger[data-armed]:hover {
+  background: var(--color-danger);
+  color: var(--white);
+}
+
 .kai-btn--icon {
   width: 36px;
   height: 36px;
   min-height: 36px;
   padding: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-full);
   background: transparent;
   color: var(--text-tertiary);
 }
@@ -432,7 +486,7 @@ export const styles = `
 .kai-marker--inactive,
 .kai-marker-stack--inactive {
   background: var(--bg-3);
-  border: 1px solid var(--border-3);
+  border-color: var(--bg-3);
   color: var(--text-tertiary);
   pointer-events: none;
   cursor: default;
@@ -507,9 +561,9 @@ export const styles = `
 
 .kai-autocomplete {
   position: fixed;
-  background: var(--bg-3);
-  border: 1px solid var(--border-3);
-  border-radius: var(--radius-sm);
+  background: var(--bg-1);
+  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-lg);
   max-height: 200px;
   overflow-y: auto;
   z-index: var(--z-tooltip);
@@ -702,6 +756,7 @@ export const styles = `
   pointer-events: none;
   border: 1.5px dashed var(--color-accent);
   background: hsl(from var(--color-accent) h s l / 5%);
+  border-radius: var(--radius-sm);
   z-index: var(--z-overlay);
 }
 
@@ -753,6 +808,7 @@ export const styles = `
   height: 20px;
   padding: 0 5px;
   background: var(--gray-700);
+  color: var(--white);
   border-radius: var(--radius-sm);
   font-size: 11px;
   font-weight: 700;

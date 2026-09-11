@@ -262,16 +262,13 @@ mountSpecimen('buttons', '', (shadow) => {
 
   shadow.appendChild(makeLabel('Delete confirmation'));
   const deleteBtn = document.createElement('button');
-  deleteBtn.className = 'kai-btn kai-btn--secondary';
+  deleteBtn.className = 'kai-btn kai-btn--danger';
   deleteBtn.textContent = 'Delete';
-  deleteBtn.style.color = 'var(--color-danger)';
 
   const deleteSure = document.createElement('button');
-  deleteSure.className = 'kai-btn kai-btn--secondary';
+  deleteSure.className = 'kai-btn kai-btn--danger';
+  deleteSure.setAttribute('data-armed', '');
   deleteSure.textContent = 'Sure?';
-  deleteSure.style.background = 'var(--color-danger)';
-  deleteSure.style.color = 'var(--white)';
-  deleteSure.style.borderColor = 'var(--color-danger)';
 
   shadow.appendChild(makeRow(deleteBtn, deleteSure));
 });
@@ -426,7 +423,7 @@ mountSpecimen('tooltip', '', (shadow) => {
 
   const tip = document.createElement('div');
   tip.className = 'kai-tooltip';
-  tip.style.display = 'block';
+  tip.style.display = 'inline-block';
   tip.textContent = 'div.container.active';
   shadow.appendChild(tip);
 });
@@ -487,15 +484,12 @@ mountSpecimen('popover', `
       footer.appendChild(add);
     } else {
       const deleteBtn = document.createElement('button');
-      deleteBtn.className = 'kai-btn kai-btn--secondary';
+      deleteBtn.className = 'kai-btn kai-btn--danger';
       if (mode === 'delete-confirm') {
         deleteBtn.textContent = 'Sure?';
-        deleteBtn.style.background = 'var(--color-danger)';
-        deleteBtn.style.color = 'var(--white)';
-        deleteBtn.style.borderColor = 'var(--color-danger)';
+        deleteBtn.setAttribute('data-armed', '');
       } else {
         deleteBtn.textContent = 'Delete';
-        deleteBtn.style.color = 'var(--color-danger)';
       }
       footer.appendChild(deleteBtn);
 
@@ -697,7 +691,7 @@ mountSpecimen('measure', `
   shadow.appendChild(makeLabel('Measurement tooltip'));
   const mTooltip = document.createElement('div');
   mTooltip.className = 'kai-measure-tooltip';
-  mTooltip.style.display = 'block';
+  mTooltip.style.display = 'inline-block';
   mTooltip.textContent = '320×48 px';
   shadow.appendChild(mTooltip);
 

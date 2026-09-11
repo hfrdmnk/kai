@@ -103,18 +103,15 @@ export const createPopover = (
 
   if (isEdit && opts.onDelete) {
     const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'kai-btn kai-btn--secondary';
+    deleteBtn.className = 'kai-btn kai-btn--danger';
     deleteBtn.textContent = 'Delete';
-    deleteBtn.style.color = 'var(--color-danger)';
 
     let deleteArmed = false;
     let deleteTimer: ReturnType<typeof setTimeout> | null = null;
     const resetDelete = () => {
       deleteArmed = false;
       deleteBtn.textContent = 'Delete';
-      deleteBtn.style.background = '';
-      deleteBtn.style.color = '';
-      deleteBtn.style.borderColor = '';
+      deleteBtn.removeAttribute('data-armed');
       deleteTimer = null;
     };
     deleteBtn.addEventListener('click', () => {
@@ -124,9 +121,7 @@ export const createPopover = (
       } else {
         deleteArmed = true;
         deleteBtn.textContent = 'Sure?';
-        deleteBtn.style.background = 'var(--color-danger)';
-        deleteBtn.style.color = 'var(--white)';
-        deleteBtn.style.borderColor = 'var(--color-danger)';
+        deleteBtn.setAttribute('data-armed', '');
         deleteTimer = setTimeout(resetDelete, 3000);
       }
     });

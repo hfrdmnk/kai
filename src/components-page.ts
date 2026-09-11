@@ -46,17 +46,21 @@ const overrideCSS = `
   }
 `;
 
-const createShadow = (mountId: string, extraCSS = ''): ShadowRoot => {
-  const host = document.createElement('div');
-  host.setAttribute('data-theme', 'dark');
-  document.getElementById(mountId)!.appendChild(host);
-  const shadow = host.attachShadow({ mode: 'open' });
+/** Render one specimen into both the light and the dark pane of its section */
+const mountSpecimen = (name: string, extraCSS: string, build: (shadow: ShadowRoot) => void) => {
+  const panes = document.querySelectorAll<HTMLElement>(`[data-mount="${name}"] .pane`);
+  for (const pane of panes) {
+    const host = document.createElement('div');
+    host.setAttribute('data-theme', pane.dataset.theme!);
+    pane.querySelector('.specimen-mount')!.appendChild(host);
+    const shadow = host.attachShadow({ mode: 'open' });
 
-  const style = document.createElement('style');
-  style.textContent = styles + overrideCSS + extraCSS;
-  shadow.appendChild(style);
+    const style = document.createElement('style');
+    style.textContent = styles + overrideCSS + extraCSS;
+    shadow.appendChild(style);
 
-  return shadow;
+    build(shadow);
+  }
 };
 
 const makeLabel = (text: string): HTMLElement => {
@@ -81,8 +85,7 @@ const makeSpacer = (h = 24): HTMLElement => {
 
 // ── 1. Color Palette ───────────────────────────────
 
-(() => {
-  const shadow = createShadow('mount-colors');
+mountSpecimen('colors', '', (shadow) => {
 
   const makeSwatchGroup = (title: string, tokens: [string, string][]) => {
     shadow.appendChild(makeLabel(title));
@@ -133,12 +136,11 @@ const makeSpacer = (h = 24): HTMLElement => {
   makeSwatchGroup('Inverse', [
     ['inv-bg', '--inv-bg'], ['inv-text', '--inv-text'], ['inv-text-muted', '--inv-text-muted'],
   ]);
-})();
+});
 
 // ── 2. Typography ──────────────────────────────────
 
-(() => {
-  const shadow = createShadow('mount-typography');
+mountSpecimen('typography', '', (shadow) => {
   const sizes = [11, 12, 13, 14, 16];
 
   shadow.appendChild(makeLabel('--font-sans'));
@@ -157,12 +159,11 @@ const makeSpacer = (h = 24): HTMLElement => {
     el.textContent = `The quick brown fox jumps — ${s}px`;
     shadow.appendChild(el);
   }
-})();
+});
 
 // ── 3. Shadows ─────────────────────────────────────
 
-(() => {
-  const shadow = createShadow('mount-shadows');
+mountSpecimen('shadows', '', (shadow) => {
   const shadowTokens = ['2xs', 'xs', 'sm', 'md', 'lg', 'xl', '2xl'];
 
   const grid = document.createElement('div');
@@ -181,12 +182,11 @@ const makeSpacer = (h = 24): HTMLElement => {
   }
 
   shadow.appendChild(grid);
-})();
+});
 
 // ── 4. Icons ───────────────────────────────────────
 
-(() => {
-  const shadow = createShadow('mount-icons');
+mountSpecimen('icons', '', (shadow) => {
   const icons: [string, string][] = [
     ['kai', iconKai], ['close', iconClose], ['trash', iconTrash],
     ['copy', iconCopy], ['check', iconCheck], ['help', iconHelp],
@@ -216,12 +216,11 @@ const makeSpacer = (h = 24): HTMLElement => {
     }
     shadow.appendChild(r);
   }
-})();
+});
 
 // ── 5. Buttons ─────────────────────────────────────
 
-(() => {
-  const shadow = createShadow('mount-buttons');
+mountSpecimen('buttons', '', (shadow) => {
 
   shadow.appendChild(makeLabel('Primary'));
   const primary = document.createElement('button');
@@ -275,15 +274,14 @@ const makeSpacer = (h = 24): HTMLElement => {
   deleteSure.style.borderColor = 'var(--color-danger)';
 
   shadow.appendChild(makeRow(deleteBtn, deleteSure));
-})();
+});
 
 // ── 6. FAB ─────────────────────────────────────────
 
-(() => {
-  const shadow = createShadow('mount-fab', `
+mountSpecimen('fab', `
     .kai-fab { position: relative !important; display: inline-flex !important; }
     .kai-fab[data-corner] { top: auto !important; bottom: auto !important; left: auto !important; right: auto !important; }
-  `);
+  `, (shadow) => {
 
   const corners: string[] = ['bottom-right', 'bottom-left', 'top-right', 'top-left'];
 
@@ -358,14 +356,13 @@ const makeSpacer = (h = 24): HTMLElement => {
     badgeActiveRow.appendChild(fab);
   }
   shadow.appendChild(badgeActiveRow);
-})();
+});
 
 // ── 7. FAB Actions ─────────────────────────────────
 
-(() => {
-  const shadow = createShadow('mount-fab-actions', `
+mountSpecimen('fab-actions', `
     .kai-fab-actions { position: relative !important; display: inline-flex !important; }
-  `);
+  `, (shadow) => {
 
   shadow.appendChild(makeLabel('Default'));
   const actions = document.createElement('div');
@@ -421,24 +418,22 @@ const makeSpacer = (h = 24): HTMLElement => {
   actionsDisabled.appendChild(copyDisabled);
   actionsDisabled.appendChild(trashDisabled);
   shadow.appendChild(actionsDisabled);
-})();
+});
 
 // ── 8. Tooltip ─────────────────────────────────────
 
-(() => {
-  const shadow = createShadow('mount-tooltip');
+mountSpecimen('tooltip', '', (shadow) => {
 
   const tip = document.createElement('div');
   tip.className = 'kai-tooltip';
   tip.style.display = 'block';
   tip.textContent = 'div.container.active';
   shadow.appendChild(tip);
-})();
+});
 
 // ── 9. Overlay ─────────────────────────────────────
 
-(() => {
-  const shadow = createShadow('mount-overlay');
+mountSpecimen('overlay', '', (shadow) => {
 
   const overlay = document.createElement('div');
   overlay.className = 'kai-overlay';
@@ -446,14 +441,13 @@ const makeSpacer = (h = 24): HTMLElement => {
   overlay.style.width = '240px';
   overlay.style.height = '80px';
   shadow.appendChild(overlay);
-})();
+});
 
 // ── 10. Popover ────────────────────────────────────
 
-(() => {
-  const shadow = createShadow('mount-popover', `
+mountSpecimen('popover', `
     .kai-popover { position: relative !important; display: flex !important; }
-  `);
+  `, (shadow) => {
 
   const makePopover = (mode: 'create' | 'edit' | 'delete-confirm') => {
     const popover = document.createElement('div');
@@ -532,14 +526,13 @@ const makeSpacer = (h = 24): HTMLElement => {
 
   shadow.appendChild(makeLabel('Delete confirmation'));
   shadow.appendChild(makePopover('delete-confirm'));
-})();
+});
 
 // ── 11. Markers ────────────────────────────────────
 
-(() => {
-  const shadow = createShadow('mount-markers', `
+mountSpecimen('markers', `
     .kai-marker, .kai-marker-stack { position: relative !important; display: inline-flex !important; }
-  `);
+  `, (shadow) => {
 
   const addMarkerIcon = (el: HTMLElement) => {
     const svg = parseSVG(iconKai, 12);
@@ -578,14 +571,13 @@ const makeSpacer = (h = 24): HTMLElement => {
   badge2.textContent = '3';
   stackInactive.appendChild(badge2);
   shadow.appendChild(stackInactive);
-})();
+});
 
 // ── 12. Stack Expanded ─────────────────────────────
 
-(() => {
-  const shadow = createShadow('mount-stack-expanded', `
+mountSpecimen('stack-expanded', `
     .kai-stack-expanded { position: relative !important; display: inline-flex !important; }
-  `);
+  `, (shadow) => {
 
   const container = document.createElement('div');
   container.className = 'kai-stack-expanded';
@@ -601,12 +593,11 @@ const makeSpacer = (h = 24): HTMLElement => {
   }
 
   shadow.appendChild(container);
-})();
+});
 
 // ── 13. Annotation Box ─────────────────────────────
 
-(() => {
-  const shadow = createShadow('mount-annotation-box');
+mountSpecimen('annotation-box', '', (shadow) => {
 
   const box = document.createElement('div');
   box.className = 'kai-annotation-box';
@@ -614,14 +605,13 @@ const makeSpacer = (h = 24): HTMLElement => {
   box.style.width = '240px';
   box.style.height = '80px';
   shadow.appendChild(box);
-})();
+});
 
 // ── 14. Autocomplete ───────────────────────────────
 
-(() => {
-  const shadow = createShadow('mount-autocomplete', `
+mountSpecimen('autocomplete', `
     .kai-autocomplete { position: relative !important; display: block !important; }
-  `);
+  `, (shadow) => {
 
   shadow.appendChild(makeLabel('CSS variable items'));
   const dropdown = document.createElement('div');
@@ -631,7 +621,7 @@ const makeSpacer = (h = 24): HTMLElement => {
   const vars: [string, string, string | null][] = [
     ['--color-accent', 'oklch(0.69 0.25 38.8)', 'oklch(0.69 0.25 38.8)'],
     ['--color-danger', 'oklch(0.63 0.25 24.2)', 'oklch(0.63 0.25 24.2)'],
-    ['--gray-200', 'oklch(92.8% 0.006 264.5)', 'oklch(92.8% 0.006 264.5)'],
+    ['--gray-200', 'oklch(92.2% 0 0)', 'oklch(92.2% 0 0)'],
     ['--font-sans', '-apple-system, …', null],
   ];
 
@@ -670,17 +660,16 @@ const makeSpacer = (h = 24): HTMLElement => {
   remItem.textContent = '→ 1rem';
   remDropdown.appendChild(remItem);
   shadow.appendChild(remDropdown);
-})();
+});
 
 // ── 15. Measurement Tools ──────────────────────────
 
-(() => {
-  const shadow = createShadow('mount-measure', `
+mountSpecimen('measure', `
     .kai-measure-line, .kai-measure-cross, .kai-measure-tooltip,
     .kai-measure-text-tooltip, .kai-measure-selection, .kai-measure-highlight {
       position: relative !important;
     }
-  `);
+  `, (shadow) => {
 
   // Crosshair demo
   shadow.appendChild(makeLabel('Crosshair lines'));
@@ -749,12 +738,11 @@ const makeSpacer = (h = 24): HTMLElement => {
   hl.className = 'kai-measure-highlight';
   hl.style.cssText = 'display:block;width:200px;height:60px;';
   shadow.appendChild(hl);
-})();
+});
 
 // ── 16. Guide Bar ──────────────────────────────────
 
-(() => {
-  const shadow = createShadow('mount-guide-bar', `
+mountSpecimen('guide-bar', `
     .kai-guide-bar {
       position: relative !important;
       top: auto !important;
@@ -762,7 +750,7 @@ const makeSpacer = (h = 24): HTMLElement => {
       transform: none !important;
       display: inline-flex !important;
     }
-  `);
+  `, (shadow) => {
 
   const makeGuideBar = (text: string, keys: [string, boolean][], hint: string) => {
     const bar = document.createElement('div');
@@ -808,4 +796,4 @@ const makeSpacer = (h = 24): HTMLElement => {
   shadow.appendChild(makeSpacer(16));
   shadow.appendChild(makeLabel('With pressed key'));
   shadow.appendChild(makeGuideBar('Click elements to annotate', [['⌥', true]], 'inspect mode'));
-})();
+});

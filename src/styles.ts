@@ -1,17 +1,17 @@
 export const styles = `
 :host {
   --white: oklch(100% 0 0);
-  --gray-50: oklch(98.5% 0.002 247.839);
-  --gray-100: oklch(96.7% 0.003 264.542);
-  --gray-200: oklch(92.8% 0.006 264.531);
-  --gray-300: oklch(87.2% 0.01 258.338);
-  --gray-400: oklch(70.7% 0.022 261.325);
-  --gray-500: oklch(55.1% 0.027 264.364);
-  --gray-600: oklch(44.6% 0.03 256.802);
-  --gray-700: oklch(37.3% 0.034 259.733);
-  --gray-800: oklch(27.8% 0.033 256.848);
-  --gray-900: oklch(21% 0.034 264.665);
-  --gray-950: oklch(13% 0.028 261.692);
+  --gray-50: oklch(98.5% 0 0);
+  --gray-100: oklch(97% 0 0);
+  --gray-200: oklch(92.2% 0 0);
+  --gray-300: oklch(87% 0 0);
+  --gray-400: oklch(70.8% 0 0);
+  --gray-500: oklch(55.6% 0 0);
+  --gray-600: oklch(43.9% 0 0);
+  --gray-700: oklch(37.1% 0 0);
+  --gray-800: oklch(26.9% 0 0);
+  --gray-900: oklch(20.5% 0 0);
+  --gray-950: oklch(14.5% 0 0);
 
   --color-accent: oklch(0.6927 0.2513 38.8022);
   --color-accent-hover: oklch(0.6405 0.2241 38.8022);

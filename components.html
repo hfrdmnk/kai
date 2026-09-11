@@ -10,23 +10,24 @@
 		<style>
 			:root {
 				--white: oklch(100% 0 0);
-				--gray-50: oklch(98.5% 0.002 247.839);
-				--gray-100: oklch(96.7% 0.003 264.542);
-				--gray-200: oklch(92.8% 0.006 264.531);
-				--gray-300: oklch(87.2% 0.01 258.338);
-				--gray-400: oklch(70.7% 0.022 261.325);
-				--gray-500: oklch(55.1% 0.027 264.364);
-				--gray-600: oklch(44.6% 0.03 256.802);
-				--gray-700: oklch(37.3% 0.034 259.733);
-				--gray-800: oklch(27.8% 0.033 256.848);
-				--gray-900: oklch(21% 0.034 264.665);
-				--gray-950: oklch(13% 0.028 261.692);
+				--gray-50: oklch(98.5% 0 0);
+				--gray-100: oklch(97% 0 0);
+				--gray-200: oklch(92.2% 0 0);
+				--gray-300: oklch(87% 0 0);
+				--gray-400: oklch(70.8% 0 0);
+				--gray-500: oklch(55.6% 0 0);
+				--gray-600: oklch(43.9% 0 0);
+				--gray-700: oklch(37.1% 0 0);
+				--gray-800: oklch(26.9% 0 0);
+				--gray-900: oklch(20.5% 0 0);
+				--gray-950: oklch(14.5% 0 0);
 				--color-accent: oklch(0.6927 0.2513 38.8022);
 				--font-sans: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 				--font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 				--text-primary: var(--gray-900);
 				--text-secondary: var(--gray-600);
 				--text-tertiary: var(--gray-500);
+				--divider: var(--gray-200);
 			}
 
 			*, *::before, *::after {
@@ -37,15 +38,40 @@
 
 			body {
 				font-family: var(--font-sans);
-				color: var(--text-primary);
-				background: var(--white);
 				line-height: 1.5;
 				-webkit-font-smoothing: antialiased;
-				padding: 64px 48px 120px;
+				min-height: 100vh;
+				background: linear-gradient(to right, var(--white) 50%, var(--gray-950) 50%);
+			}
+
+			.pane {
+				color: var(--text-primary);
+				padding: 0 48px;
+			}
+
+			.pane[data-theme="dark"] {
+				--text-primary: var(--white);
+				--text-secondary: var(--gray-400);
+				--text-tertiary: var(--gray-500);
+				--divider: var(--gray-800);
+			}
+
+			.page-header,
+			.section {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
 			}
 
 			.page-header {
-				margin-bottom: 64px;
+				padding: 64px 0;
+			}
+
+			.section {
+				padding-bottom: 64px;
+			}
+
+			.section:last-of-type {
+				padding-bottom: 120px;
 			}
 
 			.page-header h1 {
@@ -59,10 +85,6 @@
 				color: var(--text-secondary);
 			}
 
-			.section {
-				margin-bottom: 64px;
-			}
-
 			.section-title {
 				font-size: 13px;
 				font-weight: 600;
@@ -71,7 +93,7 @@
 				letter-spacing: 0.06em;
 				margin-bottom: 20px;
 				padding-bottom: 8px;
-				border-bottom: 1px solid var(--gray-200);
+				border-bottom: 1px solid var(--divider);
 			}
 
 			.specimen {
@@ -105,88 +127,190 @@
 	</head>
 	<body>
 		<div class="page-header">
-			<h1>kai — Components</h1>
-			<p>Internal component catalog for design review</p>
+			<div class="pane" data-theme="light">
+				<h1>kai — Components</h1>
+				<p>Internal component catalog for design review · Light theme</p>
+			</div>
+			<div class="pane" data-theme="dark">
+				<h1>kai — Components</h1>
+				<p>Internal component catalog for design review · Dark theme</p>
+			</div>
 		</div>
 
-		<div class="section">
-			<div class="section-title">1. Color Palette</div>
-			<div id="mount-colors" class="specimen-mount"></div>
+		<div class="section" data-mount="colors">
+			<div class="pane" data-theme="light">
+				<div class="section-title">1. Color Palette</div>
+				<div class="specimen-mount"></div>
+			</div>
+			<div class="pane" data-theme="dark">
+				<div class="section-title">1. Color Palette</div>
+				<div class="specimen-mount"></div>
+			</div>
 		</div>
 
-		<div class="section">
-			<div class="section-title">2. Typography</div>
-			<div id="mount-typography" class="specimen-mount"></div>
+		<div class="section" data-mount="typography">
+			<div class="pane" data-theme="light">
+				<div class="section-title">2. Typography</div>
+				<div class="specimen-mount"></div>
+			</div>
+			<div class="pane" data-theme="dark">
+				<div class="section-title">2. Typography</div>
+				<div class="specimen-mount"></div>
+			</div>
 		</div>
 
-		<div class="section">
-			<div class="section-title">3. Shadows</div>
-			<div id="mount-shadows" class="specimen-mount"></div>
+		<div class="section" data-mount="shadows">
+			<div class="pane" data-theme="light">
+				<div class="section-title">3. Shadows</div>
+				<div class="specimen-mount"></div>
+			</div>
+			<div class="pane" data-theme="dark">
+				<div class="section-title">3. Shadows</div>
+				<div class="specimen-mount"></div>
+			</div>
 		</div>
 
-		<div class="section">
-			<div class="section-title">4. Icons</div>
-			<div id="mount-icons" class="specimen-mount"></div>
+		<div class="section" data-mount="icons">
+			<div class="pane" data-theme="light">
+				<div class="section-title">4. Icons</div>
+				<div class="specimen-mount"></div>
+			</div>
+			<div class="pane" data-theme="dark">
+				<div class="section-title">4. Icons</div>
+				<div class="specimen-mount"></div>
+			</div>
 		</div>
 
-		<div class="section">
-			<div class="section-title">5. Buttons</div>
-			<div id="mount-buttons" class="specimen-mount"></div>
+		<div class="section" data-mount="buttons">
+			<div class="pane" data-theme="light">
+				<div class="section-title">5. Buttons</div>
+				<div class="specimen-mount"></div>
+			</div>
+			<div class="pane" data-theme="dark">
+				<div class="section-title">5. Buttons</div>
+				<div class="specimen-mount"></div>
+			</div>
 		</div>
 
-		<div class="section">
-			<div class="section-title">6. FAB</div>
-			<div id="mount-fab" class="specimen-mount"></div>
+		<div class="section" data-mount="fab">
+			<div class="pane" data-theme="light">
+				<div class="section-title">6. FAB</div>
+				<div class="specimen-mount"></div>
+			</div>
+			<div class="pane" data-theme="dark">
+				<div class="section-title">6. FAB</div>
+				<div class="specimen-mount"></div>
+			</div>
 		</div>
 
-		<div class="section">
-			<div class="section-title">7. FAB Actions</div>
-			<div id="mount-fab-actions" class="specimen-mount"></div>
+		<div class="section" data-mount="fab-actions">
+			<div class="pane" data-theme="light">
+				<div class="section-title">7. FAB Actions</div>
+				<div class="specimen-mount"></div>
+			</div>
+			<div class="pane" data-theme="dark">
+				<div class="section-title">7. FAB Actions</div>
+				<div class="specimen-mount"></div>
+			</div>
 		</div>
 
-		<div class="section">
-			<div class="section-title">8. Tooltip</div>
-			<div id="mount-tooltip" class="specimen-mount"></div>
+		<div class="section" data-mount="tooltip">
+			<div class="pane" data-theme="light">
+				<div class="section-title">8. Tooltip</div>
+				<div class="specimen-mount"></div>
+			</div>
+			<div class="pane" data-theme="dark">
+				<div class="section-title">8. Tooltip</div>
+				<div class="specimen-mount"></div>
+			</div>
 		</div>
 
-		<div class="section">
-			<div class="section-title">9. Overlay</div>
-			<div id="mount-overlay" class="specimen-mount"></div>
+		<div class="section" data-mount="overlay">
+			<div class="pane" data-theme="light">
+				<div class="section-title">9. Overlay</div>
+				<div class="specimen-mount"></div>
+			</div>
+			<div class="pane" data-theme="dark">
+				<div class="section-title">9. Overlay</div>
+				<div class="specimen-mount"></div>
+			</div>
 		</div>
 
-		<div class="section">
-			<div class="section-title">10. Popover</div>
-			<div id="mount-popover" class="specimen-mount"></div>
+		<div class="section" data-mount="popover">
+			<div class="pane" data-theme="light">
+				<div class="section-title">10. Popover</div>
+				<div class="specimen-mount"></div>
+			</div>
+			<div class="pane" data-theme="dark">
+				<div class="section-title">10. Popover</div>
+				<div class="specimen-mount"></div>
+			</div>
 		</div>
 
-		<div class="section">
-			<div class="section-title">11. Markers</div>
-			<div id="mount-markers" class="specimen-mount"></div>
+		<div class="section" data-mount="markers">
+			<div class="pane" data-theme="light">
+				<div class="section-title">11. Markers</div>
+				<div class="specimen-mount"></div>
+			</div>
+			<div class="pane" data-theme="dark">
+				<div class="section-title">11. Markers</div>
+				<div class="specimen-mount"></div>
+			</div>
 		</div>
 
-		<div class="section">
-			<div class="section-title">12. Stack Expanded</div>
-			<div id="mount-stack-expanded" class="specimen-mount"></div>
+		<div class="section" data-mount="stack-expanded">
+			<div class="pane" data-theme="light">
+				<div class="section-title">12. Stack Expanded</div>
+				<div class="specimen-mount"></div>
+			</div>
+			<div class="pane" data-theme="dark">
+				<div class="section-title">12. Stack Expanded</div>
+				<div class="specimen-mount"></div>
+			</div>
 		</div>
 
-		<div class="section">
-			<div class="section-title">13. Annotation Box</div>
-			<div id="mount-annotation-box" class="specimen-mount"></div>
+		<div class="section" data-mount="annotation-box">
+			<div class="pane" data-theme="light">
+				<div class="section-title">13. Annotation Box</div>
+				<div class="specimen-mount"></div>
+			</div>
+			<div class="pane" data-theme="dark">
+				<div class="section-title">13. Annotation Box</div>
+				<div class="specimen-mount"></div>
+			</div>
 		</div>
 
-		<div class="section">
-			<div class="section-title">14. Autocomplete</div>
-			<div id="mount-autocomplete" class="specimen-mount"></div>
+		<div class="section" data-mount="autocomplete">
+			<div class="pane" data-theme="light">
+				<div class="section-title">14. Autocomplete</div>
+				<div class="specimen-mount"></div>
+			</div>
+			<div class="pane" data-theme="dark">
+				<div class="section-title">14. Autocomplete</div>
+				<div class="specimen-mount"></div>
+			</div>
 		</div>
 
-		<div class="section">
-			<div class="section-title">15. Measurement Tools</div>
-			<div id="mount-measure" class="specimen-mount"></div>
+		<div class="section" data-mount="measure">
+			<div class="pane" data-theme="light">
+				<div class="section-title">15. Measurement Tools</div>
+				<div class="specimen-mount"></div>
+			</div>
+			<div class="pane" data-theme="dark">
+				<div class="section-title">15. Measurement Tools</div>
+				<div class="specimen-mount"></div>
+			</div>
 		</div>
 
-		<div class="section">
-			<div class="section-title">16. Guide Bar</div>
-			<div id="mount-guide-bar" class="specimen-mount"></div>
+		<div class="section" data-mount="guide-bar">
+			<div class="pane" data-theme="light">
+				<div class="section-title">16. Guide Bar</div>
+				<div class="specimen-mount"></div>
+			</div>
+			<div class="pane" data-theme="dark">
+				<div class="section-title">16. Guide Bar</div>
+				<div class="specimen-mount"></div>
+			</div>
 		</div>
 
 		<script type="module" src="/src/components-page.ts"></script>

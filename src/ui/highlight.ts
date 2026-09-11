@@ -1,18 +1,28 @@
 import { getDirectText } from '../core/text.ts';
 
+const GAP = 4;
+
 export const createOverlay = (shadowRoot: ShadowRoot) => {
-  const overlay = document.createElement('div');
-  overlay.className = 'kai-overlay';
-  overlay.setAttribute('aria-hidden', 'true');
-  overlay.style.display = 'none';
+  const boxes: HTMLElement[] = [];
+  let current: Element | null = null;
 
   const tooltip = document.createElement('div');
   tooltip.className = 'kai-tooltip';
   tooltip.setAttribute('aria-hidden', 'true');
   tooltip.style.display = 'none';
-
-  shadowRoot.appendChild(overlay);
   shadowRoot.appendChild(tooltip);
+
+  const getBox = (i: number): HTMLElement => {
+    while (boxes.length <= i) {
+      const box = document.createElement('div');
+      box.className = 'kai-overlay';
+      box.setAttribute('aria-hidden', 'true');
+      box.style.display = 'none';
+      shadowRoot.insertBefore(box, tooltip);
+      boxes.push(box);
+    }
+    return boxes[i];
+  };
 
   const describeElement = (el: Element): string => {
     let label = el.tagName.toLowerCase();
@@ -27,15 +37,26 @@ export const createOverlay = (shadowRoot: ShadowRoot) => {
     return label;
   };
 
-  const show = (el: Element) => {
-    const rect = el.getBoundingClientRect();
+  const placeBox = (box: HTMLElement, rect: DOMRect) => {
+    box.style.display = 'block';
+    box.style.top = `${rect.top - GAP}px`;
+    box.style.left = `${rect.left - GAP}px`;
+    box.style.width = `${rect.width + GAP * 2}px`;
+    box.style.height = `${rect.height + GAP * 2}px`;
+  };
 
-    const gap = 4;
-    overlay.style.display = 'block';
-    overlay.style.top = `${rect.top - gap}px`;
-    overlay.style.left = `${rect.left - gap}px`;
-    overlay.style.width = `${rect.width + gap * 2}px`;
-    overlay.style.height = `${rect.height + gap * 2}px`;
+  const show = (el: Element) => {
+    current = el;
+    const bounding = el.getBoundingClientRect();
+
+    // Inline elements wrapping across lines get one box per line fragment
+    const fragments = Array.from(el.getClientRects()).filter(r => r.width > 0 && r.height > 0);
+    const rects = fragments.length > 1 ? fragments : [bounding];
+
+    rects.forEach((rect, i) => placeBox(getBox(i), rect));
+    for (let i = rects.length; i < boxes.length; i++) {
+      boxes[i].style.display = 'none';
+    }
 
     tooltip.textContent = describeElement(el);
     tooltip.style.display = 'block';
@@ -46,13 +67,13 @@ export const createOverlay = (shadowRoot: ShadowRoot) => {
     const vh = document.documentElement.clientHeight;
     const pad = 4;
 
-    let left = Math.max(pad, Math.min(rect.left, vw - tw - pad));
+    const left = Math.max(pad, Math.min(bounding.left, vw - tw - pad));
 
     let top: number;
-    if (rect.top > th + pad + 2) {
-      top = rect.top - th - 2;
-    } else if (rect.bottom + th + 6 < vh - pad) {
-      top = rect.bottom + 6;
+    if (bounding.top > th + pad + 2) {
+      top = bounding.top - th - 2;
+    } else if (bounding.bottom + th + 6 < vh - pad) {
+      top = bounding.bottom + 6;
     } else {
       top = pad;
     }
@@ -62,14 +83,25 @@ export const createOverlay = (shadowRoot: ShadowRoot) => {
   };
 
   const hide = () => {
-    overlay.style.display = 'none';
+    current = null;
+    for (const box of boxes) box.style.display = 'none';
     tooltip.style.display = 'none';
   };
 
+  /** Re-measure the currently shown element, e.g. after scroll or layout changes. */
+  const refresh = () => {
+    if (!current) return;
+    if (!current.isConnected) {
+      hide();
+      return;
+    }
+    show(current);
+  };
+
   const destroy = () => {
-    overlay.remove();
+    for (const box of boxes) box.remove();
     tooltip.remove();
   };
 
-  return { show, hide, destroy };
+  return { show, hide, refresh, destroy };
 };

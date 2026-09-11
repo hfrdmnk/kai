@@ -16,6 +16,8 @@ The name 回 (kai) is Japanese for "turn," as in a turn in a cycle. Annotate wha
 - Smart element selection with hover highlight, breadcrumb paths, and computed styles (px→rem)
 - CSS variable autocomplete — type `--` to browse the page's custom properties
 - Measurement mode (<kbd>Alt</kbd>): crosshair with dimensions, text metrics, selection rectangle
+- Pass-through mode (hold <kbd>Cmd</kbd> / <kbd>Ctrl</kbd>): interact with the page without leaving the annotator
+- Copy any element's selector with the cursor action bubble
 - Markers with automatic clustering for dense annotations
 - Session persistence via localStorage — survives reloads
 - Export as Markdown (optimized for AI agents)
@@ -57,6 +59,18 @@ Alternatively, you can also add this script tag to your project and render it co
 ### Measurement mode
 
 Hold <kbd>Alt</kbd> to enter measurement mode. A crosshair follows your cursor showing element dimensions. Hold <kbd>Shift</kbd> additionally to see text metrics. Click and drag to measure arbitrary distances.
+
+### Pass-through mode
+
+While kai is active, clicks never reach the page. Hold <kbd>Cmd</kbd> (Mac) or <kbd>Ctrl</kbd> (Windows/Linux) to interact with the page normally, for example to open a modal, then release to annotate what appeared.
+
+### Selecting a covered parent
+
+When a child fills its parent (a link wrapping a card, a span filling a button), press <kbd>↑</kbd> while hovering to move the highlight to the parent and <kbd>↓</kbd> to go back down.
+
+### Copy a selector
+
+Click the cursor bubble next to the FAB, then click any element. Its selector lands on the clipboard and the bubble shows a check.
 
 ## FAQ
 

@@ -1,8 +1,9 @@
 import type { Annotation, FabCorner } from './types.ts';
 import { styles } from './styles.ts';
-import { generateSelector, generatePath } from './core/selector.ts';
+import { generateSelector, generatePath, resolveSelector, composedParent, composedChildren, composedContains } from './core/selector.ts';
 import { getComputedStyles } from './core/styles.ts';
 import { getNearbyText } from './core/text.ts';
+import { isMac, PASS_THROUGH_KEY } from './core/platform.ts';
 import { loadSession, saveSession, clearSession, loadFabCorner, saveFabCorner, loadTheme } from './core/session.ts';
 import { computeCrosshair, computeTextInspectData, findLargestEnclosedElement } from './core/measure.ts';
 import { toMarkdown } from './export/markdown.ts';
@@ -15,6 +16,21 @@ import { createGuideBar } from './ui/guide-bar.ts';
 
 const DRAG_THRESHOLD = 5;
 
+/** SVG internals (path, g, use…) are never what a user means to annotate; snap to the root <svg>. */
+const snapToSvgRoot = (el: Element): Element => {
+  let current = el;
+  while (current instanceof SVGElement && current.ownerSVGElement) {
+    current = current.ownerSVGElement;
+  }
+  return current;
+};
+
+/** The modifier state on the mouse event is the source of truth; keydown can be missed when focus sits in an iframe or our own UI. */
+const isPassThroughEvent = (e: MouseEvent): boolean => isMac ? e.metaKey : e.ctrlKey;
+
+const isEditable = (t: EventTarget | null): boolean =>
+  t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+
 let instance: UIAnnotator | null = null;
 
 class UIAnnotator extends HTMLElement {
@@ -24,9 +40,12 @@ class UIAnnotator extends HTMLElement {
   private fabCorner!: FabCorner;
   private altHeld = false;
   private shiftHeld = false;
+  private passThrough = false;
+  private pickMode = false;
   private dragging = false;
   private dragStart: { x: number; y: number } | null = null;
   private lastMousePos: { x: number; y: number } = { x: 0, y: 0 };
+  private hasPointer = false;
   private measureRafId: number | null = null;
   private highlightLocked = false;
 
@@ -38,15 +57,23 @@ class UIAnnotator extends HTMLElement {
   private activePopover: ReturnType<typeof createPopover> | null = null;
   private activePopoverAnnotationId: string | null = null;
 
-  private hoveredElement: Element | null = null;
+  // Hover state: hoverTarget is what the hit test found, selectedElement is what
+  // the box shows (hoverTarget or one of its ancestors after walking up with ↑).
+  private hoverTarget: Element | null = null;
+  private selectedElement: Element | null = null;
+  private walkedUp = false;
+  private hoverDirty = false;
+  private hoverRafId: number | null = null;
+  private domObserver: MutationObserver | null = null;
 
-  private handleMouseOver!: (e: MouseEvent) => void;
-  private handleMouseOut!: () => void;
+  private handleMouseLeave!: (e: MouseEvent) => void;
   private handleClick!: (e: MouseEvent) => void;
+  private handleBlockedPointer!: (e: MouseEvent) => void;
   private handleGlobalKeydown!: (e: KeyboardEvent) => void;
   private handleKeydown!: (e: KeyboardEvent) => void;
   private handleKeyup!: (e: KeyboardEvent) => void;
   private handleWindowBlur!: () => void;
+  private handleLayoutChange!: () => void;
   private handleMouseMove!: (e: MouseEvent) => void;
   private handleMouseDown!: (e: MouseEvent) => void;
   private handleMouseUp!: (e: MouseEvent) => void;
@@ -68,7 +95,6 @@ class UIAnnotator extends HTMLElement {
 
     this.annotations = loadSession();
     this.fabCorner = loadFabCorner();
-    this.setAttribute('data-theme', loadTheme());
 
     this.fab = createFab(this.shadow, {
       initialCorner: this.fabCorner,
@@ -85,6 +111,11 @@ class UIAnnotator extends HTMLElement {
         this.fab.updateBadge(0);
         this.fab.updateActionStates(0);
         this.closePopover();
+      },
+      onPickToggle: (armed) => {
+        this.pickMode = armed;
+        if (armed) this.closePopover();
+        this.guideBar.show(armed ? 'pick' : 'annotate');
       },
       onCornerChange: (c) => {
         this.fabCorner = c;
@@ -115,33 +146,40 @@ class UIAnnotator extends HTMLElement {
     this.fab.updateActionStates(this.annotations.length);
 
     // Bind event handlers
-    this.handleMouseOver = (e: MouseEvent) => {
-      if (this.isOwnElement(e)) return;
-      const target = e.target as Element;
-      this.hoveredElement = target;
-      if (!this.altHeld) {
-        this.overlay.show(target);
-      }
+    this.handleMouseLeave = (e: MouseEvent) => {
+      if (e.relatedTarget) return;
+      this.hasPointer = false;
+      this.clearHover();
     };
 
-    this.handleMouseOut = () => {
-      this.hoveredElement = null;
-      if (!this.altHeld) {
-        this.overlay.hide();
-      }
+    this.handleLayoutChange = () => {
+      this.hoverDirty = true;
+      this.scheduleHoverUpdate();
     };
 
     this.handleClick = (e: MouseEvent) => {
       if (this.isOwnElement(e)) return;
+      if (this.passThrough || isPassThroughEvent(e)) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       if (this.altHeld) return;
-      const target = this.hoveredElement;
-      if (!target) return;
-      this.overlay.hide();
+
+      const target = this.selectedElement ?? this.hitTest(e.clientX, e.clientY);
+      if (!target || !target.isConnected) return;
+      this.clearHover();
+
+      if (this.pickMode) {
+        this.pickMode = false;
+        this.fab.setPickArmed(false);
+        this.guideBar.show('annotate');
+        navigator.clipboard.writeText(generateSelector(target)).then(() => {
+          this.fab.confirmPick();
+        });
+        return;
+      }
 
       const existing = this.annotations.find(a => {
-        try { return document.querySelector(a.selector) === target; }
+        try { return resolveSelector(a.selector) === target; }
         catch { return false; }
       });
 
@@ -154,21 +192,40 @@ class UIAnnotator extends HTMLElement {
       }
     };
 
+    // Libraries like Radix and React Aria act on pointerdown, not click, so
+    // those have to be swallowed too. No preventDefault: that would suppress
+    // the compat mouse events our own handlers rely on.
+    this.handleBlockedPointer = (e: MouseEvent) => {
+      if (this.isOwnElement(e)) return;
+      if (this.passThrough || isPassThroughEvent(e)) return;
+      e.stopImmediatePropagation();
+    };
+
     this.handleGlobalKeydown = (e: KeyboardEvent) => {
       if (e.key === 'A' && e.ctrlKey && e.shiftKey) {
         e.preventDefault();
         this.toggle();
       }
       if (e.key === 'Escape' && this.active && !this.activePopover) {
-        this.deactivate();
+        if (this.pickMode) {
+          this.disarmPick();
+        } else {
+          this.deactivate();
+        }
       }
     };
 
     this.handleKeydown = (e: KeyboardEvent) => {
+      if (e.key === PASS_THROUGH_KEY) {
+        // Cmd+Enter in the popover textarea must not flip modes
+        if (this.passThrough || this.altHeld || isEditable(this.shadow.activeElement)) return;
+        this.enterPassThrough();
+        return;
+      }
       if (e.key === 'Alt') {
-        if (this.altHeld) return;
+        if (this.altHeld || this.passThrough) return;
         this.altHeld = true;
-        this.overlay.hide();
+        this.clearHover();
         document.body.style.cursor = 'crosshair';
         this.guideBar.show('measure', ['alt']);
         this.scheduleMeasureUpdate();
@@ -180,9 +237,21 @@ class UIAnnotator extends HTMLElement {
           this.scheduleMeasureUpdate();
         }
       }
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        if (!this.altHeld && !this.passThrough) {
+          this.guideBar.updateKeys([e.key === 'ArrowUp' ? 'up' : 'down']);
+        }
+        this.walkAncestors(e);
+      }
     };
 
     this.handleKeyup = (e: KeyboardEvent) => {
+      if (e.key === PASS_THROUGH_KEY && this.passThrough) {
+        this.exitPassThrough();
+      }
+      if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !this.altHeld && !this.passThrough) {
+        this.guideBar.updateKeys([]);
+      }
       if (e.key === 'Alt') {
         this.exitMeasureMode();
       }
@@ -199,12 +268,19 @@ class UIAnnotator extends HTMLElement {
       if (this.altHeld) {
         this.exitMeasureMode();
       }
+      if (this.passThrough) {
+        this.exitPassThrough();
+      }
     };
 
     this.handleMouseMove = (e: MouseEvent) => {
       this.lastMousePos = { x: e.clientX, y: e.clientY };
+      this.hasPointer = true;
 
-      if (!this.altHeld) return;
+      if (!this.altHeld) {
+        this.scheduleHoverUpdate();
+        return;
+      }
 
       if (this.dragStart && !this.dragging) {
         const dx = e.clientX - this.dragStart.x;
@@ -220,6 +296,7 @@ class UIAnnotator extends HTMLElement {
 
     this.handleMouseDown = (e: MouseEvent) => {
       if (this.isOwnElement(e)) return;
+      if (this.passThrough || isPassThroughEvent(e)) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       if (!this.altHeld) return;
@@ -231,6 +308,7 @@ class UIAnnotator extends HTMLElement {
 
     this.handleMouseUp = (e: MouseEvent) => {
       if (this.isOwnElement(e)) return;
+      if (this.passThrough || isPassThroughEvent(e)) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       if (!this.altHeld) return;
@@ -263,6 +341,104 @@ class UIAnnotator extends HTMLElement {
     };
   }
 
+  // ── Hover / hit testing ──
+
+  private hitTest(x: number, y: number): Element | null {
+    let el = document.elementFromPoint(x, y);
+    if (!el || el === this) return null;
+    // Descend through open shadow roots to the element actually under the pointer
+    while (el.shadowRoot) {
+      const inner = el.shadowRoot.elementFromPoint(x, y);
+      if (!inner || inner === el) break;
+      el = inner;
+    }
+    return snapToSvgRoot(el);
+  }
+
+  private scheduleHoverUpdate() {
+    if (this.hoverRafId !== null) return;
+    this.hoverRafId = requestAnimationFrame(() => {
+      this.hoverRafId = null;
+      this.updateHover();
+    });
+  }
+
+  private updateHover() {
+    if (!this.active || this.altHeld || this.passThrough || !this.hasPointer) return;
+
+    const dirty = this.hoverDirty;
+    this.hoverDirty = false;
+
+    const hit = this.hitTest(this.lastMousePos.x, this.lastMousePos.y);
+    if (!hit) {
+      this.clearHover();
+      return;
+    }
+    if (hit === this.hoverTarget && !dirty) return;
+    this.hoverTarget = hit;
+
+    const keepWalked = this.walkedUp
+      && this.selectedElement?.isConnected
+      && composedContains(this.selectedElement, hit);
+    if (!keepWalked) {
+      this.selectedElement = hit;
+      this.walkedUp = false;
+    }
+    this.overlay.show(this.selectedElement!);
+  }
+
+  private clearHover() {
+    this.hoverTarget = null;
+    this.selectedElement = null;
+    this.walkedUp = false;
+    this.overlay.hide();
+  }
+
+  private walkAncestors(e: KeyboardEvent) {
+    if (this.activePopover || this.altHeld || this.passThrough) return;
+    if (!this.selectedElement || !this.hoverTarget || isEditable(e.target)) return;
+
+    // A box is showing, so the arrows belong to us even at the ends of the chain
+    e.preventDefault();
+
+    if (e.key === 'ArrowUp') {
+      const parent = composedParent(this.selectedElement);
+      if (!parent || this.selectedElement === document.body) return;
+      this.selectedElement = parent;
+      this.walkedUp = true;
+    } else {
+      if (this.selectedElement === this.hoverTarget) return;
+      const hover = this.hoverTarget;
+      const child = composedChildren(this.selectedElement).find(c => composedContains(c, hover));
+      if (!child) return;
+      this.selectedElement = child;
+      this.walkedUp = child !== hover;
+    }
+    this.overlay.show(this.selectedElement);
+  }
+
+  // ── Modes ──
+
+  private enterPassThrough() {
+    this.passThrough = true;
+    this.clearHover();
+    this.guideBar.show('interact', ['meta']);
+  }
+
+  private exitPassThrough() {
+    this.passThrough = false;
+    if (!this.active) return;
+    this.guideBar.show(this.pickMode ? 'pick' : 'annotate');
+    this.handleLayoutChange();
+  }
+
+  private disarmPick() {
+    if (!this.pickMode) return;
+    this.pickMode = false;
+    this.fab.setPickArmed(false);
+    if (this.active) this.guideBar.show('annotate');
+  }
+
   private exitMeasureMode() {
     this.altHeld = false;
     this.shiftHeld = false;
@@ -271,14 +447,12 @@ class UIAnnotator extends HTMLElement {
     this.highlightLocked = false;
     document.body.style.cursor = '';
     this.inspector.hide();
-    if (this.active) this.guideBar.show('annotate');
+    if (this.active) this.guideBar.show(this.pickMode ? 'pick' : 'annotate');
     if (this.measureRafId !== null) {
       cancelAnimationFrame(this.measureRafId);
       this.measureRafId = null;
     }
-    if (this.hoveredElement) {
-      this.overlay.show(this.hoveredElement);
-    }
+    this.handleLayoutChange();
   }
 
   private scheduleMeasureUpdate() {
@@ -319,6 +493,8 @@ class UIAnnotator extends HTMLElement {
   }
 
   connectedCallback() {
+    // Attributes may not be set in the constructor of an element made via createElement
+    this.setAttribute('data-theme', loadTheme());
     document.addEventListener('keydown', this.handleGlobalKeydown);
   }
 
@@ -347,15 +523,22 @@ class UIAnnotator extends HTMLElement {
     this.markers.setActive(true);
     this.guideBar.show('annotate');
 
-    document.addEventListener('mouseover', this.handleMouseOver, true);
-    document.addEventListener('mouseout', this.handleMouseOut, true);
+    document.addEventListener('mouseout', this.handleMouseLeave, true);
     document.addEventListener('click', this.handleClick, true);
+    document.addEventListener('dblclick', this.handleBlockedPointer, true);
+    document.addEventListener('pointerdown', this.handleBlockedPointer, true);
+    document.addEventListener('pointerup', this.handleBlockedPointer, true);
     document.addEventListener('keydown', this.handleKeydown);
     document.addEventListener('keyup', this.handleKeyup);
     document.addEventListener('mousemove', this.handleMouseMove, true);
     document.addEventListener('mousedown', this.handleMouseDown, true);
     document.addEventListener('mouseup', this.handleMouseUp, true);
+    window.addEventListener('scroll', this.handleLayoutChange, { capture: true, passive: true });
+    window.addEventListener('resize', this.handleLayoutChange);
     window.addEventListener('blur', this.handleWindowBlur);
+
+    this.domObserver = new MutationObserver(this.handleLayoutChange);
+    this.domObserver.observe(document.body, { childList: true, subtree: true, attributes: true });
   }
 
   private deactivate() {
@@ -367,29 +550,41 @@ class UIAnnotator extends HTMLElement {
     if (this.altHeld) {
       this.exitMeasureMode();
     }
+    this.passThrough = false;
+    this.disarmPick();
 
-    document.removeEventListener('mouseover', this.handleMouseOver, true);
-    document.removeEventListener('mouseout', this.handleMouseOut, true);
+    document.removeEventListener('mouseout', this.handleMouseLeave, true);
     document.removeEventListener('click', this.handleClick, true);
+    document.removeEventListener('dblclick', this.handleBlockedPointer, true);
+    document.removeEventListener('pointerdown', this.handleBlockedPointer, true);
+    document.removeEventListener('pointerup', this.handleBlockedPointer, true);
     document.removeEventListener('keydown', this.handleKeydown);
     document.removeEventListener('keyup', this.handleKeyup);
     document.removeEventListener('mousemove', this.handleMouseMove, true);
     document.removeEventListener('mousedown', this.handleMouseDown, true);
     document.removeEventListener('mouseup', this.handleMouseUp, true);
+    window.removeEventListener('scroll', this.handleLayoutChange, { capture: true });
+    window.removeEventListener('resize', this.handleLayoutChange);
     window.removeEventListener('blur', this.handleWindowBlur);
 
-    this.overlay.hide();
+    this.domObserver?.disconnect();
+    this.domObserver = null;
+
+    this.clearHover();
     this.inspector.hide();
-    this.hoveredElement = null;
     this.closePopover();
 
     if (this.measureRafId !== null) {
       cancelAnimationFrame(this.measureRafId);
       this.measureRafId = null;
     }
+    if (this.hoverRafId !== null) {
+      cancelAnimationFrame(this.hoverRafId);
+      this.hoverRafId = null;
+    }
   }
 
-  private isOwnElement(e: MouseEvent): boolean {
+  private isOwnElement(e: Event): boolean {
     return e.composedPath().some(
       el => el === this || el === this.shadow
     );
@@ -452,7 +647,7 @@ class UIAnnotator extends HTMLElement {
     this.activePopoverAnnotationId = annotation.id;
     this.markers.showBox(annotation.id);
 
-    const target = document.querySelector(annotation.selector);
+    const target = resolveSelector(annotation.selector);
     if (!target) return;
 
     const path = annotation.path;

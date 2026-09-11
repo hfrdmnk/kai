@@ -1,5 +1,5 @@
 import type { FabCorner } from '../types.ts';
-import { iconKai, iconCopy, iconTrash, iconCheck, iconHelp } from '../icons.ts';
+import { iconKai, iconCopy, iconTrash, iconCheck, iconHelp, iconCursor } from '../icons.ts';
 import { SPRING } from '../core/easing.ts';
 
 const parser = new DOMParser();
@@ -17,6 +17,7 @@ type FabOptions = {
   onToggle: () => void;
   onCopyMarkdown: () => void;
   onClearAll: () => void;
+  onPickToggle: (armed: boolean) => void;
   onCornerChange: (corner: FabCorner) => void;
 };
 
@@ -154,6 +155,12 @@ export const createFab = (
   actions.className = 'kai-fab-actions';
   actions.style.display = 'none';
 
+  const pickBtn = document.createElement('button');
+  pickBtn.className = 'kai-fab-action';
+  pickBtn.setAttribute('aria-label', 'Copy selector');
+  pickBtn.setAttribute('aria-pressed', 'false');
+  setIcon(pickBtn, iconCursor);
+
   const copyBtn = document.createElement('button');
   copyBtn.className = 'kai-fab-action';
   copyBtn.setAttribute('aria-label', 'Copy as Markdown');
@@ -191,13 +198,15 @@ export const createFab = (
     tooltip.style.display = 'none';
   };
 
+  pickBtn.addEventListener('mouseenter', () => showTooltip(pickBtn, 'Copy selector'));
+  pickBtn.addEventListener('mouseleave', hideTooltip);
   copyBtn.addEventListener('mouseenter', () => showTooltip(copyBtn, 'Copy as Markdown'));
   copyBtn.addEventListener('mouseleave', hideTooltip);
   clearBtn.addEventListener('mouseenter', () => showTooltip(clearBtn, 'Clear all'));
   clearBtn.addEventListener('mouseleave', hideTooltip);
 
-  actions.appendChild(copyBtn);
-  actions.appendChild(clearBtn);
+  const actionBtns = [pickBtn, copyBtn, clearBtn];
+  for (const btn of actionBtns) actions.appendChild(btn);
 
   shadowRoot.appendChild(fab);
   shadowRoot.appendChild(actions);
@@ -399,6 +408,34 @@ export const createFab = (
     opts.onCopyMarkdown();
   });
 
+  let pickArmed = false;
+  let pickTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const setPickArmed = (armed: boolean) => {
+    pickArmed = armed;
+    pickBtn.classList.toggle('kai-fab-action--armed', armed);
+    pickBtn.setAttribute('aria-pressed', String(armed));
+  };
+
+  pickBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (pickTimer) return;
+    setPickArmed(!pickArmed);
+    opts.onPickToggle(pickArmed);
+  });
+
+  const confirmPick = () => {
+    if (pickTimer) clearTimeout(pickTimer);
+    setPickArmed(false);
+    animateStateSwap(pickBtn, iconCheck, 'var(--color-success)');
+    copyStatus.textContent = 'Selector copied';
+    pickTimer = setTimeout(() => {
+      animateStateSwap(pickBtn, iconCursor);
+      copyStatus.textContent = '';
+      pickTimer = null;
+    }, 2000);
+  };
+
   let clearArmed = false;
   let clearTimer: ReturnType<typeof setTimeout> | null = null;
   const resetClear = () => {
@@ -443,7 +480,7 @@ export const createFab = (
     requestAnimationFrame(() => {
       positionActions(actions, fab, corner);
       const tx = isRightCorner() ? '12px' : '-12px';
-      [copyBtn, clearBtn].forEach((btn, i) => {
+      actionBtns.forEach((btn, i) => {
         const anim = btn.animate(
           [
             { transform: `translateX(${tx}) scale(0.8)`, opacity: 0 },
@@ -462,7 +499,7 @@ export const createFab = (
     actionAnims = [];
 
     const tx = isRightCorner() ? '8px' : '-8px';
-    const anims = [copyBtn, clearBtn].map((btn, i) => {
+    const anims = actionBtns.map((btn, i) => {
       const anim = btn.animate(
         [
           { transform: 'translateX(0) scale(1)', opacity: 1 },
@@ -507,5 +544,5 @@ export const createFab = (
     copyStatus.remove();
   };
 
-  return { updateBadge, setActive, updateActionStates, confirmCopy, destroy };
+  return { updateBadge, setActive, updateActionStates, confirmCopy, confirmPick, setPickArmed, destroy };
 };

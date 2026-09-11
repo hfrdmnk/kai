@@ -258,6 +258,13 @@ export const styles = `
   pointer-events: none;
 }
 
+.kai-fab-action--armed,
+.kai-fab-action--armed:hover {
+  background: var(--color-accent);
+  color: var(--white);
+  border-color: var(--color-accent);
+}
+
 .kai-fab-action svg {
   width: 16px;
   height: 16px;

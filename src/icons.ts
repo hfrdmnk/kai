@@ -4,5 +4,6 @@ import iconTrash from './icons/trash.svg?raw';
 import iconCopy from './icons/copy.svg?raw';
 import iconCheck from './icons/check.svg?raw';
 import iconHelp from './icons/help.svg?raw';
+import iconCursor from './icons/cursor.svg?raw';
 
-export { iconKai, iconClose, iconTrash, iconCopy, iconCheck, iconHelp };
+export { iconKai, iconClose, iconTrash, iconCopy, iconCheck, iconHelp, iconCursor };

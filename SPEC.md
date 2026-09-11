@@ -38,6 +38,10 @@ No React, no Svelte, no Vue. Pure vanilla TypeScript compiled to a single IIFE b
 ### Element Selection & Inspection
 - Activate with FAB button (bottom-right) or `Ctrl+Shift+A`
 - Hover highlights elements with a bounding box overlay and a tooltip showing `tag#id.class`
+- Hit testing runs on pointer position (`elementFromPoint`), so the box follows scroll and DOM changes; SVG internals snap to their root `<svg>`; inline elements get one box per line fragment
+- Open shadow roots are pierced: hover, ↑/↓ walking and paths cross the boundary, and selectors for shadow content read `host-selector >>> inner-selector` (see `resolveSelector` in `src/core/selector.ts`)
+- `↑` / `↓` walk the ancestor chain when the wanted parent is fully covered by a child
+- Page interactions (click, pointerdown, dblclick) are swallowed while active; hold `Cmd`/`Ctrl` to pass them through, e.g. to open a modal before annotating it
 - Click any element to open the annotation panel
 - Panel displays:
   - CSS selector (minimal, unique)
@@ -61,6 +65,7 @@ No React, no Svelte, no Vue. Pure vanilla TypeScript compiled to a single IIFE b
 - **JSON**: Structured object with url, viewport dimensions, timestamp, and annotation array (each with selector, path, intent, styles, rect, comment)
 - **Markdown**: Formatted for pasting into AI coding agents — headings per annotation with selector as code, styles listed, feedback quoted
 - Copy to clipboard with inline button feedback (icon swap + color change, auto-reset)
+- **Copy selector**: cursor action bubble arms a one-shot pick mode; clicking an element copies its selector and the bubble shows the same check confirmation
 
 ### Session Persistence
 - Annotations saved to `localStorage` under key `ui-annotator:{origin}{pathname}`
@@ -127,7 +132,10 @@ All kai UI layers sit at the top of the stacking context, above any host page co
 |---|---|---|
 | `Ctrl+Shift+A` | Global | Toggle annotator on/off |
 | `Escape` | Panel open | Close panel |
+| `Escape` | Pick mode armed | Cancel pick mode |
 | `Escape` | Annotator active, no panel | Deactivate annotator |
+| `Cmd` (Mac) / `Ctrl` (Win), held | Annotator active | Pass-through: interact with the page normally |
+| `↑` / `↓` | Element hovered | Move the highlight to the parent / back toward the hovered element |
 | `Cmd/Ctrl+Enter` | Panel textarea focused | Submit annotation |
 | `Tab` | Autocomplete visible | Accept selected suggestion |
 | `Tab` | Rem suggestion visible | Accept px→rem replacement |

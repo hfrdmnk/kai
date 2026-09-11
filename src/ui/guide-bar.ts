@@ -1,46 +1,71 @@
 import { SPRING, GLIDE } from '../core/easing.ts';
+import { isMac } from '../core/platform.ts';
 
-export type KeyId = 'alt' | 'shift';
-type GuideMode = 'annotate' | 'measure';
-
-const isMac = /Mac|iPhone|iPad/.test(navigator.platform ?? navigator.userAgent);
+export type KeyId = 'alt' | 'shift' | 'meta' | 'up' | 'down' | 'esc';
+export type GuideMode = 'annotate' | 'measure' | 'interact' | 'pick';
 
 const KEY_LABELS: Record<KeyId, string> = {
   alt: isMac ? '⌥' : 'Alt',
   shift: isMac ? '⇧' : 'Shift',
+  meta: isMac ? '⌘' : 'Ctrl',
+  up: '↑',
+  down: '↓',
+  esc: 'Esc',
 };
 
-const CONTENT: Record<GuideMode, { text: string; keys: KeyId[]; hint: string }> = {
-  annotate: { text: 'Click elements to annotate', keys: ['alt'],          hint: 'inspect mode' },
-  measure:  { text: 'Drag to measure',            keys: ['alt', 'shift'], hint: 'text info' },
+type Hint = { keys: KeyId[]; hint: string };
+
+const CONTENT: Record<GuideMode, { text: string; hints: Hint[] }> = {
+  annotate: {
+    text: 'Click elements to annotate',
+    hints: [
+      { keys: ['alt'],    hint: 'inspect' },
+      { keys: ['meta'],   hint: 'interact' },
+      { keys: ['up', 'down'], hint: 'parent / child' },
+    ],
+  },
+  measure: {
+    text: 'Drag to measure',
+    hints: [{ keys: ['alt', 'shift'], hint: 'text info' }],
+  },
+  interact: {
+    text: 'Interacting with page',
+    hints: [{ keys: ['meta'], hint: 'release to annotate' }],
+  },
+  pick: {
+    text: 'Click an element to copy its selector',
+    hints: [{ keys: ['esc'], hint: 'cancel' }],
+  },
 };
 
 const renderContent = (mode: GuideMode, pressedKeys: KeyId[] = []): DocumentFragment => {
   const frag = document.createDocumentFragment();
-  const { text, keys, hint } = CONTENT[mode];
+  const { text, hints } = CONTENT[mode];
 
   const span = document.createElement('span');
   span.textContent = text;
   frag.appendChild(span);
 
-  const sep = document.createElement('span');
-  sep.className = 'kai-guide-bar-sep';
-  sep.textContent = '·';
-  frag.appendChild(sep);
+  for (const { keys, hint } of hints) {
+    const sep = document.createElement('span');
+    sep.className = 'kai-guide-bar-sep';
+    sep.textContent = '·';
+    frag.appendChild(sep);
 
-  for (const k of keys) {
-    const kbd = document.createElement('span');
-    kbd.className = 'kai-guide-bar-kbd';
-    kbd.setAttribute('data-key', k);
-    if (pressedKeys.includes(k)) kbd.setAttribute('data-pressed', '');
-    kbd.textContent = KEY_LABELS[k];
-    frag.appendChild(kbd);
+    for (const k of keys) {
+      const kbd = document.createElement('span');
+      kbd.className = 'kai-guide-bar-kbd';
+      kbd.setAttribute('data-key', k);
+      if (pressedKeys.includes(k)) kbd.setAttribute('data-pressed', '');
+      kbd.textContent = KEY_LABELS[k];
+      frag.appendChild(kbd);
+    }
+
+    const hintEl = document.createElement('span');
+    hintEl.className = 'kai-guide-bar-hint';
+    hintEl.textContent = hint;
+    frag.appendChild(hintEl);
   }
-
-  const hintEl = document.createElement('span');
-  hintEl.className = 'kai-guide-bar-hint';
-  hintEl.textContent = hint;
-  frag.appendChild(hintEl);
 
   return frag;
 };

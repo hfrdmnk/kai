@@ -1,5 +1,6 @@
 import type { Annotation } from '../types.ts';
 import { iconKai } from '../icons.ts';
+import { resolveSelector } from '../core/selector.ts';
 import { SPRING } from '../core/easing.ts';
 
 const parser = new DOMParser();
@@ -374,7 +375,7 @@ export const createMarkerManager = (
       const marker = markerMap.get(annotation.id);
       if (!marker) continue;
 
-      const target = document.querySelector(annotation.selector);
+      const target = resolveSelector(annotation.selector);
       if (!target) {
         marker.style.display = 'none';
         const box = boxMap.get(annotation.id);

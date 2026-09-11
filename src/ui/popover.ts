@@ -180,12 +180,13 @@ export const createPopover = (
   };
   window.addEventListener('scroll', onScroll, { capture: true, passive: true });
 
-  // Close on click outside
+  // Close on click outside. Listens on window so it runs before the
+  // annotator's document-level capture handler swallows page pointerdowns.
   const onPointerDown = (e: PointerEvent) => {
     if (e.composedPath().includes(shadowRoot.host)) return;
     opts.onClose();
   };
-  document.addEventListener('pointerdown', onPointerDown, { capture: true });
+  window.addEventListener('pointerdown', onPointerDown, { capture: true });
 
   // Close on resize
   const onResize = () => opts.onClose();
@@ -203,6 +204,8 @@ export const createPopover = (
   // Escape to close (if autocomplete not open)
   const onKeydown = (e: KeyboardEvent) => {
     if (e.key === 'Escape' && !shadowRoot.querySelector('.kai-autocomplete')) {
+      // Stop here, or the document-level Escape handler sees "no popover" and deactivates the annotator
+      e.stopPropagation();
       opts.onClose();
     }
   };
@@ -210,7 +213,7 @@ export const createPopover = (
 
   const destroy = () => {
     window.removeEventListener('scroll', onScroll, { capture: true });
-    document.removeEventListener('pointerdown', onPointerDown, { capture: true });
+    window.removeEventListener('pointerdown', onPointerDown, { capture: true });
     window.removeEventListener('resize', onResize);
     ac.destroy();
     popover.remove();

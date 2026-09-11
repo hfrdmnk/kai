@@ -5,6 +5,7 @@ import iconTrash from './icons/trash.svg?raw';
 import iconCopy from './icons/copy.svg?raw';
 import iconCheck from './icons/check.svg?raw';
 import iconHelp from './icons/help.svg?raw';
+import iconCursor from './icons/cursor.svg?raw';
 
 // ── Helpers ────────────────────────────────────────
 
@@ -190,6 +191,7 @@ mountSpecimen('icons', '', (shadow) => {
   const icons: [string, string][] = [
     ['kai', iconKai], ['close', iconClose], ['trash', iconTrash],
     ['copy', iconCopy], ['check', iconCheck], ['help', iconHelp],
+    ['cursor', iconCursor],
   ];
   const sizes = [24, 16, 12];
 
@@ -366,6 +368,10 @@ mountSpecimen('fab-actions', `
   actions.className = 'kai-fab-actions';
   actions.style.display = 'flex';
 
+  const pickBtn = document.createElement('button');
+  pickBtn.className = 'kai-fab-action';
+  setIcon(pickBtn, iconCursor, 16);
+
   const copyBtn = document.createElement('button');
   copyBtn.className = 'kai-fab-action';
   setIcon(copyBtn, iconCopy, 16);
@@ -374,9 +380,22 @@ mountSpecimen('fab-actions', `
   trashBtn.className = 'kai-fab-action';
   setIcon(trashBtn, iconTrash, 16);
 
+  actions.appendChild(pickBtn);
   actions.appendChild(copyBtn);
   actions.appendChild(trashBtn);
   shadow.appendChild(actions);
+
+  shadow.appendChild(makeLabel('Pick armed'));
+  const actionsArmed = document.createElement('div');
+  actionsArmed.className = 'kai-fab-actions';
+  actionsArmed.style.display = 'flex';
+
+  const pickArmed = document.createElement('button');
+  pickArmed.className = 'kai-fab-action kai-fab-action--armed';
+  setIcon(pickArmed, iconCursor, 16);
+
+  actionsArmed.appendChild(pickArmed);
+  shadow.appendChild(actionsArmed);
 
   shadow.appendChild(makeLabel('Hover state'));
   const actionsHover = document.createElement('div');

@@ -1,10 +1,11 @@
-import type { Annotation, FabCorner } from './types.ts';
+import type { AccentId, Annotation, FabCorner, Theme } from './types.ts';
 import { styles } from './styles.ts';
 import { generateSelector, generatePath, resolveSelector, composedParent, composedChildren, composedContains } from './core/selector.ts';
 import { getComputedStyles } from './core/styles.ts';
 import { getNearbyText } from './core/text.ts';
 import { isMac, PASS_THROUGH_KEY } from './core/platform.ts';
-import { loadSession, saveSession, clearSession, loadFabCorner, saveFabCorner, loadTheme } from './core/session.ts';
+import { loadSession, saveSession, clearSession, loadFabCorner, saveFabCorner, loadTheme, saveTheme, loadAccent, saveAccent } from './core/session.ts';
+import { applyAccent } from './core/accents.ts';
 import { computeCrosshair, computeTextInspectData, findLargestEnclosedElement } from './core/measure.ts';
 import { toMarkdown } from './export/markdown.ts';
 import { createOverlay } from './ui/highlight.ts';
@@ -38,10 +39,14 @@ class UIAnnotator extends HTMLElement {
   private annotations: Annotation[] = [];
   private active = false;
   private fabCorner!: FabCorner;
+  private theme!: Theme;
+  private accent!: AccentId;
+  private readonly systemDark = window.matchMedia('(prefers-color-scheme: dark)');
   private altHeld = false;
   private shiftHeld = false;
   private passThrough = false;
   private pickMode = false;
+  private settingsOpen = false;
   private dragging = false;
   private dragStart: { x: number; y: number } | null = null;
   private lastMousePos: { x: number; y: number } = { x: 0, y: 0 };
@@ -95,6 +100,8 @@ class UIAnnotator extends HTMLElement {
 
     this.annotations = loadSession();
     this.fabCorner = loadFabCorner();
+    this.theme = loadTheme();
+    this.accent = loadAccent();
 
     this.fab = createFab(this.shadow, {
       initialCorner: this.fabCorner,
@@ -120,6 +127,31 @@ class UIAnnotator extends HTMLElement {
       onCornerChange: (c) => {
         this.fabCorner = c;
         saveFabCorner(c);
+      },
+      onSettingsToggle: (open) => {
+        this.settingsOpen = open;
+        if (open) {
+          this.clearHover();
+          this.guideBar.hide();
+        } else if (this.active) {
+          this.guideBar.show(this.pickMode ? 'pick' : 'annotate');
+          this.handleLayoutChange();
+        }
+      },
+      settings: {
+        version: __KAI_VERSION__,
+        theme: this.theme,
+        accent: this.accent,
+        onThemeChange: (t) => {
+          this.theme = t;
+          saveTheme(t);
+          this.applyTheme();
+        },
+        onAccentChange: (a) => {
+          this.accent = a;
+          saveAccent(a);
+          applyAccent(this, a);
+        },
       },
     });
 
@@ -207,6 +239,7 @@ class UIAnnotator extends HTMLElement {
         this.toggle();
       }
       if (e.key === 'Escape' && this.active && !this.activePopover) {
+        if (this.fab.closeSettings()) return;
         if (this.pickMode) {
           this.disarmPick();
         } else {
@@ -364,7 +397,7 @@ class UIAnnotator extends HTMLElement {
   }
 
   private updateHover() {
-    if (!this.active || this.altHeld || this.passThrough || !this.hasPointer) return;
+    if (!this.active || this.altHeld || this.passThrough || this.settingsOpen || !this.hasPointer) return;
 
     const dirty = this.hoverDirty;
     this.hoverDirty = false;
@@ -492,15 +525,25 @@ class UIAnnotator extends HTMLElement {
     this.inspector.showCrosshair(data);
   }
 
+  private applyTheme = () => {
+    const resolved = this.theme === 'system'
+      ? (this.systemDark.matches ? 'dark' : 'light')
+      : this.theme;
+    this.setAttribute('data-theme', resolved);
+  };
+
   connectedCallback() {
     // Attributes may not be set in the constructor of an element made via createElement
-    this.setAttribute('data-theme', loadTheme());
+    this.applyTheme();
+    applyAccent(this, this.accent);
+    this.systemDark.addEventListener('change', this.applyTheme);
     document.addEventListener('keydown', this.handleGlobalKeydown);
   }
 
   disconnectedCallback() {
     if (instance === this) instance = null;
     this.deactivate();
+    this.systemDark.removeEventListener('change', this.applyTheme);
     document.removeEventListener('keydown', this.handleGlobalKeydown);
     this.markers.destroy();
     this.overlay.destroy();

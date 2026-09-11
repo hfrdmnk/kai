@@ -1,3 +1,6 @@
+import { ACCENTS, DEFAULT_ACCENT } from './core/accents.ts';
+import { EASE_OUT } from './core/easing.ts';
+
 export const styles = `
 :host {
   --white: oklch(100% 0 0);
@@ -13,8 +16,8 @@ export const styles = `
   --gray-900: oklch(20.5% 0 0);
   --gray-950: oklch(14.5% 0 0);
 
-  --color-accent: oklch(0.6927 0.2513 38.8022);
-  --color-accent-hover: oklch(0.6405 0.2241 38.8022);
+  --color-accent: ${ACCENTS[DEFAULT_ACCENT]};
+  --color-accent-hover: oklch(from var(--color-accent) calc(l - 0.052) calc(c - 0.027) h);
   --color-danger: oklch(0.6338 0.2516 24.17);
   --color-success: oklch(72.3% 0.219 149.579);
 
@@ -26,6 +29,8 @@ export const styles = `
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
   --radius-full: 9999px;
+
+  --ease-out: ${EASE_OUT};
 
   --bg-1: var(--white);
   --bg-2: var(--gray-50);
@@ -253,8 +258,6 @@ export const styles = `
 }
 
 .kai-fab-action:disabled {
-  opacity: 0.35;
-  cursor: default;
   pointer-events: none;
 }
 
@@ -268,6 +271,97 @@ export const styles = `
 .kai-fab-action svg {
   width: 16px;
   height: 16px;
+}
+
+/* ── Settings ────────────────────────────────────── */
+
+.kai-settings {
+  position: fixed;
+  width: 240px;
+  background: var(--bg-1);
+  color: var(--text-primary);
+  border: 1px solid var(--border-2);
+  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-xl);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1;
+  z-index: var(--z-fab);
+  pointer-events: auto;
+  will-change: transform, opacity;
+}
+
+.kai-settings-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+/* Lowercase-only wordmark; one size up keeps it optically level with the theme labels */
+.kai-settings-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.kai-settings-version {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.kai-settings-themes,
+.kai-settings-accents {
+  display: flex;
+  align-items: center;
+}
+
+.kai-settings-themes {
+  gap: 12px;
+}
+
+.kai-settings-theme {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.kai-settings-theme:hover {
+  color: var(--text-secondary);
+}
+
+.kai-settings-theme[aria-checked="true"] {
+  color: var(--text-primary);
+}
+
+.kai-settings-accents {
+  gap: 8px;
+}
+
+.kai-settings-accent {
+  width: 16px;
+  height: 16px;
+  border: none;
+  padding: 0;
+  border-radius: var(--radius-full);
+  background: var(--swatch);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.kai-settings-accent:hover {
+  transform: scale(1.15);
+}
+
+.kai-settings-accent[aria-checked="true"] {
+  box-shadow: 0 0 0 2px var(--bg-1), 0 0 0 3.5px var(--swatch);
 }
 
 /* ── Overlay ─────────────────────────────────────── */
@@ -303,7 +397,9 @@ export const styles = `
 
 /* Overlays sit on the opposite palette of the page theme */
 .kai-popover,
-.kai-autocomplete {
+.kai-autocomplete,
+.kai-settings,
+.kai-fab-actions {
   --bg-1: var(--inv-bg-1);
   --bg-2: var(--inv-bg-2);
   --bg-3: var(--inv-bg-3);
@@ -402,8 +498,12 @@ export const styles = `
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, transform 160ms var(--ease-out);
   white-space: nowrap;
+}
+
+.kai-btn:active {
+  transform: scale(0.97);
 }
 
 .kai-btn--primary {
@@ -412,18 +512,9 @@ export const styles = `
   font-weight: 600;
 }
 
-.kai-btn--primary:hover {
-  background: var(--color-accent-hover);
-}
-
 .kai-btn--secondary {
   background: var(--bg-3);
   color: var(--text-tertiary);
-}
-
-.kai-btn--secondary:hover {
-  background: var(--bg-4);
-  color: var(--text-primary);
 }
 
 .kai-btn--danger {
@@ -431,14 +522,31 @@ export const styles = `
   color: var(--color-danger);
 }
 
-.kai-btn--danger:hover {
-  background: hsl(from var(--color-danger) h s l / 20%);
-}
-
 .kai-btn--danger[data-armed],
 .kai-btn--danger[data-armed]:hover {
   background: var(--color-danger);
   color: var(--white);
+}
+
+/* Touch devices fire :hover on tap, which would leave buttons stuck in their hover state */
+@media (hover: hover) and (pointer: fine) {
+  .kai-btn--primary:hover {
+    background: var(--color-accent-hover);
+  }
+
+  .kai-btn--secondary:hover {
+    background: var(--bg-4);
+    color: var(--text-primary);
+  }
+
+  .kai-btn--danger:hover {
+    background: hsl(from var(--color-danger) h s l / 20%);
+  }
+
+  .kai-btn--icon:hover {
+    background: var(--bg-3);
+    color: var(--text-secondary);
+  }
 }
 
 .kai-btn--icon {
@@ -449,11 +557,6 @@ export const styles = `
   border-radius: var(--radius-full);
   background: transparent;
   color: var(--text-tertiary);
-}
-
-.kai-btn--icon:hover {
-  background: var(--bg-3);
-  color: var(--text-secondary);
 }
 
 /* ── Markers ─────────────────────────────────────── */

@@ -1,10 +1,12 @@
-import type { Annotation, FabCorner, Theme } from '../types.ts';
+import type { Annotation, FabCorner, Theme, AccentId } from '../types.ts';
+import { isAccentId, DEFAULT_ACCENT } from './accents.ts';
 
 const getKey = (): string =>
   `ui-annotator:${location.origin}${location.pathname}`;
 
 const FAB_CORNER_KEY = 'ui-annotator:fab-corner';
 const THEME_KEY = 'ui-annotator:theme';
+const ACCENT_KEY = 'ui-annotator:accent';
 
 export const loadSession = (): Annotation[] => {
   try {
@@ -55,16 +57,33 @@ export const saveFabCorner = (corner: FabCorner): void => {
 export const loadTheme = (): Theme => {
   try {
     const raw = localStorage.getItem(THEME_KEY);
-    if (raw === 'light' || raw === 'dark') return raw;
-    return 'dark';
+    if (raw === 'system' || raw === 'light' || raw === 'dark') return raw;
+    return 'system';
   } catch {
-    return 'dark';
+    return 'system';
   }
 };
 
 export const saveTheme = (theme: Theme): void => {
   try {
     localStorage.setItem(THEME_KEY, theme);
+  } catch {
+    // unavailable
+  }
+};
+
+export const loadAccent = (): AccentId => {
+  try {
+    const raw = localStorage.getItem(ACCENT_KEY);
+    return isAccentId(raw) ? raw : DEFAULT_ACCENT;
+  } catch {
+    return DEFAULT_ACCENT;
+  }
+};
+
+export const saveAccent = (accent: AccentId): void => {
+  try {
+    localStorage.setItem(ACCENT_KEY, accent);
   } catch {
     // unavailable
   }

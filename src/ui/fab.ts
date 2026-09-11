@@ -1,6 +1,7 @@
-import type { FabCorner } from '../types.ts';
-import { iconKai, iconCopy, iconTrash, iconCheck, iconHelp, iconCursor } from '../icons.ts';
-import { SPRING } from '../core/easing.ts';
+import type { AccentId, FabCorner, Theme } from '../types.ts';
+import { iconKai, iconCopy, iconTrash, iconCheck, iconHelp, iconCursor, iconSettings } from '../icons.ts';
+import { SPRING, SNAP, EASE_OUT } from '../core/easing.ts';
+import { createSettingsPanel } from './settings.ts';
 
 const parser = new DOMParser();
 
@@ -19,6 +20,14 @@ type FabOptions = {
   onClearAll: () => void;
   onPickToggle: (armed: boolean) => void;
   onCornerChange: (corner: FabCorner) => void;
+  onSettingsToggle: (open: boolean) => void;
+  settings: {
+    version: string;
+    theme: Theme;
+    accent: AccentId;
+    onThemeChange: (theme: Theme) => void;
+    onAccentChange: (accent: AccentId) => void;
+  };
 };
 
 const snapToCorner = (x: number, y: number): FabCorner => {
@@ -64,6 +73,41 @@ const positionActions = (
   }
 };
 
+const clamp = (v: number, lo: number, hi: number) =>
+  Math.max(lo, Math.min(hi, v));
+
+const SETTINGS_WIDTH = 240;
+const SETTINGS_EDGE_GAP = 12;
+
+/** Centered on the settings button and clear of the taller FAB, opening away from the screen edge the FAB sits on. */
+const positionSettings = (
+  panelEl: HTMLElement,
+  anchorEl: HTMLElement,
+  fabEl: HTMLElement,
+  corner: FabCorner,
+) => {
+  const rect = anchorEl.getBoundingClientRect();
+  const fabRect = fabEl.getBoundingClientRect();
+  const gap = 8;
+  const vw = document.documentElement.clientWidth;
+  const vh = document.documentElement.clientHeight;
+  const isTop = corner === 'top-left' || corner === 'top-right';
+
+  if (isTop) {
+    panelEl.style.top = `${Math.max(rect.bottom, fabRect.bottom) + gap}px`;
+    panelEl.style.bottom = 'auto';
+  } else {
+    panelEl.style.top = 'auto';
+    panelEl.style.bottom = `${vh - Math.min(rect.top, fabRect.top) + gap}px`;
+  }
+
+  const anchorX = rect.left + rect.width / 2;
+  const left = clamp(anchorX - SETTINGS_WIDTH / 2, SETTINGS_EDGE_GAP, vw - SETTINGS_WIDTH - SETTINGS_EDGE_GAP);
+  panelEl.style.left = `${left}px`;
+  panelEl.style.right = 'auto';
+  panelEl.style.transformOrigin = `${anchorX - left}px ${isTop ? '0' : '100%'}`;
+};
+
 const SWAP = {
   shrinkMs:  120,
   expandMs:  400,
@@ -105,10 +149,16 @@ const animateStateSwap = async (
   }
 };
 
-const DRAG_THRESHOLD = 5;
+/* The bouncy spring lands within its first quarter, so the expand needs the same 600ms the corner snap uses to read at all. */
+const COLLAPSE = {
+  expandMs:      600,
+  appearDelayMs: 80,
+  staggerMs:     60,
+  collapseMs:    200,
+  shrinkMs:      150,
+};
 
-const clamp = (v: number, lo: number, hi: number) =>
-  Math.max(lo, Math.min(hi, v));
+const DRAG_THRESHOLD = 5;
 
 const computeDragRadii = (cx: number, cy: number): string => {
   const nx = clamp(cx / window.innerWidth, 0, 1);
@@ -171,6 +221,12 @@ export const createFab = (
   clearBtn.setAttribute('aria-label', 'Clear all');
   setIcon(clearBtn, iconTrash);
 
+  const settingsBtn = document.createElement('button');
+  settingsBtn.className = 'kai-fab-action';
+  settingsBtn.setAttribute('aria-label', 'Settings');
+  settingsBtn.setAttribute('aria-expanded', 'false');
+  setIcon(settingsBtn, iconSettings);
+
   // ── Tooltips for action buttons ──
   const tooltip = document.createElement('div');
   tooltip.className = 'kai-tooltip';
@@ -204,12 +260,97 @@ export const createFab = (
   copyBtn.addEventListener('mouseleave', hideTooltip);
   clearBtn.addEventListener('mouseenter', () => showTooltip(clearBtn, 'Clear all'));
   clearBtn.addEventListener('mouseleave', hideTooltip);
+  settingsBtn.addEventListener('mouseenter', () => { if (!settingsOpen) showTooltip(settingsBtn, 'Settings'); });
+  settingsBtn.addEventListener('mouseleave', hideTooltip);
 
-  const actionBtns = [pickBtn, copyBtn, clearBtn];
+  const actionBtns = [pickBtn, copyBtn, clearBtn, settingsBtn];
   for (const btn of actionBtns) actions.appendChild(btn);
+
+  // Copy and clear only exist once there is something to copy or clear
+  const countBtns = [copyBtn, clearBtn];
+  let countVisible = true;
+  const visibleActionBtns = () => actionBtns.filter(b => b.style.display !== 'none');
+
+  // ── Settings panel ──
+  const settings = createSettingsPanel(opts.settings);
+  const panel = settings.el;
+  panel.style.display = 'none';
+  let settingsOpen = false;
+  let settingsAnim: Animation | null = null;
+
+  // A window listener only sees the closed shadow root's host in composedPath,
+  // so page clicks are caught on window and clicks on other kai UI inside the root.
+  // The dismissing click is swallowed so it never becomes an annotation.
+  const onOutsideClick = (e: MouseEvent) => {
+    if (e.composedPath().includes(shadowRoot.host)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    closeSettings();
+  };
+  const onInsidePointerDown = (e: Event) => {
+    const path = e.composedPath();
+    if (path.includes(panel) || path.includes(settingsBtn)) return;
+    closeSettings();
+  };
+
+  const openSettings = () => {
+    if (settingsOpen) return;
+    settingsOpen = true;
+    hideTooltip();
+    settingsBtn.setAttribute('aria-expanded', 'true');
+    settingsBtn.classList.add('kai-fab-action--armed');
+    settingsAnim?.cancel();
+    panel.style.display = 'flex';
+    positionSettings(panel, settingsBtn, fab, corner);
+    settingsAnim = panel.animate(
+      [
+        { transform: 'scale(0.9)', opacity: 0 },
+        { transform: 'scale(1)', opacity: 1 },
+      ],
+      { duration: 400, easing: SPRING, fill: 'both' },
+    );
+    window.addEventListener('click', onOutsideClick, { capture: true });
+    shadowRoot.addEventListener('pointerdown', onInsidePointerDown);
+    window.addEventListener('resize', closeSettings);
+    opts.onSettingsToggle(true);
+  };
+
+  const closeSettings = (): boolean => {
+    if (!settingsOpen) return false;
+    settingsOpen = false;
+    settingsBtn.setAttribute('aria-expanded', 'false');
+    settingsBtn.classList.remove('kai-fab-action--armed');
+    window.removeEventListener('click', onOutsideClick, { capture: true });
+    shadowRoot.removeEventListener('pointerdown', onInsidePointerDown);
+    window.removeEventListener('resize', closeSettings);
+    opts.onSettingsToggle(false);
+    settingsAnim?.cancel();
+    settingsAnim = panel.animate(
+      [
+        { transform: 'scale(1)', opacity: 1 },
+        { transform: 'scale(0.9)', opacity: 0 },
+      ],
+      { duration: 150, easing: 'ease-in', fill: 'forwards' },
+    );
+    const anim = settingsAnim;
+    anim.finished.then(() => {
+      if (settingsAnim !== anim) return;
+      panel.style.display = 'none';
+      anim.cancel();
+      settingsAnim = null;
+    }).catch(() => {});
+    return true;
+  };
+
+  settingsBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (settingsOpen) closeSettings();
+    else openSettings();
+  });
 
   shadowRoot.appendChild(fab);
   shadowRoot.appendChild(actions);
+  shadowRoot.appendChild(panel);
 
   // ── Click/drag disambiguation via pointer events ──
   let dragging = false;
@@ -480,13 +621,13 @@ export const createFab = (
     requestAnimationFrame(() => {
       positionActions(actions, fab, corner);
       const tx = isRightCorner() ? '12px' : '-12px';
-      actionBtns.forEach((btn, i) => {
+      visibleActionBtns().forEach((btn, i) => {
         const anim = btn.animate(
           [
             { transform: `translateX(${tx}) scale(0.8)`, opacity: 0 },
             { transform: 'translateX(0) scale(1)', opacity: 1 },
           ],
-          { duration: 400, easing: SPRING, delay: i * 50, fill: 'both' },
+          { duration: 400, easing: SPRING, delay: i * 50, fill: 'backwards' },
         );
         actionAnims.push(anim);
       });
@@ -495,11 +636,12 @@ export const createFab = (
 
   const animateActionsOut = () => {
     hideTooltip();
+    closeSettings();
     actionAnims.forEach(a => a.cancel());
     actionAnims = [];
 
     const tx = isRightCorner() ? '8px' : '-8px';
-    const anims = actionBtns.map((btn, i) => {
+    const anims = visibleActionBtns().map((btn, i) => {
       const anim = btn.animate(
         [
           { transform: 'translateX(0) scale(1)', opacity: 1 },
@@ -531,18 +673,78 @@ export const createFab = (
     }
   };
 
+  const setCountDisplay = (visible: boolean) => {
+    for (const b of countBtns) b.style.display = visible ? '' : 'none';
+  };
+
+  /** Settings button offset between the row with and without the count buttons. */
+  const measureShift = (visible: boolean): number => {
+    const before = settingsBtn.getBoundingClientRect().left;
+    setCountDisplay(visible);
+    const after = settingsBtn.getBoundingClientRect().left;
+    setCountDisplay(!visible);
+    return after - before;
+  };
+
   const updateActionStates = (count: number) => {
-    const disabled = count === 0;
-    copyBtn.disabled = disabled;
-    clearBtn.disabled = disabled;
+    const visible = count > 0;
+    if (visible === countVisible) return;
+    countVisible = visible;
+    for (const b of countBtns) b.disabled = !visible;
+
+    if (!active || actions.style.display === 'none') {
+      setCountDisplay(visible);
+      return;
+    }
+
+    const shift = measureShift(visible);
+
+    if (visible) {
+      // FLIP: buttons take their space at once, settings slides in from where it was
+      setCountDisplay(true);
+      actionAnims.push(settingsBtn.animate(
+        [{ transform: `translateX(${-shift}px)` }, { transform: 'translateX(0)' }],
+        { duration: COLLAPSE.expandMs, easing: SPRING },
+      ));
+      countBtns.forEach((btn, i) => {
+        actionAnims.push(btn.animate(
+          [{ transform: 'scale(0.8)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }],
+          { duration: COLLAPSE.expandMs, easing: SPRING, delay: COLLAPSE.appearDelayMs + i * COLLAPSE.staggerMs, fill: 'backwards' },
+        ));
+      });
+      return;
+    }
+
+    // Buttons keep their space while they shrink and settings slides over them;
+    // the space is released only once the slide has landed.
+    for (const btn of countBtns) {
+      actionAnims.push(btn.animate(
+        [{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(0.8)', opacity: 0 }],
+        { duration: COLLAPSE.shrinkMs, easing: EASE_OUT, fill: 'forwards' },
+      ));
+    }
+    // No overshoot here: the target sits flush against the pick button
+    const slide = settingsBtn.animate(
+      [{ transform: 'translateX(0)' }, { transform: `translateX(${shift}px)` }],
+      { duration: COLLAPSE.collapseMs, easing: SNAP, fill: 'forwards' },
+    );
+    actionAnims.push(slide);
+    slide.finished.catch(() => {}).finally(() => {
+      if (countVisible) return;
+      setCountDisplay(false);
+      for (const btn of countBtns) btn.getAnimations().forEach(a => a.cancel());
+      slide.cancel();
+    });
   };
 
   const destroy = () => {
+    closeSettings();
     fab.remove();
     actions.remove();
+    panel.remove();
     tooltip.remove();
     copyStatus.remove();
   };
 
-  return { updateBadge, setActive, updateActionStates, confirmCopy, confirmPick, setPickArmed, destroy };
+  return { updateBadge, setActive, updateActionStates, confirmCopy, confirmPick, setPickArmed, closeSettings, destroy };
 };

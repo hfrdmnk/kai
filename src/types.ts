@@ -16,4 +16,6 @@ export type Annotation = {
 
 export type FabCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
-export type Theme = 'light' | 'dark';
+export type Theme = 'system' | 'light' | 'dark';
+
+export type AccentId = 'red' | 'orange' | 'yellow' | 'green' | 'teal' | 'blue' | 'violet';

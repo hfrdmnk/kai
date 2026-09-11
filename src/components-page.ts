@@ -6,6 +6,11 @@ import iconCopy from './icons/copy.svg?raw';
 import iconCheck from './icons/check.svg?raw';
 import iconHelp from './icons/help.svg?raw';
 import iconCursor from './icons/cursor.svg?raw';
+import iconSettings from './icons/settings.svg?raw';
+import type { AccentId, Theme } from './types';
+import { applyAccent } from './core/accents';
+import { loadAccent, saveAccent, loadTheme, saveTheme } from './core/session';
+import { createSettingsPanel } from './ui/settings';
 
 // ── Helpers ────────────────────────────────────────
 
@@ -41,11 +46,14 @@ const overrideCSS = `
   .kai-marker, .kai-marker-stack, .kai-stack-expanded, .kai-annotation-box,
   .kai-autocomplete, .kai-measure-line, .kai-measure-cross, .kai-measure-tooltip,
   .kai-measure-text-tooltip, .kai-measure-selection, .kai-measure-highlight,
-  .kai-guide-bar {
+  .kai-guide-bar, .kai-settings {
     position: relative !important;
     z-index: auto !important;
   }
 `;
+
+/** Every specimen host on the page, so an accent picked in one settings panel recolors the whole catalog. */
+const specimenHosts: HTMLElement[] = [];
 
 /** Render one specimen into both the light and the dark pane of its section */
 const mountSpecimen = (name: string, extraCSS: string, build: (shadow: ShadowRoot) => void) => {
@@ -53,6 +61,8 @@ const mountSpecimen = (name: string, extraCSS: string, build: (shadow: ShadowRoo
   for (const pane of panes) {
     const host = document.createElement('div');
     host.setAttribute('data-theme', pane.dataset.theme!);
+    applyAccent(host, loadAccent());
+    specimenHosts.push(host);
     pane.querySelector('.specimen-mount')!.appendChild(host);
     const shadow = host.attachShadow({ mode: 'open' });
 
@@ -191,7 +201,7 @@ mountSpecimen('icons', '', (shadow) => {
   const icons: [string, string][] = [
     ['kai', iconKai], ['close', iconClose], ['trash', iconTrash],
     ['copy', iconCopy], ['check', iconCheck], ['help', iconHelp],
-    ['cursor', iconCursor],
+    ['cursor', iconCursor], ['settings', iconSettings],
   ];
   const sizes = [24, 16, 12];
 
@@ -380,10 +390,28 @@ mountSpecimen('fab-actions', `
   trashBtn.className = 'kai-fab-action';
   setIcon(trashBtn, iconTrash, 16);
 
+  const settingsBtn = document.createElement('button');
+  settingsBtn.className = 'kai-fab-action';
+  setIcon(settingsBtn, iconSettings, 16);
+
   actions.appendChild(pickBtn);
   actions.appendChild(copyBtn);
   actions.appendChild(trashBtn);
+  actions.appendChild(settingsBtn);
   shadow.appendChild(actions);
+
+  shadow.appendChild(makeLabel('Settings open'));
+  const actionsOpen = document.createElement('div');
+  actionsOpen.className = 'kai-fab-actions';
+  actionsOpen.style.display = 'flex';
+
+  const settingsOpen = document.createElement('button');
+  settingsOpen.className = 'kai-fab-action kai-fab-action--armed';
+  settingsOpen.setAttribute('aria-expanded', 'true');
+  setIcon(settingsOpen, iconSettings, 16);
+
+  actionsOpen.appendChild(settingsOpen);
+  shadow.appendChild(actionsOpen);
 
   shadow.appendChild(makeLabel('Pick armed'));
   const actionsArmed = document.createElement('div');
@@ -416,24 +444,22 @@ mountSpecimen('fab-actions', `
   actionsHover.appendChild(trashHover);
   shadow.appendChild(actionsHover);
 
-  shadow.appendChild(makeLabel('Disabled'));
-  const actionsDisabled = document.createElement('div');
-  actionsDisabled.className = 'kai-fab-actions';
-  actionsDisabled.style.display = 'flex';
+  shadow.appendChild(makeLabel('No annotations'));
+  const actionsEmpty = document.createElement('div');
+  actionsEmpty.className = 'kai-fab-actions';
+  actionsEmpty.style.display = 'flex';
 
-  const copyDisabled = document.createElement('button');
-  copyDisabled.className = 'kai-fab-action';
-  setIcon(copyDisabled, iconCopy, 16);
-  copyDisabled.disabled = true;
+  const pickEmpty = document.createElement('button');
+  pickEmpty.className = 'kai-fab-action';
+  setIcon(pickEmpty, iconCursor, 16);
 
-  const trashDisabled = document.createElement('button');
-  trashDisabled.className = 'kai-fab-action';
-  setIcon(trashDisabled, iconTrash, 16);
-  trashDisabled.disabled = true;
+  const settingsEmpty = document.createElement('button');
+  settingsEmpty.className = 'kai-fab-action';
+  setIcon(settingsEmpty, iconSettings, 16);
 
-  actionsDisabled.appendChild(copyDisabled);
-  actionsDisabled.appendChild(trashDisabled);
-  shadow.appendChild(actionsDisabled);
+  actionsEmpty.appendChild(pickEmpty);
+  actionsEmpty.appendChild(settingsEmpty);
+  shadow.appendChild(actionsEmpty);
 });
 
 // ── 8. Tooltip ─────────────────────────────────────
@@ -809,4 +835,32 @@ mountSpecimen('guide-bar', `
   shadow.appendChild(makeSpacer(16));
   shadow.appendChild(makeLabel('With pressed key'));
   shadow.appendChild(makeGuideBar('Click elements to annotate', [['⌥', true]], 'inspect mode'));
+});
+
+// ── 17. Settings ───────────────────────────────────
+
+// Theme and accent choices are shared across both panes and persisted like in the tool itself.
+const settingsPanels: ReturnType<typeof createSettingsPanel>[] = [];
+
+mountSpecimen('settings', `
+    .kai-settings { display: flex !important; }
+  `, (shadow) => {
+
+  shadow.appendChild(makeLabel('Panel'));
+  const panel = createSettingsPanel({
+    version: __KAI_VERSION__,
+    theme: loadTheme(),
+    accent: loadAccent(),
+    onThemeChange: (t: Theme) => {
+      saveTheme(t);
+      settingsPanels.forEach(p => p.setTheme(t));
+    },
+    onAccentChange: (a: AccentId) => {
+      saveAccent(a);
+      settingsPanels.forEach(p => p.setAccent(a));
+      specimenHosts.forEach(h => applyAccent(h, a));
+    },
+  });
+  settingsPanels.push(panel);
+  shadow.appendChild(panel.el);
 });

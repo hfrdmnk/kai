@@ -48,7 +48,8 @@ const scopedSelector = (el: Element, root: Document | ShadowRoot): string => {
 
     const classes = Array.from(current.classList)
       .filter(c => !c.startsWith('kai-'))
-      .slice(0, 2);
+      .slice(0, 2)
+      .map(c => CSS.escape(c));
     if (classes.length) {
       segment += `.${classes.join('.')}`;
     }

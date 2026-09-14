@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout at tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        run: bun run build
+
+      - name: Commit dist into tagged commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f dist/
+          git commit --amend --no-edit
+
+      - name: Force-move version tag to new commit
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          git tag -fa "$TAG" -m "$TAG"
+
+      - name: Force-create/move latest tag
+        run: git tag -fa latest -m "latest"
+
+      - name: Push updated tags
+        run: git push origin --tags --force
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes "$(cat <<EOF
+          ## CDN URLs
+
+          \`\`\`html
+          <!-- Pinned version -->
+          <script src="https://cdn.jsdelivr.net/gh/hfrdmnk/kai@${TAG}/dist/kai.min.js"><\/script>
+
+          <!-- Latest -->
+          <script src="https://cdn.jsdelivr.net/gh/hfrdmnk/kai@latest/dist/kai.min.js"><\/script>
+          \`\`\`
+
+          See [CHANGELOG.md](https://github.com/hfrdmnk/kai/blob/main/CHANGELOG.md) for details.
+          EOF
+          )" \
+            dist/kai.js \
+            dist/kai.min.js

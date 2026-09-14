@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 — 2026-09-14
+
+Annotating elements with Tailwind-style class names (`md:flex`, `data-[state=selected]:bg-ui-3`) no longer throws, so the popover opens on table cells and similar elements.
+
 ## 0.2.0 — 2026-09-11
 
 Dark theme, keyboard shortcuts for every action, pass-through and copy-selector modes, and markers that stay on the element you actually clicked.

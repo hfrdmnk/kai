@@ -1,14 +1,11 @@
 import type { AccentId, FabCorner, Theme } from '../types.ts';
-import { iconKai, iconCopy, iconTrash, iconCheck, iconHelp, iconCursor, iconSettings } from '../icons.ts';
+import { iconKai, iconCopy, iconTrash, iconCheck, iconHelp, iconCursor, iconSettings, createIcon } from '../icons.ts';
 import { SPRING, SNAP, EASE_OUT } from '../core/easing.ts';
 import { SHORTCUTS, type ShortcutAction } from '../core/platform.ts';
 import { createSettingsPanel } from './settings.ts';
 
-const parser = new DOMParser();
-
 const setIcon = (el: HTMLElement, svg: string) => {
-  const doc = parser.parseFromString(svg, 'image/svg+xml');
-  el.appendChild(document.importNode(doc.documentElement, true));
+  el.appendChild(createIcon(svg));
 };
 
 const supportsAnchor = typeof CSS !== 'undefined' &&

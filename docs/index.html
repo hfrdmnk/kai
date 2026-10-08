@@ -116,39 +116,13 @@
 					0 1px 2px oklch(0% 0 0 / 0.06);
 			}
 
-			.install-methods {
-				display: flex;
-				flex-direction: column;
-				gap: 0;
-			}
-
-			.divider {
-				display: flex;
-				align-items: center;
-				gap: 16px;
-				margin: 24px 0;
-			}
-
-			.divider::before,
-			.divider::after {
-				content: '';
-				flex: 1;
-				height: 1px;
-				background: var(--gray-300);
-			}
-
-			.divider span {
-				font-size: 13px;
-				color: var(--text-tertiary);
-			}
-
 			.install-method-label {
 				font-size: 13px;
 				color: var(--text-tertiary);
 				margin-bottom: 10px;
 			}
 
-			.bookmarklet {
+			.download-button {
 				display: inline-flex;
 				align-items: center;
 				justify-content: center;
@@ -160,38 +134,23 @@
 				font-weight: 600;
 				text-decoration: none;
 				border-radius: 8px;
-				cursor: grab;
 				transition: background 150ms ease;
 			}
 
-			.bookmarklet:hover {
+			.download-button:hover {
 				background: var(--color-accent-hover);
 			}
 
-			.bookmarklet:active {
-				cursor: grabbing;
-			}
-
-			.bookmarklet-hint {
+			.install-steps {
 				font-size: 13px;
 				color: var(--text-tertiary);
-				margin-top: 8px;
+				margin-top: 12px;
+				padding-left: 20px;
 			}
 
-			.code-block {
-				background: var(--white);
-				border: 1px solid var(--gray-200);
-				border-radius: 8px;
-				padding: 16px 20px;
-				overflow-x: auto;
-			}
-
-			.code-block code {
+			.install-steps code {
 				font-family: var(--font-mono);
-				font-size: 14px;
-				color: var(--text-primary);
-				line-height: 1.6;
-				white-space: pre;
+				font-size: 12px;
 			}
 
 			/* -- Etymology ---------------------------------------------- */
@@ -265,27 +224,21 @@
 			<section>
 				<p class="section-label">Get started</p>
 				<div class="card">
-					<div class="install-methods">
-						<div>
+					<div>
 							<p class="install-method-label">
-								Bookmarklet — drag to your bookmark bar
+								Chrome extension — install locally
 							</p>
 							<a
-								class="bookmarklet"
-								href="javascript:void((async()=>{if(document.querySelector('ui-annotator')){document.querySelector('ui-annotator').toggle();return}try{const r=await fetch('https://cdn.jsdelivr.net/gh/hfrdmnk/kai@latest/dist/kai.min.js');const t=await r.text();const s=document.createElement('script');s.textContent=t;document.head.appendChild(s)}catch(e){alert('kai: Could not load — this site may block external requests.')}})())"
-								>kai</a
+								class="download-button"
+								href="https://github.com/hfrdmnk/kai/releases/latest/download/kai-extension.zip"
+								>Download kai-extension.zip</a
 							>
-							<p class="bookmarklet-hint">
-								Works on any page. Click once to activate, again to toggle.
-							</p>
-						</div>
-						<div class="divider"><span>or</span></div>
-						<div>
-							<p class="install-method-label">
-								Script tag — add to your project
-							</p>
-							<pre
-								class="code-block"><code>&lt;script src="https://cdn.jsdelivr.net/gh/hfrdmnk/kai@latest/dist/kai.min.js"&gt;&lt;/script&gt;</code></pre>
+							<ol class="install-steps">
+								<li>Unzip it</li>
+								<li>Open <code>chrome://extensions</code> and turn on Developer mode</li>
+								<li>Click Load unpacked and select the unzipped folder</li>
+								<li>Pin kai from the puzzle-piece menu, then click its icon to toggle it on any page</li>
+							</ol>
 						</div>
 					</div>
 				</div>
@@ -302,7 +255,7 @@
 			<footer>
 				<a href="https://github.com/hfrdmnk/kai">GitHub</a>
 				<span class="footer-sep">·</span>
-				<span>zero deps · ~58 kB · MIT</span>
+				<span>zero deps · MIT</span>
 			</footer>
 		</div>
 	</body>

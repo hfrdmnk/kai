@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && MINIFY=true vite build",
+    "build": "tsc && vite build && bun scripts/build-extension.ts",
     "preview": "vite preview"
   },
   "devDependencies": {

@@ -94,9 +94,10 @@ class UIAnnotator extends HTMLElement {
 
     this.shadow = this.attachShadow({ mode: 'closed' });
 
-    const style = document.createElement('style');
-    style.textContent = styles;
-    this.shadow.appendChild(style);
+    // A <style> element is blocked by the page's style-src CSP; a constructed sheet is not
+    const sheet = new CSSStyleSheet();
+    sheet.replaceSync(styles);
+    this.shadow.adoptedStyleSheets = [sheet];
 
     this.annotations = loadSession();
     this.fabCorner = loadFabCorner();
@@ -231,10 +232,6 @@ class UIAnnotator extends HTMLElement {
     };
 
     this.handleGlobalKeydown = (e: KeyboardEvent) => {
-      if (e.key === 'A' && e.ctrlKey && e.shiftKey) {
-        e.preventDefault();
-        this.toggle();
-      }
       if (e.key === 'Escape' && this.active && !this.activePopover) {
         if (this.fab.closeSettings()) return;
         if (this.pickMode) {

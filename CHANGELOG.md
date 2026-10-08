@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.0.0 — 2026-10-08
+
+kai now ships as a Chrome extension and nothing else. Click the toolbar icon or press Ctrl+Shift+A to toggle it on any tab, including pages with a strict CSP or Trusted Types. The bookmarklet and the jsDelivr script tag are gone.
+
+### Added
+
+- Chrome extension: the toolbar click injects kai into the active tab and toggles it, using only `activeTab` and `scripting` (no host-access warning)
+- Ctrl+Shift+A extension command toggles kai before it has been injected (physical Ctrl on Mac)
+- Toolbar icon shows a `!` badge when kai can't run on a page (`chrome://` pages, injection or startup failures)
+- Releases attach `kai-extension.zip` for loading unpacked
+
+### Improved
+
+- kai re-attaches itself if a single-page app removes it, and a second click no longer hits a duplicate element definition
+- 16px toolbar icon snapped to the pixel grid
+- Install and update steps in the README and landing page match and no longer rely on unzipping over the old folder
+
+### Fixed
+
+- Styles survive a strict `style-src` CSP: the shadow root adopts a constructed stylesheet instead of a `<style>` element
+- Icons render on sites that enforce Trusted Types (`require-trusted-types-for 'script'`)
+
+### Removed
+
+- **Breaking:** the bookmarklet. Install the extension instead
+- **Breaking:** the jsDelivr script tag and CDN build (`kai.min.js` is no longer built or published)
+- kai's own in-page Ctrl+Shift+A listener, replaced by the extension command
+
 ## 0.2.1 — 2026-09-14
 
 Annotating elements with Tailwind-style class names (`md:flex`, `data-[state=selected]:bg-ui-3`) no longer throws, so the popover opens on table cells and similar elements.

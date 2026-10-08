@@ -77,7 +77,7 @@ Every action has a keyboard path. The single-key shortcuts apply while kai is ac
 
 | Shortcut | Context | Action |
 |---|---|---|
-| <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> | Page where kai is loaded | Toggle kai on / off |
+| <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> | Any tab | Toggle kai on / off (extension shortcut, change it at `chrome://extensions/shortcuts`) |
 | <kbd>Esc</kbd> | Active | Close settings → cancel pick mode → deactivate, whichever applies first |
 | <kbd>S</kbd> | Active | Toggle copy-selector pick mode |
 | <kbd>M</kbd> | Active, has annotations | Copy all annotations as Markdown |

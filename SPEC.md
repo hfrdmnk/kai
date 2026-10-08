@@ -36,7 +36,7 @@ No React, no Svelte, no Vue. Pure vanilla TypeScript compiled to a single IIFE b
 ## Features
 
 ### Element Selection & Inspection
-- Activate with FAB button (bottom-right) or `Ctrl+Shift+A`
+- Activate with the toolbar icon, FAB button or `Ctrl+Shift+A`
 - Hover highlights elements with a bounding box overlay and a tooltip showing `tag#id.class`
 - Hit testing runs on pointer position (`elementFromPoint`), so the box follows scroll and DOM changes; SVG internals snap to their root `<svg>`; inline elements get one box per line fragment
 - Open shadow roots are pierced: hover, ↑/↓ walking and paths cross the boundary, and selectors for shadow content read `host-selector >>> inner-selector` (see `resolveSelector` in `src/core/selector.ts`)
@@ -131,7 +131,7 @@ All kai UI layers sit at the top of the stacking context, above any host page co
 
 | Shortcut | Context | Action |
 |---|---|---|
-| `Ctrl+Shift+A` | Global | Toggle annotator on/off |
+| `Ctrl+Shift+A` | Global | Toggle annotator on/off. Extension command (`_execute_action` in `extension/manifest.json`, Ctrl on Mac too); kai itself doesn't listen for it, so the two can't double-toggle |
 | `Escape` | Panel open | Close panel |
 | `Escape` | Settings open | Close settings |
 | `Escape` | Pick mode armed | Cancel pick mode |

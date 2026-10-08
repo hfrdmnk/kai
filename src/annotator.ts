@@ -232,10 +232,6 @@ class UIAnnotator extends HTMLElement {
     };
 
     this.handleGlobalKeydown = (e: KeyboardEvent) => {
-      if (e.key === 'A' && e.ctrlKey && e.shiftKey) {
-        e.preventDefault();
-        this.toggle();
-      }
       if (e.key === 'Escape' && this.active && !this.activePopover) {
         if (this.fab.closeSettings()) return;
         if (this.pickMode) {

@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 
-const minify = !!process.env.MINIFY;
 const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 
 export default defineConfig({
@@ -11,10 +10,9 @@ export default defineConfig({
       entry: 'src/annotator.ts',
       formats: ['iife'],
       name: 'kai',
-      fileName: () => minify ? 'kai.min.js' : 'kai.js',
+      fileName: () => 'kai.js',
     },
-    emptyOutDir: !minify,
-    minify: minify ? 'oxc' : false,
+    minify: false,
     sourcemap: false,
   },
 });

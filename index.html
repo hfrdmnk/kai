@@ -116,32 +116,6 @@
 					0 1px 2px oklch(0% 0 0 / 0.06);
 			}
 
-			.install-methods {
-				display: flex;
-				flex-direction: column;
-				gap: 0;
-			}
-
-			.divider {
-				display: flex;
-				align-items: center;
-				gap: 16px;
-				margin: 24px 0;
-			}
-
-			.divider::before,
-			.divider::after {
-				content: '';
-				flex: 1;
-				height: 1px;
-				background: var(--gray-300);
-			}
-
-			.divider span {
-				font-size: 13px;
-				color: var(--text-tertiary);
-			}
-
 			.install-method-label {
 				font-size: 13px;
 				color: var(--text-tertiary);
@@ -176,22 +150,6 @@
 			.install-hint code {
 				font-family: var(--font-mono);
 				font-size: 12px;
-			}
-
-			.code-block {
-				background: var(--white);
-				border: 1px solid var(--gray-200);
-				border-radius: 8px;
-				padding: 16px 20px;
-				overflow-x: auto;
-			}
-
-			.code-block code {
-				font-family: var(--font-mono);
-				font-size: 14px;
-				color: var(--text-primary);
-				line-height: 1.6;
-				white-space: pre;
 			}
 
 			/* ── Etymology ───────────────────────────────────── */
@@ -265,8 +223,7 @@
 			<section>
 				<p class="section-label">Get started</p>
 				<div class="card">
-					<div class="install-methods">
-						<div>
+					<div>
 							<p class="install-method-label">
 								Chrome extension — install locally
 							</p>
@@ -280,14 +237,6 @@
 								mode and choose Load unpacked. Click the kai icon in the toolbar
 								to toggle it on any page.
 							</p>
-						</div>
-						<div class="divider"><span>or</span></div>
-						<div>
-							<p class="install-method-label">
-								Script tag — add to your project
-							</p>
-							<pre
-								class="code-block"><code>&lt;script src="https://cdn.jsdelivr.net/gh/hfrdmnk/kai@latest/dist/kai.min.js"&gt;&lt;/script&gt;</code></pre>
 						</div>
 					</div>
 				</div>
@@ -304,7 +253,7 @@
 			<footer>
 				<a href="https://github.com/hfrdmnk/kai">GitHub</a>
 				<span class="footer-sep">·</span>
-				<span>zero deps · ~58 kB · MIT</span>
+				<span>zero deps · MIT</span>
 			</footer>
 		</div>
 

@@ -4,7 +4,7 @@
 
 ## Overview
 
-kai is a framework-agnostic, zero-dependency UI annotation tool built as a single Web Component. Developers activate it on any web page (through the Chrome extension or a `<script>` tag) to click elements, write feedback, and export structured annotation data for AI coding agents or design review.
+kai is a framework-agnostic, zero-dependency UI annotation tool built as a single Web Component. Developers activate it on any web page through a Chrome extension to click elements, write feedback, and export structured annotation data for AI coding agents or design review.
 
 The tool injects itself into the page, runs entirely client-side, and outputs JSON or Markdown that includes CSS selectors, computed styles, element paths, and human feedback — giving AI agents the exact context they need to find and fix UI issues without guessing.
 
@@ -159,17 +159,16 @@ Single-key shortcuts are the keys in `SHORTCUTS` (`src/core/platform.ts`). They 
 
 ```
 dist/
-├── kai.js        # Unminified, readable, with source comments
-├── kai.min.js    # Minified + tree-shaken, production-ready
+├── kai.js        # Unminified, readable bundle
 └── extension/    # Unpacked Chrome extension (manifest, service worker, icons, kai.js)
 ```
 
-Both bundles are fully self-contained:
+`kai.js` is fully self-contained:
 - All SVG icons inlined as template literal strings
 - All CSS embedded inside Shadow DOM via `<style>` tags
 - No CSS files, no asset files, no chunks, no sourcemaps
 - Single IIFE that registers `<ui-annotator>` and auto-injects it into the page
-- Unminified version is human-readable for developers who want to understand or fork
+- Unminified, so it stays human-readable for developers who want to understand or fork
 
 ### Chrome extension
 
@@ -193,5 +192,6 @@ Source lives in `extension/`; `scripts/build-extension.ts` assembles it into `di
 - No natural language CSS mutation ("make this font 2rem" applying styles) — reserved for v2
 - No accounts, no auth, no cloud sync
 - Chrome only: no Firefox or Safari extension, no Web Store listing
+- No script tag or CDN build; the extension is the only distribution
 
 </section>

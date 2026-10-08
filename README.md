@@ -10,7 +10,7 @@ The name 回 (kai) is Japanese for "turn," as in a turn in a cycle. Annotate wha
 
 ## Features
 
-- Zero dependencies, ~60 kB self-contained script
+- Zero dependencies, one self-contained script
 - Works on any website via a Chrome extension: one click in the toolbar, no host permissions
 - Closed Shadow DOM — fully isolated from host page styles
 - Smart element selection with hover highlight, breadcrumb paths, and computed styles (px→rem)
@@ -46,14 +46,6 @@ bun run build   # writes the unpacked extension to dist/extension/
 ```
 
 Then load `dist/extension/` as above.
-
-### Script tag
-
-Alternatively, add this script tag to your project and render it conditionally in dev mode:
-
-```html
-<script src="https://cdn.jsdelivr.net/gh/hfrdmnk/kai@latest/dist/kai.min.js"></script>
-```
 
 ## How it works
 

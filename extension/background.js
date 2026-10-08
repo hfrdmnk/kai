@@ -1,4 +1,4 @@
-// MAIN world: content-script worlds have no customElements, and the page's CSP doesn't apply to extension injections.
+// MAIN world: content-script worlds have no customElements, and the page's CSP doesn't block extension injections.
 const toggleKai = async (tab) => {
   const target = { tabId: tab.id };
   try {

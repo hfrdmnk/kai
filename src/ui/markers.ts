@@ -1,9 +1,7 @@
 import type { Annotation } from '../types.ts';
-import { iconKai } from '../icons.ts';
+import { iconKai, createIcon } from '../icons.ts';
 import { resolveAnnotation } from '../core/selector.ts';
 import { SPRING } from '../core/easing.ts';
-
-const parser = new DOMParser();
 
 const MARKER_SIZE = 22;
 const MARKER_PAD = 4;
@@ -16,8 +14,7 @@ const clampMarker = (top: number, left: number): { top: number; left: number } =
 });
 
 const createMarkerIcon = (): SVGElement => {
-  const doc = parser.parseFromString(iconKai, 'image/svg+xml');
-  const svg = document.importNode(doc.documentElement, true) as unknown as SVGElement;
+  const svg = createIcon(iconKai);
   svg.setAttribute('width', '12');
   svg.setAttribute('height', '12');
   svg.setAttribute('stroke-width', '2.5');

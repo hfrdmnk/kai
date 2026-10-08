@@ -94,9 +94,10 @@ class UIAnnotator extends HTMLElement {
 
     this.shadow = this.attachShadow({ mode: 'closed' });
 
-    const style = document.createElement('style');
-    style.textContent = styles;
-    this.shadow.appendChild(style);
+    // A <style> element is blocked by the page's style-src CSP; a constructed sheet is not
+    const sheet = new CSSStyleSheet();
+    sheet.replaceSync(styles);
+    this.shadow.adoptedStyleSheets = [sheet];
 
     this.annotations = loadSession();
     this.fabCorner = loadFabCorner();

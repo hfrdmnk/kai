@@ -34,9 +34,9 @@ kai isn't on the Chrome Web Store. Install it locally as an unpacked extension:
 3. Click **Load unpacked** and select the unzipped folder
 4. Pin kai from the puzzle-piece menu so the icon stays in your toolbar
 
-To update, unzip a newer release over the same folder and click the reload icon on kai's card in `chrome://extensions`.
+To update, replace the folder's contents with the new release (for example `unzip -o kai-extension.zip -d path/to/your/kai-folder`) and click the reload icon on kai's card in `chrome://extensions`. Unzipping by double-click creates a new folder instead, so Chrome would keep loading the old one.
 
-kai can't run on Chrome's own pages (`chrome://…`) or the Chrome Web Store.
+kai can't run on Chrome's own pages (`chrome://…`) or the Chrome Web Store; clicking the icon there shows a `!` badge. For local `file://` pages, turn on **Allow access to file URLs** in kai's details.
 
 #### From source
 

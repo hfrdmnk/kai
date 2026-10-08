@@ -175,7 +175,7 @@ dist/
 Source lives in `extension/`; `scripts/build-extension.ts` assembles it into `dist/extension/` and stamps the version from `package.json`. Releases attach it as `kai-extension.zip`.
 
 - Manifest V3, permissions `activeTab` and `scripting` only, so installing shows no host-access warning
-- Toolbar click (`extension/background.js`): inject `kai.js` into the tab's MAIN world if `<ui-annotator>` is absent, then call `toggle()`. The first click therefore opens kai already active
+- Toolbar click (`extension/background.js`): inject `kai.js` into the tab's MAIN world if `<ui-annotator>` is not yet defined, re-append the element if the page dropped it, then call `toggle()`. The first click therefore opens kai already active
 - MAIN world is required because content-script worlds have no `customElements`; it also sidesteps the page's CSP
 - Pages Chrome protects (`chrome://`, the Web Store) reject injection; the click does nothing there
 - Toolbar icon is the FAB at its default bottom-left corner: accent bubble with the asterisk. `extension/icons/icon.svg` is the source for the committed PNGs

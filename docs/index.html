@@ -141,13 +141,14 @@
 				background: var(--color-accent-hover);
 			}
 
-			.install-hint {
+			.install-steps {
 				font-size: 13px;
 				color: var(--text-tertiary);
-				margin-top: 8px;
+				margin-top: 12px;
+				padding-left: 20px;
 			}
 
-			.install-hint code {
+			.install-steps code {
 				font-family: var(--font-mono);
 				font-size: 12px;
 			}
@@ -232,11 +233,12 @@
 								href="https://github.com/hfrdmnk/kai/releases/latest/download/kai-extension.zip"
 								>Download kai-extension.zip</a
 							>
-							<p class="install-hint">
-								Unzip it, open <code>chrome://extensions</code>, turn on Developer
-								mode and choose Load unpacked. Click the kai icon in the toolbar
-								to toggle it on any page.
-							</p>
+							<ol class="install-steps">
+								<li>Unzip it</li>
+								<li>Open <code>chrome://extensions</code> and turn on Developer mode</li>
+								<li>Click Load unpacked and select the unzipped folder</li>
+								<li>Pin kai from the puzzle-piece menu, then click its icon to toggle it on any page</li>
+							</ol>
 						</div>
 					</div>
 				</div>

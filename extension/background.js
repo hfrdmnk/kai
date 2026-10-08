@@ -2,18 +2,19 @@
 const toggleKai = async (tab) => {
   const target = { tabId: tab.id };
   try {
-    const [{ result: present }] = await chrome.scripting.executeScript({
+    const [{ result: defined }] = await chrome.scripting.executeScript({
       target,
       world: 'MAIN',
-      func: () => !!document.querySelector('ui-annotator'),
+      func: () => !!customElements.get('ui-annotator'),
     });
-    if (!present) {
+    if (!defined) {
       await chrome.scripting.executeScript({ target, world: 'MAIN', files: ['kai.js'] });
     }
     await chrome.scripting.executeScript({
       target,
       world: 'MAIN',
-      func: () => document.querySelector('ui-annotator').toggle(),
+      // SPAs that swap <body> drop the element but keep the definition
+      func: () => (document.querySelector('ui-annotator') ?? document.body.appendChild(document.createElement('ui-annotator'))).toggle(),
     });
   } catch (err) {
     // chrome://, the Web Store and other protected pages reject injection

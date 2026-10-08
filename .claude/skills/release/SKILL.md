@@ -121,7 +121,8 @@ git push origin main --follow-tags
 
 Tell the user the release is done and show:
 - The version and tag
-- That the GitHub Action will now build and attach dist to the tag
+- That the GitHub Action will now build and attach dist to the tag, including `kai-extension.zip`
+- Extension download once the action completes: `https://github.com/hfrdmnk/kai/releases/latest/download/kai-extension.zip`
 - Expected CDN URLs once the action completes:
   - `https://cdn.jsdelivr.net/gh/hfrdmnk/kai@vX.Y.Z/dist/kai.min.js`
   - `https://cdn.jsdelivr.net/gh/hfrdmnk/kai@latest/dist/kai.min.js`

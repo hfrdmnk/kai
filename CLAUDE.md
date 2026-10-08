@@ -22,7 +22,7 @@ bun run preview    # preview production build
 - Single Web Component (`<ui-annotator>`) with **closed Shadow DOM**
 - All CSS is embedded inside the Shadow DOM via `<style>` tags — no external CSS files
 - All SVG icons are inlined as template literal strings — no external asset requests
-- Build output is two self-contained files: `dist/kai.js` (readable) and `dist/kai.min.js` (minified)
+- Build output is two self-contained files: `dist/kai.js` (readable) and `dist/kai.min.js` (minified), plus the unpacked Chrome extension in `dist/extension/` (source in `extension/`, see SPEC.md § Chrome extension)
 - No frameworks, no runtime deps — vanilla DOM only
 
 ## Code style

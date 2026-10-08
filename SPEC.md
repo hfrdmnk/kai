@@ -4,7 +4,7 @@
 
 ## Overview
 
-kai is a framework-agnostic, zero-dependency UI annotation tool built as a single Web Component. Developers activate it on any web page — via a `<script>` tag or bookmarklet — to click elements, write feedback, and export structured annotation data for AI coding agents or design review.
+kai is a framework-agnostic, zero-dependency UI annotation tool built as a single Web Component. Developers activate it on any web page (through the Chrome extension or a `<script>` tag) to click elements, write feedback, and export structured annotation data for AI coding agents or design review.
 
 The tool injects itself into the page, runs entirely client-side, and outputs JSON or Markdown that includes CSS selectors, computed styles, element paths, and human feedback — giving AI agents the exact context they need to find and fix UI issues without guessing.
 
@@ -14,8 +14,8 @@ The tool injects itself into the page, runs entirely client-side, and outputs JS
 
 ## Core Concepts
 
-### Bookmarklet-first
-kai works on any website, not just your own dev server. The primary distribution is a single JS file injectable via bookmarklet. No npm install required for end users.
+### Extension-first
+kai works on any website, not just your own dev server. The primary distribution is a Chrome extension installed locally as an unpacked developer extension (not on the Web Store). Clicking the toolbar icon injects the same IIFE bundle into the active tab. No npm install required for end users.
 
 ### Web Component with Shadow DOM
 All UI (toolbar, panel, drawer, markers) lives inside a `<ui-annotator>` custom element with a closed shadow root. Styles are fully isolated from the host page and vice versa.
@@ -157,26 +157,29 @@ Single-key shortcuts are the keys in `SHORTCUTS` (`src/core/platform.ts`). They 
 
 ## Build Output
 
-Two files in `dist/`:
-
 ```
 dist/
 ├── kai.js        # Unminified, readable, with source comments
-└── kai.min.js    # Minified + tree-shaken, production-ready
+├── kai.min.js    # Minified + tree-shaken, production-ready
+└── extension/    # Unpacked Chrome extension (manifest, service worker, icons, kai.js)
 ```
 
-Both are fully self-contained:
+Both bundles are fully self-contained:
 - All SVG icons inlined as template literal strings
 - All CSS embedded inside Shadow DOM via `<style>` tags
 - No CSS files, no asset files, no chunks, no sourcemaps
 - Single IIFE that registers `<ui-annotator>` and auto-injects it into the page
 - Unminified version is human-readable for developers who want to understand or fork
 
-### Bookmarklet
+### Chrome extension
 
-```javascript
-javascript:void((()=>{if(document.querySelector('ui-annotator')){document.querySelector('ui-annotator').toggle();return}const s=document.createElement('script');s.src='https://jsdelivr.link/kai.min.js';document.head.appendChild(s)})())
-```
+Source lives in `extension/`; `scripts/build-extension.ts` assembles it into `dist/extension/` and stamps the version from `package.json`. Releases attach it as `kai-extension.zip`.
+
+- Manifest V3, permissions `activeTab` and `scripting` only, so installing shows no host-access warning
+- Toolbar click (`extension/background.js`): inject `kai.js` into the tab's MAIN world if `<ui-annotator>` is absent, then call `toggle()`. The first click therefore opens kai already active
+- MAIN world is required because content-script worlds have no `customElements`; it also sidesteps the page's CSP
+- Pages Chrome protects (`chrome://`, the Web Store) reject injection; the click does nothing there
+- Toolbar icon is the FAB at its default bottom-left corner: accent bubble with the asterisk. `extension/icons/icon.svg` is the source for the committed PNGs
 
 </section>
 
@@ -189,6 +192,6 @@ javascript:void((()=>{if(document.querySelector('ui-annotator')){document.queryS
 - No screenshot capture
 - No natural language CSS mutation ("make this font 2rem" applying styles) — reserved for v2
 - No accounts, no auth, no cloud sync
-- No browser extension — bookmarklet and script tag only
+- Chrome only: no Firefox or Safari extension, no Web Store listing
 
 </section>

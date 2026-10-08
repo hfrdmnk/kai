@@ -44,6 +44,9 @@ jobs:
       - name: Push updated tags
         run: git push origin --tags --force
 
+      - name: Package extension
+        run: cd dist/extension && zip -r ../kai-extension.zip .
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -53,6 +56,10 @@ jobs:
           gh release create "$TAG" \
             --title "$TAG" \
             --notes "$(cat <<EOF
+          ## Chrome extension
+
+          Download \`kai-extension.zip\`, unzip it, open \`chrome://extensions\`, turn on Developer mode and choose Load unpacked.
+
           ## CDN URLs
 
           \`\`\`html
@@ -67,4 +74,5 @@ jobs:
           EOF
           )" \
             dist/kai.js \
-            dist/kai.min.js
+            dist/kai.min.js \
+            dist/kai-extension.zip

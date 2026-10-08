@@ -148,7 +148,7 @@
 				margin-bottom: 10px;
 			}
 
-			.bookmarklet {
+			.download-button {
 				display: inline-flex;
 				align-items: center;
 				justify-content: center;
@@ -160,22 +160,22 @@
 				font-weight: 600;
 				text-decoration: none;
 				border-radius: 8px;
-				cursor: grab;
 				transition: background 150ms ease;
 			}
 
-			.bookmarklet:hover {
+			.download-button:hover {
 				background: var(--color-accent-hover);
 			}
 
-			.bookmarklet:active {
-				cursor: grabbing;
-			}
-
-			.bookmarklet-hint {
+			.install-hint {
 				font-size: 13px;
 				color: var(--text-tertiary);
 				margin-top: 8px;
+			}
+
+			.install-hint code {
+				font-family: var(--font-mono);
+				font-size: 12px;
 			}
 
 			.code-block {
@@ -268,15 +268,17 @@
 					<div class="install-methods">
 						<div>
 							<p class="install-method-label">
-								Bookmarklet — drag to your bookmark bar
+								Chrome extension — install locally
 							</p>
 							<a
-								class="bookmarklet"
-								href="javascript:void((()=>{if(document.querySelector('ui-annotator')){document.querySelector('ui-annotator').toggle();return}const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/gh/hfrdmnk/kai@latest/dist/kai.min.js';document.head.appendChild(s)})())"
-								>kai</a
+								class="download-button"
+								href="https://github.com/hfrdmnk/kai/releases/latest/download/kai-extension.zip"
+								>Download kai-extension.zip</a
 							>
-							<p class="bookmarklet-hint">
-								Works on any page. Click once to activate, again to toggle.
+							<p class="install-hint">
+								Unzip it, open <code>chrome://extensions</code>, turn on Developer
+								mode and choose Load unpacked. Click the kai icon in the toolbar
+								to toggle it on any page.
 							</p>
 						</div>
 						<div class="divider"><span>or</span></div>

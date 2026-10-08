@@ -4,14 +4,14 @@ A UI annotation tool for developers and AI coding agents.
 
 ## What is kai?
 
-Click any element on a web page, describe what should change, and export structured feedback as Markdown. kai runs entirely client-side as a single Web Component — zero dependencies, nothing to install.
+Click any element on a web page, describe what should change, and export structured feedback as Markdown. kai runs entirely client-side as a single Web Component inside a small Chrome extension, with zero dependencies.
 
 The name 回 (kai) is Japanese for "turn," as in a turn in a cycle. Annotate what needs to change, hand it to your coding agent, and move on to the next iteration.
 
 ## Features
 
 - Zero dependencies, ~60 kB self-contained script
-- Works on any website via bookmarklet — lives in your bookmark bar
+- Works on any website via a Chrome extension: one click in the toolbar, no host permissions
 - Closed Shadow DOM — fully isolated from host page styles
 - Smart element selection with hover highlight, breadcrumb paths, and computed styles (px→rem)
 - CSS variable autocomplete — type `--` to browse the page's custom properties
@@ -25,24 +25,31 @@ The name 回 (kai) is Japanese for "turn," as in a turn in a cycle. Annotate wha
 
 ## Get started
 
-### Bookmarklet
+### Chrome extension
 
-[![Add kai bookmarklet](https://img.shields.io/badge/kai-Add_Bookmarklet-ff5500?style=for-the-badge)](https://hfrdmnk.github.io/kai/)
+kai isn't on the Chrome Web Store. Install it locally as an unpacked extension:
 
-> Visit the link above and drag the **kai** button to your bookmark bar.
+1. Download [`kai-extension.zip`](https://github.com/hfrdmnk/kai/releases/latest/download/kai-extension.zip) from the latest release and unzip it
+2. Open `chrome://extensions` and turn on **Developer mode** (top right)
+3. Click **Load unpacked** and select the unzipped folder
+4. Pin kai from the puzzle-piece menu so the icon stays in your toolbar
 
-<details>
-<summary>Raw bookmarklet code</summary>
+To update, unzip a newer release over the same folder and click the reload icon on kai's card in `chrome://extensions`.
 
+kai can't run on Chrome's own pages (`chrome://…`) or the Chrome Web Store.
+
+#### From source
+
+```bash
+bun install
+bun run build   # writes the unpacked extension to dist/extension/
 ```
-javascript:void((()=>{if(document.querySelector('ui-annotator')){document.querySelector('ui-annotator').toggle();return}const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/gh/hfrdmnk/kai@latest/dist/kai.min.js';document.head.appendChild(s)})())
-```
 
-</details>
+Then load `dist/extension/` as above.
 
 ### Script tag
 
-Alternatively, you can also add this script tag to your project and render it conditionally in dev mode:
+Alternatively, add this script tag to your project and render it conditionally in dev mode:
 
 ```html
 <script src="https://cdn.jsdelivr.net/gh/hfrdmnk/kai@latest/dist/kai.min.js"></script>
@@ -50,7 +57,7 @@ Alternatively, you can also add this script tag to your project and render it co
 
 ## How it works
 
-1. **Activate** — click the bookmarklet and activate kai by clicking on the asterisk icon
+1. **Activate** — click the kai icon in the toolbar (click again to turn it off)
 2. **Select** — hover over elements to see selector paths, computed styles, and dimensions
 3. **Annotate** — click an element, describe what should change, save
 4. **Repeat** — annotate as many elements as needed
@@ -78,7 +85,7 @@ Every action has a keyboard path. The single-key shortcuts apply while kai is ac
 
 | Shortcut | Context | Action |
 |---|---|---|
-| <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> | Anywhere | Toggle kai on / off |
+| <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> | Page where kai is loaded | Toggle kai on / off |
 | <kbd>Esc</kbd> | Active | Close settings → cancel pick mode → deactivate, whichever applies first |
 | <kbd>S</kbd> | Active | Toggle copy-selector pick mode |
 | <kbd>M</kbd> | Active, has annotations | Copy all annotations as Markdown |
@@ -96,7 +103,7 @@ Every action has a keyboard path. The single-key shortcuts apply while kai is ac
 ## FAQ
 
 **What inspired kai?**
-[agentation.dev](https://agentation.dev) — a great annotation tool for AI agents with MCP integration and bidirectional agent communication. But it requires `npm install` into your project and leans React-first. I wanted something that works on _any_ site. Just a bookmarklet you drag to your toolbar and use anywhere.
+[agentation.dev](https://agentation.dev) — a great annotation tool for AI agents with MCP integration and bidirectional agent communication. But it requires `npm install` into your project and leans React-first. I wanted something that works on _any_ site. Just a toolbar button you click and use anywhere.
 
 **Can I adapt this?**
 Yes, it's MIT licensed. Fork away.

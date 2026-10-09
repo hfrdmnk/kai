@@ -47,6 +47,14 @@ bun run build   # writes the unpacked extension to dist/extension/
 
 Then load `dist/extension/` as above.
 
+#### Amp orbs
+
+`.agents/setup` installs development dependencies from `bun.lock` using the Bun and Node.js
+toolchains included in Amp orbs. Amp snapshots the prepared environment so matching fresh
+orbs skip setup; when setup runs again, Bun reuses installed dependencies and its package cache.
+No secrets, backing services, or resume hook are required. Run `bun run build` to validate the
+checkout or `bun run dev` to start the development server.
+
 ## How it works
 
 1. **Activate** — click the kai icon in the toolbar (click again to turn it off)

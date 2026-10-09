@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+
+# Bun and Node.js are included in Amp's orb base image.
+printf 'Bun version: '
+bun --version
+printf 'Node.js version: '
+node --version
+
+printf 'Installing locked development dependencies...\n'
+time bun install --frozen-lockfile

@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Amp portal metadata
+.amp/portals/*
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

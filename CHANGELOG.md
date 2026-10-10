@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.1.0 — 2026-10-10
+
+Inspect mode now shows the box model, and ↑/↓ walk to parents in every mode. Interaction mode has a persistent toggle instead of a held key, there's a full shortcut reference, and keyboard use is calmer: focus rings only appear once you press Tab.
+
+### Added
+
+- Box model overlay: tap Ctrl while holding Alt to see padding, hatched margin, flex/grid gaps and in-band values, with an info card in px and rem. It combines with Shift for text metrics
+- ↑/↓ walk to the parent or child while annotating, measuring or viewing the box model. The walked element carries across mode switches while the mouse stays still
+- Interaction mode toggle (`I` or the button beside kai), replacing held modifiers; page overlays and controls stay intact
+- Shortcut reference (`?` or Settings → Keyboard shortcuts) on a blurred backdrop
+
+### Improved
+
+- The HUD lets clicks through and fades to 20% while the pointer is over it
+- Focus rings only appear after Tab, and Tab cycles through kai's controls
+- Settings: the shortcuts row has no divider and gets a hover background; text uses medium weight instead of bold
+- px→rem suggestion: Enter inserts a newline, Tab accepts
+- Annotation input stays isolated from the page's keyboard handlers
+- Optically centered toolbar icons
+
 ## 1.0.0 — 2026-10-08
 
 kai now ships as a Chrome extension and nothing else. Click the toolbar icon or press Ctrl+Shift+A to toggle it on any tab, including pages with a strict CSP or Trusted Types. The bookmarklet and the jsDelivr script tag are gone.

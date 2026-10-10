@@ -46,7 +46,7 @@ No React, no Svelte, no Vue. Pure vanilla TypeScript compiled to a single IIFE b
 - Kai's own controls do not trigger host outside-click dismissal or modal focus traps; toggling back preserves the open host overlay
 - Interaction and selector-pick buttons sit next to each other beside the FAB, using Hugeicons Stroke Rounded PointerIcon (pointing hand) and cursor-02 SVGs respectively; optical-centering offsets live in the SVG viewBoxes
 - The HUD omits ancestor-arrow, interaction-toggle, and shortcut-reference hints. `?` or the Keyboard shortcuts link in settings opens a compact panel listing shortcuts for all modes; there is no separate help button
-- The HUD is pointer-transparent and fades out over 140 ms when the pointer enters its bounds, then returns on leaving; reduced motion disables the fade. Elements underneath remain inspectable and annotatable
+- The HUD is pointer-transparent and fades to 20% opacity over 140 ms when the pointer enters its bounds, then returns on leaving; reduced motion disables the fade. Elements underneath remain inspectable and annotatable
 - Click any element to open the annotation panel
 - Panel displays:
   - CSS selector (short, readable) plus a hidden positional locator so markers stay on the exact element in repeated lists (see `resolveAnnotation` in `src/core/selector.ts`)

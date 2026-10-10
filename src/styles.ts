@@ -891,7 +891,7 @@ export const styles = `
   transition: opacity 140ms ease;
 }
 
-.kai-guide-bar[data-obscured] { opacity: 0; }
+.kai-guide-bar[data-obscured] { opacity: 0.2; }
 
 @media (prefers-reduced-motion: reduce) {
   .kai-guide-bar { transition-duration: 0ms; }

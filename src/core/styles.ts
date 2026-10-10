@@ -21,13 +21,11 @@ const TRACKED_PROPERTIES = [
   'gap',
 ] as const;
 
+export const remFromPx = (px: number): string => `${Math.round(px / 16 * 1000) / 1000}rem`;
+
 export const pxToRem = (value: string): string | null => {
   const match = value.match(/^(\d+(?:\.\d+)?)px$/);
-  if (!match) return null;
-  const px = parseFloat(match[1]);
-  const rem = px / 16;
-  const rounded = Math.round(rem * 1000) / 1000;
-  return `${rounded}rem`;
+  return match ? remFromPx(parseFloat(match[1])) : null;
 };
 
 export const getComputedStyles = (el: Element): Record<string, string> => {

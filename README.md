@@ -15,7 +15,7 @@ The name 回 (kai) is Japanese for "turn," as in a turn in a cycle. Annotate wha
 - Closed Shadow DOM — fully isolated from host page styles
 - Smart element selection with hover highlight, breadcrumb paths, and computed styles (px→rem)
 - CSS variable autocomplete — type `--` to browse the page's custom properties
-- Measurement mode (<kbd>Alt</kbd>): crosshair with dimensions, text metrics, selection rectangle
+- Measurement mode (<kbd>Alt</kbd>): crosshair with dimensions, text metrics, box model (padding, margin, flex/grid gaps), selection rectangle
 - Interaction mode (<kbd>I</kbd>): interact with the page without leaving the annotator
 - Shortcut reference (<kbd>?</kbd>): see shortcuts for every mode in one panel
 - Copy any element's selector with the cursor action bubble
@@ -69,7 +69,7 @@ To run the browser regression check, install `agent-browser` and its Chromium br
 
 ### Measurement mode
 
-Hold <kbd>Alt</kbd> to enter measurement mode. A crosshair follows your cursor showing element dimensions. Hold <kbd>Shift</kbd> additionally to see text metrics. Click and drag to measure arbitrary distances.
+Hold <kbd>Alt</kbd> to enter measurement mode. A crosshair follows your cursor showing element dimensions. Hold <kbd>Shift</kbd> additionally to see text metrics. Tap <kbd>Ctrl</kbd> while holding Alt to toggle the box model: padding in the accent color, margin and flex/grid gaps hatched, with values in px and rem. It stays on until you release Alt. Shift and the box model combine. <kbd>↑</kbd> / <kbd>↓</kbd> move whatever you're measuring to the parent or child, and the selection carries across annotating, measuring and the box model as long as you keep the mouse still. The first mouse move after switching goes back to the innermost element. Click and drag to measure arbitrary distances.
 
 ### Interaction mode
 
@@ -111,10 +111,12 @@ interaction mode outside text fields.
 | <kbd>?</kbd> | Active, outside text fields | Toggle shortcut reference for all modes |
 | <kbd>Alt</kbd> (hold) | Active | Measurement mode |
 | <kbd>Alt</kbd>+<kbd>Shift</kbd> (hold) | Active | Measurement mode with text metrics |
-| <kbd>↑</kbd> / <kbd>↓</kbd> | Element hovered | Move highlight to parent / back down |
+| <kbd>Ctrl</kbd> (tap, holding <kbd>Alt</kbd>) | Measurement mode | Toggle the box model (combines with <kbd>Shift</kbd>) |
+| <kbd>↑</kbd> / <kbd>↓</kbd> | Element hovered, annotating or measuring | Move highlight / measurement to parent / back down |
 | <kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>Enter</kbd> | Annotation popover | Save annotation |
 | <kbd>Esc</kbd> | Annotation popover | Close popover |
 | <kbd>Tab</kbd> / <kbd>Enter</kbd> | Autocomplete open | Accept suggestion |
+| <kbd>Tab</kbd> | px→rem suggestion shown | Accept the rem value (<kbd>Enter</kbd> inserts a newline); without one, move focus |
 | <kbd>Arrow keys</kbd> | Settings open | Move between theme and accent options |
 
 ## FAQ

@@ -180,6 +180,9 @@ export const attachAutocomplete = (
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setActive(Math.max(activeIndex - 1, 0));
+    } else if (e.key === 'Enter' && mode === 'rem') {
+      // A newline after a px value is far more common than wanting rem; Tab accepts
+      close();
     } else if (e.key === 'Tab' || e.key === 'Enter') {
       if (activeIndex >= 0) {
         e.preventDefault();

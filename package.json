@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build && bun scripts/build-extension.ts",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "bun test tests"
   },
   "devDependencies": {
     "typescript": "~5.9.3",

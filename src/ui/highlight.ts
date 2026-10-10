@@ -1,4 +1,5 @@
 import { getDirectText } from '../core/text.ts';
+import { elementLabel } from '../core/selector.ts';
 
 const GAP = 4;
 
@@ -25,11 +26,7 @@ export const createOverlay = (shadowRoot: ShadowRoot) => {
   };
 
   const describeElement = (el: Element): string => {
-    let label = el.tagName.toLowerCase();
-    if (el.id) label += `#${el.id}`;
-    const classes = Array.from(el.classList).filter(c => !c.startsWith('kai-')).slice(0, 3);
-    if (classes.length) label += `.${classes.join('.')}`;
-
+    let label = elementLabel(el);
     const textPreview = getDirectText(el);
     if (textPreview) {
       label += `: "${textPreview}"`;

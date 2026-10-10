@@ -22,25 +22,16 @@ export type TextInspectData = {
 };
 
 /**
- * Ray-cast from (cx, cy) in 4 directions using binary search with
- * elementFromPoint to find the nearest visual boundaries.
+ * Ray-cast from (cx, cy) in 4 directions using binary search to find where the measured
+ * element stops being visible. `probe` tells whether a viewport point still shows it.
  */
 export const computeCrosshair = (
   cx: number,
   cy: number,
-  shadowHost: Element,
+  probe: (x: number, y: number) => boolean,
 ): CrosshairData => {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-
-  const probe = (x: number, y: number): boolean => {
-    const el = document.elementFromPoint(x, y);
-    if (!el) return false;
-    if (el === shadowHost) return true;
-    // Check if it's the same element as at cursor
-    const cursorEl = document.elementFromPoint(cx, cy);
-    return el === cursorEl || el === shadowHost;
-  };
 
   // Binary search for boundary in a direction
   // Returns the distance from cursor to boundary edge

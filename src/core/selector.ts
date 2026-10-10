@@ -20,6 +20,15 @@ export const composedContains = (ancestor: Element, el: Element): boolean => {
   return false;
 };
 
+/** `tag#id.class.class` for labels, without kai's own classes. */
+export const elementLabel = (el: Element): string => {
+  let label = el.localName;
+  if (el.id) label += `#${el.id}`;
+  const classes = Array.from(el.classList).filter(c => !c.startsWith('kai-')).slice(0, 3);
+  if (classes.length) label += `.${classes.join('.')}`;
+  return label;
+};
+
 /** Light DOM children plus the top-level children of an open shadow root. */
 export const composedChildren = (el: Element): Element[] => [
   ...Array.from(el.shadowRoot?.children ?? []),

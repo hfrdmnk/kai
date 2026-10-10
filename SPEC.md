@@ -40,12 +40,15 @@ No React, no Svelte, no Vue. Pure vanilla TypeScript compiled to a single IIFE b
 - Hover highlights elements with a bounding box overlay and a tooltip showing `tag#id.class`
 - Hit testing runs on pointer position (`elementFromPoint`), so the box follows scroll and DOM changes; SVG internals snap to their root `<svg>`; inline elements get one box per line fragment
 - Open shadow roots are pierced: hover, ↑/↓ walking and paths cross the boundary, and selectors for shadow content read `host-selector >>> inner-selector` (see `resolveSelector` in `src/core/selector.ts`)
-- `↑` / `↓` walk the ancestor chain when the wanted parent is fully covered by a child
+- `↑` / `↓` walk the ancestor chain when the wanted parent is fully covered by a child. Annotate, inspect and the box model share one selection: each mode draws it its own way. A walked selection carries across mode switches (Alt, a Ctrl tap, Shift while inspecting) while the pointer stays still; the first move of at least 4px afterwards returns it to the innermost element. A fresh `↑` / `↓` after the switch is deliberate and isn't reset. Without a mode switch, a walked ancestor stays selected while the cursor stays inside it
 - Page clicks, pointer actions, and keyboard input are swallowed in annotation mode, before document-level host handlers; scrolling remains available
 - `I` toggles interaction mode with no held modifier, e.g. to open a modal before annotating it. In interaction mode, page controls and keyboard shortcuts behave normally. `I` / `?` are ignored in text fields; the interaction button and Keyboard shortcuts in settings remain available
 - Kai's own controls do not trigger host outside-click dismissal or modal focus traps; toggling back preserves the open host overlay
 - Interaction and selector-pick buttons sit next to each other beside the FAB, using Hugeicons Stroke Rounded PointerIcon (pointing hand) and cursor-02 SVGs respectively; optical-centering offsets live in the SVG viewBoxes
-- The HUD omits ancestor-arrow, interaction-toggle, and shortcut-reference hints. `?` or the Keyboard shortcuts link in settings opens a compact panel listing shortcuts for all modes; there is no separate help button
+- The HUD omits ancestor-arrow, interaction-toggle, and shortcut-reference hints. `?` or the Keyboard shortcuts link in settings opens a compact panel listing shortcuts for all modes; there is no separate help button. The panel sits above the page and the rest of kai on a blurred backdrop; clicking the backdrop closes it
+- kai's UI text uses medium weight (500) for emphasis, never bold
+- Focus rings appear only after the user presses Tab, and hide again on pointer use or a kai shortcut. Shortcuts move focus themselves (`,` focuses the selected theme, `?` the panel's close button), and browsers would otherwise show a ring for that
+- In annotation mode, Tab cycles through kai's visible controls without leaving for the frozen page or the browser UI; Tab from the page enters the toolbar. The shortcut panel keeps focus to itself while open
 - The HUD is pointer-transparent and fades to 20% opacity over 140 ms when the pointer enters its bounds, then returns on leaving; reduced motion disables the fade. Elements underneath remain inspectable and annotatable
 - Click any element to open the annotation panel
 - Panel displays:
@@ -53,10 +56,21 @@ No React, no Svelte, no Vue. Pure vanilla TypeScript compiled to a single IIFE b
   - Element path breadcrumb (e.g. `div.wrapper › section.hero › h1`)
   - Computed styles (font-size, color, padding, margin, border-radius, etc.) with px→rem conversion shown inline
 
+### Box Model Overlay
+- Tapping `Ctrl` while holding Alt toggles a box model layer for the selected element, on top of the crosshair, or of text metrics with Shift. It stays on until Alt is released; Ctrl already held when Alt goes down counts as a tap. A tap rather than a hold keeps `↑` / `↓` free of Ctrl+Alt+arrow, which some systems reserve (screen rotation, workspace switching)
+- Padding is accent at 32% opacity. Margin is accent at 12% with a 1px diagonal hatch, so empty space reads apart from padding at every accent. The border and any classic scrollbar are part of the padding band, with the border's outer edge outlined. The content box gets a 1px accent outline and no fill
+- Flex and grid containers with a `gap` also hatch their gutters. Each gutter is drawn at the `gap` width, centered in the space between items or tracks (`justify-content` / `align-content` can widen that space). Flex gutters come from the in-flow children's margin boxes plus text runs, which become anonymous items; `nowrap` containers are one line. Grid gutters come from the resolved `grid-template-columns` / `grid-template-rows`, minus the 0px tracks `auto-fit` collapses. Gutters are clipped to the container's padding box and the viewport
+- Bands at least 16px wide show their value inline. A card below the element (or above it, or pinned inside the viewport) lists `Box` (`tag#id.class` W×H), `Margin`, `Border` (when non-zero), `Padding` and `Gap` in CSS shorthand order with rem equivalents, and replaces the crosshair's size pill. With text metrics on, they describe the same element as the box model, and the rows join the text-metrics card
+- In inspect mode the crosshair measures the selected element: its lines run from the cursor to where that element (descendants included) stops being visible. Once walked up, the element gets a 1px dashed outline. Text metrics describe the selected element and hide when it has no text of its own
+- Non-replaced inline boxes ignore vertical margin; replaced ones (`img`, `svg`, form controls…) keep it. A wrapped inline box is drawn on its first line fragment, with no end-side edges. Negative margins are drawn as 0 but listed with their real value
+- Uniformly scaled elements (or ancestors) get bands at the drawn scale; values stay in CSS px. Rotated, skewed or unevenly scaled elements only get their bounding box
+- The model is computed once per target and recomputed on scroll, resize or DOM changes
+- Dragging to measure hides the layer. `Ctrl+wheel` (browser zoom) is blocked while inspecting
+
 ### Annotation Authoring
 - Textarea for writing feedback
 - **CSS variable autocomplete**: When the user types `--`, harvest all CSS custom properties from the page's stylesheets available for the selected element. Show a dropdown with variable names, resolved values, and color swatches for color values. Navigate with arrow keys, accept with Tab/Enter.
-- **px→rem conversion**: When the user types a value like `16px`, show an inline suggestion (e.g. `→ 1rem`) that can be accepted with Tab, replacing the px value.
+- **px→rem conversion**: When the user types a value like `16px`, show an inline suggestion (e.g. `→ 1rem`) that can be accepted with Tab, replacing the px value. Enter inserts a newline and Escape dismisses it; without a suggestion, Tab moves focus.
 - Submit with `Cmd+Enter` (Mac) or `Ctrl+Enter`
 
 ### Annotation Management
@@ -151,7 +165,8 @@ All kai UI layers sit at the top of the stacking context, above any host page co
 | `?` | Annotator active, no text field focused | Toggle shortcut reference for all modes |
 | `Alt`, held | Annotation mode | Inspect / drag to measure |
 | `Alt+Shift`, held | Annotation mode | Inspect text metrics |
-| `↑` / `↓` | Element hovered | Move the highlight to the parent / back toward the hovered element |
+| `Ctrl`, tapped while `Alt` is held | Inspect mode | Toggle the box model (padding, margin, flex/grid gaps); combines with `Shift` |
+| `↑` / `↓` | Element hovered, annotation or inspect mode | Move the selection (highlight, measurement or box model) to the parent / back toward the hovered element |
 | `Cmd/Ctrl+Enter` | Panel textarea focused | Submit annotation |
 | `Tab` | Autocomplete visible | Accept selected suggestion |
 | `Tab` | Rem suggestion visible | Accept px→rem replacement |

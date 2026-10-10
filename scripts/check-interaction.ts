@@ -18,6 +18,8 @@ const server = Bun.serve({
         <output id="own-events">0</output>
         <output id="focus-events">0</output>
         <output id="escapes">0</output>
+        <div id="box-parent" style="display:flex;gap:12px;padding:8px"><button id="box-child" style="margin:4px;padding:6px 10px">Box child</button><button>Two</button></div>
+        <div id="rotated" style="width:40px;height:40px;padding:20px;margin:40px;transform:rotate(45deg);background:#ccc"></div>
       </main>
       <script>
         let events = 0;
@@ -154,6 +156,92 @@ try {
   await browser('press', 'Control+Enter');
   const selected = JSON.parse(await browser('eval', 'JSON.parse(localStorage.getItem(`ui-annotator:${location.origin}${location.pathname}`) ?? "[]")'));
   assert(selected.some((a: { selector: string }) => a.selector === '#parent'), 'Ancestor selection works with toolbar focus');
+
+  await reset();
+  // agent-browser's keydown/keyup don't set modifier flags, which kai reads; dispatch browser-shaped events
+  const frames = 'new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))';
+  const key = (type: string, name: string, mods: Record<string, boolean>) => browser('eval',
+    `document.activeElement.dispatchEvent(new KeyboardEvent('${type}', { key: '${name}', bubbles: true, composed: true, cancelable: true, ...${JSON.stringify(mods)} })); ${frames}`);
+  // The snapshot splits tooltip lines into separate text pieces
+  const overlayText = async () => (await browser('snapshot')).replace(/StaticText "|"|\\n/g, '').replace(/ - /g, ' ').replace(/\s+/g, ' ');
+  const pillSize = async () => (await overlayText()).match(/(\d+)×(\d+) px/)?.slice(1).map(Number) ?? [];
+  const rectSize = async (selector: string) => JSON.parse(await browser('eval',
+    `(r => [r.width, r.height])(document.querySelector('${selector}').getBoundingClientRect())`)) as number[];
+  // The crosshair ray-casts to whole pixels
+  const near = (a: number[], b: number[]) => a.length === 2 && a.every((v, i) => Math.abs(v - b[i]) <= 2);
+  await browser('hover', '#box-child');
+  await key('keydown', 'Alt', { altKey: true });
+  assert(near(await pillSize(), await rectSize('#box-child')), 'Alt measures the hovered element');
+  await key('keydown', 'ArrowUp', { altKey: true });
+  assert(near(await pillSize(), await rectSize('#box-parent')), 'ArrowUp while inspecting measures the parent');
+  await key('keydown', 'ArrowDown', { altKey: true });
+  assert(near(await pillSize(), await rectSize('#box-child')), 'ArrowDown while inspecting goes back to the hovered element');
+  await key('keydown', 'Control', { altKey: true, ctrlKey: true });
+  await key('keyup', 'Control', { altKey: true });
+  const boxRows = await overlayText();
+  assert(/Box button#box-child [\d.]+×[\d.]+/.test(boxRows) && boxRows.includes('Margin 4 (0.25rem)')
+    && boxRows.includes('Padding 6 10 (0.375rem 0.625rem)'), 'A Ctrl tap turns the box model on and it stays after release');
+  await key('keydown', 'Shift', { altKey: true, shiftKey: true });
+  const merged = await overlayText();
+  assert(merged.includes('Font') && merged.includes('Box button#box-child'), 'Shift puts text metrics and box model in one card');
+  await key('keyup', 'Shift', { altKey: true });
+  await key('keydown', 'ArrowUp', { altKey: true });
+  const parentRows = await overlayText();
+  assert(parentRows.includes('Box div#box-parent') && parentRows.includes('Gap 12 (0.75rem)'), 'ArrowUp with Alt alone moves the box model to the parent');
+  await key('keydown', 'Control', { altKey: true, ctrlKey: true });
+  await key('keyup', 'Control', { altKey: true });
+  const toggledOff = await overlayText();
+  assert(!toggledOff.includes('Box div#box-parent') && near(await pillSize(), await rectSize('#box-parent')),
+    'A second Ctrl tap hides the box model and keeps measuring the selection');
+  await key('keyup', 'Alt', {});
+  await browser('eval', frames);
+  await browser('click', '#box-child');
+  await browser('snapshot', '-i');
+  await browser('keyboard', 'type', 'Box parent annotation');
+  await browser('press', 'Control+Enter');
+  const afterBox = JSON.parse(await browser('eval', 'JSON.parse(localStorage.getItem(`ui-annotator:${location.origin}${location.pathname}`) ?? "[]")'));
+  assert(afterBox.some((a: { selector: string }) => a.selector === '#box-parent'), 'The walked selection carries back into annotate mode');
+
+  await reset();
+  await browser('hover', '#box-child');
+  await key('keydown', 'Alt', { altKey: true });
+  await key('keydown', 'ArrowUp', { altKey: true });
+  await key('keyup', 'Alt', {});
+  // Still inside the child and the walked parent, but far enough to count as moving on
+  const [moveX, moveY] = JSON.parse(await browser('eval',
+    `(r => [r.x + r.width / 2 + 10, r.y + r.height / 2])(document.querySelector('#box-child').getBoundingClientRect())`)) as number[];
+  await browser('mouse', 'move', String(Math.round(moveX)), String(Math.round(moveY)));
+  await browser('eval', frames);
+  await browser('mouse', 'down');
+  await browser('mouse', 'up');
+  await browser('snapshot', '-i');
+  await browser('keyboard', 'type', 'Moved on');
+  await browser('press', 'Control+Enter');
+  const afterMove = JSON.parse(await browser('eval', 'JSON.parse(localStorage.getItem(`ui-annotator:${location.origin}${location.pathname}`) ?? "[]")'));
+  assert(afterMove.some((a: { selector: string }) => a.selector === '#box-child') && !afterMove.some((a: { selector: string }) => a.selector === '#box-parent'),
+    'A mouse move after a mode switch returns the selection to the innermost element');
+
+  await reset();
+  await browser('hover', '#box-child');
+  await key('keydown', 'ArrowUp', {});
+  await key('keydown', 'Alt', { altKey: true });
+  // A fresh walk after the switch is deliberate, so moving to measure keeps it
+  await key('keydown', 'ArrowUp', { altKey: true });
+  await browser('mouse', 'move', String(Math.round(moveX)), String(Math.round(moveY)));
+  await browser('eval', frames);
+  assert(near(await pillSize(), await rectSize('main')), 'A walk made after a mode switch survives the next mouse move');
+  await key('keyup', 'Alt', {});
+
+  await reset();
+  // A rotated square's bounding box looks evenly scaled; its bands would be drawn in the wrong place
+  await browser('hover', '#rotated');
+  await key('keydown', 'Alt', { altKey: true });
+  await key('keydown', 'Control', { altKey: true, ctrlKey: true });
+  await key('keyup', 'Control', { altKey: true });
+  // The card lists padding 20; an in-band label would be a text piece of its own
+  const rotatedRows = await browser('snapshot');
+  assert(rotatedRows.includes('div#rotated') && !rotatedRows.includes('StaticText "20"'), 'A rotated element gets only its outline, no in-band values');
+  await key('keyup', 'Alt', {});
 
   await reset();
   await browser('focus', '#action');

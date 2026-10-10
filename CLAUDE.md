@@ -15,6 +15,8 @@ bun install        # install deps
 bun run dev        # dev server
 bun run build      # typecheck + build
 bun run preview    # preview production build
+bun run test       # unit tests (tests/)
+bun scripts/check-interaction.ts  # browser regression checks (needs agent-browser, build first)
 ```
 
 ## Architecture constraints

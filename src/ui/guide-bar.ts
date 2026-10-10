@@ -1,12 +1,13 @@
 import { SPRING, GLIDE } from '../core/easing.ts';
 import { isMac, INTERACTION_KEY, SHORTCUTS } from '../core/platform.ts';
 
-export type KeyId = 'alt' | 'shift' | 'esc';
+export type KeyId = 'alt' | 'shift' | 'ctrl' | 'esc';
 export type GuideMode = 'annotate' | 'measure' | 'interact' | 'pick';
 
 const KEY_LABELS: Record<KeyId, string> = {
   alt: isMac ? '⌥' : 'Alt',
   shift: isMac ? '⇧' : 'Shift',
+  ctrl: isMac ? '⌃' : 'Ctrl',
   esc: 'Esc',
 };
 
@@ -19,7 +20,10 @@ const CONTENT: Record<GuideMode, { text: string; hints: Hint[] }> = {
   },
   measure: {
     text: 'Drag to measure',
-    hints: [{ keys: ['alt', 'shift'], hint: 'text info' }],
+    hints: [
+      { keys: ['alt', 'shift'], hint: 'text info' },
+      { keys: ['alt', 'ctrl'], hint: 'box model' },
+    ],
   },
   interact: {
     text: 'Interacting with page',
@@ -81,6 +85,11 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
 
   shadowRoot.appendChild(bar);
 
+  // Blurs the page and the rest of kai behind the shortcut reference; clicking it closes the panel
+  const backdrop = document.createElement('div');
+  backdrop.className = 'kai-shortcuts-backdrop';
+  backdrop.hidden = true;
+
   const help = document.createElement('section');
   help.className = 'kai-shortcuts';
   help.hidden = true;
@@ -103,9 +112,10 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
       ['?', 'Toggle this panel'],
       ['Alt (hold)', 'Inspect / drag to measure'],
       ['Alt + Shift (hold)', 'Inspect text metrics'],
+      ['Alt (hold) + Ctrl (tap)', 'Toggle box model (add Shift for text metrics)'],
     ]],
     ['Annotation & selector', [
-      ['↑ / ↓', 'Select parent / child'],
+      ['↑ / ↓', 'Select parent / child, also while inspecting'],
       [SHORTCUTS.pick.label, 'Toggle copy-selector mode'],
       [SHORTCUTS.copy.label, 'Copy annotations as Markdown'],
       [SHORTCUTS.clear.label, 'Clear all (press twice within 3 s)'],
@@ -138,21 +148,26 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
   const note = document.createElement('p');
   note.textContent = 'I and ? work outside text fields. While typing, use the interaction button or Keyboard shortcuts in settings. In interaction mode, other keys belong to the page.';
   help.appendChild(note);
-  shadowRoot.appendChild(help);
+  shadowRoot.append(backdrop, help);
   let previousFocus: Element | null = null;
   const closeHelp = () => {
     if (help.hidden) return false;
     help.hidden = true;
+    backdrop.hidden = true;
     if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
     return true;
   };
   const toggleHelp = () => {
     if (closeHelp()) return;
     previousFocus = shadowRoot.activeElement ?? document.activeElement;
+    // Last in the tree: the popover and other layers added later share the top z-index
+    shadowRoot.append(backdrop, help);
     help.hidden = false;
+    backdrop.hidden = false;
     close.focus();
   };
   close.addEventListener('click', closeHelp);
+  backdrop.addEventListener('click', closeHelp);
 
   const updatePointer = (x: number, y: number) => {
     if (!visible) return;
@@ -273,6 +288,7 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
     contentAnim?.cancel();
     widthAnim?.cancel();
     bar.remove();
+    backdrop.remove();
     help.remove();
   };
 

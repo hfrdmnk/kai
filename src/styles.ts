@@ -58,6 +58,7 @@ export const styles = `
   --z-tooltip: 2147483647;
   --z-host: 2147483645;
   --z-fab: 2147483646;
+  --z-modal: 2147483647;
 
   --shadow-2xs: 0 1px rgb(0 0 0 / 0.05);
   --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
@@ -125,6 +126,12 @@ export const styles = `
   outline-offset: 2px;
 }
 
+/* Rings only while tabbing: shortcuts move focus too, and browsers count that as keyboard focus.
+   The textarea keeps its focus outline: it shows where typing goes */
+:host(:not([data-focus-ring])) :focus-visible:not(textarea) {
+  outline: none;
+}
+
 /* ── FAB ─────────────────────────────────────────── */
 
 .kai-fab {
@@ -185,7 +192,7 @@ export const styles = `
   background: var(--color-accent);
   color: var(--white);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   font-family: var(--font-sans);
   display: flex;
   align-items: center;
@@ -285,7 +292,7 @@ export const styles = `
 /* Lowercase-only wordmark; one size up keeps it optically level with the theme labels */
 .kai-settings-name {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .kai-settings-version {
@@ -307,6 +314,7 @@ export const styles = `
 .kai-settings-theme {
   background: none;
   border: none;
+  border-radius: var(--radius-sm);
   padding: 0;
   font: inherit;
   color: var(--text-tertiary);
@@ -345,22 +353,33 @@ export const styles = `
   box-shadow: 0 0 0 2px var(--bg-1), 0 0 0 3.5px var(--swatch);
 }
 
+/* Outside the checked ring, which would otherwise hide it */
+.kai-settings-accent:focus-visible {
+  outline-offset: 5px;
+}
+
 .kai-settings-shortcuts {
+  /* Bleeds into the panel padding so the hover fill sits --inset from the panel edge,
+     text staying aligned with the rows above */
+  --inset: 6px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 0 0;
+  margin: 8px calc(var(--inset) - 16px) calc(var(--inset) - 14px);
+  padding: 8px calc(16px - var(--inset));
   border: 0;
-  border-top: 1px solid var(--bg-4);
+  /* Concentric with the panel: inner radius = outer radius - inset */
+  border-radius: calc(var(--radius-xl) - var(--inset));
   background: none;
   font: inherit;
   color: var(--text-secondary);
   cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.kai-settings-shortcuts:hover { color: var(--text-primary); }
+.kai-settings-shortcuts:hover { background: var(--bg-2); color: var(--text-primary); }
 .kai-settings-shortcuts kbd { font: 11px var(--font-mono); }
-.kai-settings-shortcuts:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 4px; }
+.kai-settings-shortcuts:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 0; }
 
 /* ── Overlay ─────────────────────────────────────── */
 
@@ -399,7 +418,7 @@ export const styles = `
   color: var(--white);
   border-radius: var(--radius-sm);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1;
   vertical-align: 1px;
 }
@@ -513,7 +532,7 @@ export const styles = `
 .kai-btn--primary {
   background: var(--color-accent);
   color: var(--white);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .kai-btn--secondary {
@@ -574,7 +593,7 @@ export const styles = `
   color: var(--white);
   font-family: var(--font-sans);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -604,7 +623,7 @@ export const styles = `
   background: var(--white);
   color: var(--color-accent);
   font-size: 9px;
-  font-weight: 700;
+  font-weight: 500;
   font-family: var(--font-sans);
   display: flex;
   align-items: center;
@@ -838,13 +857,12 @@ export const styles = `
   padding: 8px 12px;
   border-radius: var(--radius-md);
   white-space: pre;
-  max-width: 280px;
   z-index: var(--z-tooltip);
 }
 
 .kai-measure-text-tooltip .kai-tt-label {
   display: inline-block;
-  width: 6ch;
+  width: 7ch;
   text-align: right;
   margin-right: 2ch;
   color: var(--inv-text-muted);
@@ -859,6 +877,13 @@ export const styles = `
   z-index: var(--z-overlay);
 }
 
+.kai-measure-target {
+  position: fixed;
+  pointer-events: none;
+  border: 1px dashed var(--color-accent);
+  z-index: var(--z-overlay);
+}
+
 .kai-measure-highlight {
   position: fixed;
   pointer-events: none;
@@ -866,6 +891,54 @@ export const styles = `
   background: hsl(from var(--color-accent) h s l / 8%);
   border-radius: var(--radius-sm);
   z-index: var(--z-overlay);
+}
+
+/* ── Box model (Alt+Ctrl) ──────────────────────── */
+
+.kai-box {
+  position: fixed;
+  pointer-events: none;
+  box-sizing: border-box;
+  z-index: var(--z-overlay);
+}
+
+/* Empty space (margin, gaps) is hatched so it reads apart from padding at any accent */
+.kai-box-margin,
+.kai-box-gap {
+  background:
+    repeating-linear-gradient(-45deg, hsl(from var(--color-accent) h s l / 45%) 0 1px, transparent 1px 6px),
+    hsl(from var(--color-accent) h s l / 12%);
+}
+
+/* Margin is the ring between its padding (= margin widths) and the border box */
+.kai-box-margin {
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+
+.kai-box-padding {
+  border-style: solid;
+  border-color: hsl(from var(--color-accent) h s l / 32%);
+  outline: 1px solid hsl(from var(--color-accent) h s l / 70%);
+  outline-offset: -1px;
+}
+
+.kai-box-content {
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+
+.kai-box-label {
+  position: fixed;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  background: var(--inv-bg);
+  color: var(--inv-text);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+  z-index: var(--z-tooltip);
 }
 
 /* ── Guide Bar ──────────────────────────────────── */
@@ -918,7 +991,7 @@ export const styles = `
   color: var(--white);
   border-radius: var(--radius-sm);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1;
   transition: background 0.15s ease;
 }
@@ -936,6 +1009,17 @@ export const styles = `
   color: var(--inv-text-muted);
 }
 
+.kai-shortcuts-backdrop {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in oklab, var(--bg-1) 30%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: var(--z-modal);
+}
+
+.kai-shortcuts-backdrop[hidden] { display: none; }
+
 .kai-shortcuts {
   position: fixed;
   top: 58px;
@@ -952,12 +1036,12 @@ export const styles = `
   color: var(--text-primary);
   box-shadow: var(--shadow-xl);
   font: 12px/1.5 var(--font-sans);
-  z-index: var(--z-fab);
+  z-index: var(--z-modal);
 }
 
 .kai-shortcuts[hidden] { display: none; }
-.kai-shortcuts h2 { margin: 0 32px 16px 0; font-size: 15px; font-weight: 600; }
-.kai-shortcuts h3 { margin: 16px 0 8px; font-size: 11px; color: var(--text-secondary); }
+.kai-shortcuts h2 { margin: 0 32px 16px 0; font-size: 15px; font-weight: 500; }
+.kai-shortcuts h3 { margin: 16px 0 8px; font-size: 11px; font-weight: 500; color: var(--text-secondary); }
 .kai-shortcuts p { margin: 16px 0 0; color: var(--text-secondary); }
 .kai-shortcuts-row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 4px 0; }
 .kai-shortcuts-row kbd { flex-shrink: 0; font: 11px var(--font-mono); color: var(--text-secondary); }

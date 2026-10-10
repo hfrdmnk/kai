@@ -6,16 +6,19 @@ import { getNearbyText } from './core/text.ts';
 import { INTERACTION_KEY, SHORTCUTS, type ShortcutAction } from './core/platform.ts';
 import { loadSession, saveSession, clearSession, loadFabCorner, saveFabCorner, loadTheme, saveTheme, loadAccent, saveAccent } from './core/session.ts';
 import { applyAccent } from './core/accents.ts';
-import { computeCrosshair, computeTextInspectData, findLargestEnclosedElement } from './core/measure.ts';
+import { computeCrosshair, computeTextInspectData, findLargestEnclosedElement, type TextInspectData } from './core/measure.ts';
+import { computeBoxModel, type BoxModelData } from './core/box-model.ts';
 import { toMarkdown } from './export/markdown.ts';
 import { createOverlay } from './ui/highlight.ts';
 import { createFab } from './ui/fab.ts';
 import { createPopover } from './ui/popover.ts';
 import { createMarkerManager } from './ui/markers.ts';
 import { createInspector } from './ui/inspector.ts';
-import { createGuideBar } from './ui/guide-bar.ts';
+import { createGuideBar, type KeyId } from './ui/guide-bar.ts';
 
 const DRAG_THRESHOLD = 5;
+/** Pointer travel after a mode switch that counts as moving on rather than hand jitter */
+const MODE_SWITCH_SLOP = 4;
 const BLOCKED_POINTER_EVENTS = [
   'dblclick', 'auxclick', 'contextmenu', 'dragstart',
   'pointerdown', 'pointerup', 'pointermove', 'pointerover', 'pointerout',
@@ -46,6 +49,8 @@ class UIAnnotator extends HTMLElement {
   private readonly systemDark = window.matchMedia('(prefers-color-scheme: dark)');
   private altHeld = false;
   private shiftHeld = false;
+  /** Box model layer: a Ctrl tap toggles it for the rest of the Alt hold (Ctrl+Alt+arrows are OS shortcuts on some systems) */
+  private boxLayer = false;
   private passThrough = false;
   private pickMode = false;
   private settingsOpen = false;
@@ -55,6 +60,8 @@ class UIAnnotator extends HTMLElement {
   private hasPointer = false;
   private measureRafId: number | null = null;
   private highlightLocked = false;
+  /** Box model of the last target; reading a flex container's children every frame is costly */
+  private boxCache: { el: Element; rect: DOMRect; data: BoxModelData | null } | null = null;
 
   private fab!: ReturnType<typeof createFab>;
   private overlay!: ReturnType<typeof createOverlay>;
@@ -64,11 +71,13 @@ class UIAnnotator extends HTMLElement {
   private activePopover: ReturnType<typeof createPopover> | null = null;
   private activePopoverAnnotationId: string | null = null;
 
-  // Hover state: hoverTarget is what the hit test found, selectedElement is what
-  // the box shows (hoverTarget or one of its ancestors after walking up with ↑).
+  // Selection shared by every mode: hoverTarget is what the hit test found, selectedElement
+  // what annotate, inspect and the box model show (hoverTarget or an ancestor walked to with ↑).
   private hoverTarget: Element | null = null;
   private selectedElement: Element | null = null;
   private walkedUp = false;
+  /** Pointer position at a mode switch that carried a ↑ walk over; the first real move afterwards drops the walk */
+  private modeSwitchAt: { x: number; y: number } | null = null;
   private hoverDirty = false;
   private hoverRafId: number | null = null;
   private domObserver: MutationObserver | null = null;
@@ -84,6 +93,7 @@ class UIAnnotator extends HTMLElement {
   private handleMouseMove!: (e: MouseEvent) => void;
   private handleMouseDown!: (e: MouseEvent) => void;
   private handleMouseUp!: (e: MouseEvent) => void;
+  private handleWheel!: (e: WheelEvent) => void;
   private handleBeforeInput!: (e: Event) => void;
   private handleHostFocus!: (e: FocusEvent) => void;
 
@@ -210,7 +220,9 @@ class UIAnnotator extends HTMLElement {
       // Host modals may hide their siblings, but kai remains a separate set of controls.
       if (this.getAttribute('aria-hidden') === 'true') this.removeAttribute('aria-hidden');
       this.hoverDirty = true;
+      this.boxCache = null;
       this.scheduleHoverUpdate();
+      if (this.altHeld) this.scheduleMeasureUpdate();
     };
 
     this.handleClick = (e: MouseEvent) => {
@@ -295,6 +307,7 @@ class UIAnnotator extends HTMLElement {
         && (e.key === '?' || (!e.altKey && e.key.toUpperCase() === INTERACTION_KEY))) {
         e.preventDefault();
         e.stopImmediatePropagation();
+        this.hideFocusRing();
         if (e.key === '?') {
           this.fab.closeSettings();
           this.clearHover();
@@ -313,6 +326,7 @@ class UIAnnotator extends HTMLElement {
       if (action) {
         e.preventDefault();
         e.stopImmediatePropagation();
+        this.hideFocusRing();
         if (action !== 'settings') this.fab.closeSettings();
         this.fab.pressAction(action);
         return;
@@ -330,29 +344,37 @@ class UIAnnotator extends HTMLElement {
         this.fab.focusToolbar(e.shiftKey);
         return;
       }
+      if (e.key === 'Tab') {
+        // kai's controls see it first (e.g. Tab accepts an autocomplete suggestion)
+        this.forwardKeyEvent(e);
+        if (!e.defaultPrevented) this.wrapFocus(e);
+        return;
+      }
       if (own && (editable || this.settingsOpen || this.activePopover || this.guideBar.isHelpOpen())) {
         this.forwardKeyEvent(e);
         return;
       }
+      this.syncModifiers(e);
       if (e.key === 'Alt' && !this.altHeld) {
         this.altHeld = true;
-        this.clearHover();
+        this.markModeSwitch();
+        // Ctrl already held counts as the tap
+        this.boxLayer = e.ctrlKey;
+        // The selection carries over; inspect mode draws it its own way
+        this.overlay.hide();
         document.body.style.cursor = 'crosshair';
-        this.guideBar.show('measure', ['alt']);
+        this.guideBar.show('measure', this.measureKeys());
         this.scheduleMeasureUpdate();
-      }
-      if (e.key === 'Shift') {
-        this.shiftHeld = true;
-        if (this.altHeld) this.guideBar.updateKeys(['alt', 'shift']);
-        if (this.altHeld && !this.dragging && !this.highlightLocked) {
-          this.scheduleMeasureUpdate();
-        }
+      } else if (e.key === 'Control' && !e.repeat && this.altHeld) {
+        this.boxLayer = !this.boxLayer;
+        this.markModeSwitch();
+        this.refreshMeasure();
       }
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         this.walkAncestors(e);
       }
       if (own) {
-        if (['Alt', 'Shift', 'ArrowUp', 'ArrowDown'].includes(e.key)) e.preventDefault();
+        if (['Alt', 'Shift', 'Control', 'ArrowUp', 'ArrowDown'].includes(e.key)) e.preventDefault();
         this.forwardKeyEvent(e);
         return;
       }
@@ -364,13 +386,7 @@ class UIAnnotator extends HTMLElement {
       if (e.key === 'Alt' && this.altHeld) {
         this.exitMeasureMode();
       }
-      if (e.key === 'Shift') {
-        this.shiftHeld = false;
-        if (this.altHeld) this.guideBar.updateKeys(['alt']);
-        if (this.altHeld && !this.dragging && !this.highlightLocked) {
-          this.scheduleMeasureUpdate();
-        }
-      }
+      this.syncModifiers(e);
       if (this.isOwnElement(e)) this.forwardKeyEvent(e);
       else if (!this.passThrough) {
         e.preventDefault();
@@ -382,10 +398,16 @@ class UIAnnotator extends HTMLElement {
       if (this.altHeld) {
         this.exitMeasureMode();
       }
+      this.shiftHeld = false;
     };
 
     this.handleMouseMove = (e: MouseEvent) => {
       this.lastMousePos = { x: e.clientX, y: e.clientY };
+      if (this.modeSwitchAt && Math.hypot(e.clientX - this.modeSwitchAt.x, e.clientY - this.modeSwitchAt.y) >= MODE_SWITCH_SLOP) {
+        this.modeSwitchAt = null;
+        this.walkedUp = false;
+        this.hoverDirty = true;
+      }
       this.hasPointer = true;
       this.guideBar.updatePointer(e.clientX, e.clientY);
       if (!this.isOwnElement(e) && !this.passThrough) e.stopImmediatePropagation();
@@ -394,6 +416,8 @@ class UIAnnotator extends HTMLElement {
         this.scheduleHoverUpdate();
         return;
       }
+      // Catches modifier changes whose key events went elsewhere
+      this.syncModifiers(e);
 
       if (this.dragStart && !this.dragging) {
         const dx = e.clientX - this.dragStart.x;
@@ -405,6 +429,11 @@ class UIAnnotator extends HTMLElement {
       }
 
       this.scheduleMeasureUpdate();
+    };
+
+    // Ctrl+wheel is browser zoom, which the site would keep after kai closes
+    this.handleWheel = (e: WheelEvent) => {
+      if (this.altHeld && e.ctrlKey) e.preventDefault();
     };
 
     this.handleMouseDown = (e: MouseEvent) => {
@@ -488,31 +517,54 @@ class UIAnnotator extends HTMLElement {
       return;
     }
     if (hit === this.hoverTarget && !dirty) return;
-    this.hoverTarget = hit;
+    this.overlay.show(this.retarget(hit));
+  }
 
+  /** Points the selection at a new hit, keeping an ancestor walked up to with ↑ while it still contains the hit */
+  private retarget(hit: Element): Element {
+    this.hoverTarget = hit;
     const keepWalked = this.walkedUp
       && this.selectedElement?.isConnected
       && composedContains(this.selectedElement, hit);
-    if (!keepWalked) {
+    if (!keepWalked || !this.selectedElement) {
       this.selectedElement = hit;
       this.walkedUp = false;
+      this.modeSwitchAt = null;
     }
-    this.overlay.show(this.selectedElement!);
+    return this.selectedElement;
   }
 
   private clearHover() {
     this.hoverTarget = null;
     this.selectedElement = null;
     this.walkedUp = false;
+    this.modeSwitchAt = null;
     this.overlay.hide();
   }
 
+  /**
+   * The page is frozen, so Tab cycles through kai's controls instead of leaving for the page or
+   * browser UI. The shortcut panel is modal and keeps focus to itself.
+   */
+  private wrapFocus(e: KeyboardEvent) {
+    const scope = (this.guideBar.isHelpOpen() && this.shadow.querySelector('.kai-shortcuts')) || this.shadow;
+    const focusable = [...scope.querySelectorAll<HTMLElement>('button, textarea, input, [tabindex]')]
+      .filter(el => el.tabIndex >= 0 && !el.matches(':disabled') && el.checkVisibility({ visibilityProperty: true }));
+    if (!focusable.length) return;
+    const i = focusable.indexOf(this.shadow.activeElement as HTMLElement);
+    if (i !== -1 && i !== (e.shiftKey ? 0 : focusable.length - 1)) return;
+    e.preventDefault();
+    focusable[e.shiftKey ? focusable.length - 1 : 0].focus();
+  }
+
   private walkAncestors(e: KeyboardEvent) {
-    if (this.activePopover || this.altHeld || this.passThrough) return;
+    if (this.activePopover || this.passThrough) return;
     if (!this.selectedElement || !this.hoverTarget || isEditable(e.target)) return;
 
     // A box is showing, so the arrows belong to us even at the ends of the chain
     e.preventDefault();
+    // A walk made in the current mode is deliberate; only one carried across a switch is temporary
+    this.modeSwitchAt = null;
 
     if (e.key === 'ArrowUp') {
       const parent = composedParent(this.selectedElement);
@@ -527,7 +579,8 @@ class UIAnnotator extends HTMLElement {
       this.selectedElement = child;
       this.walkedUp = child !== hover;
     }
-    this.overlay.show(this.selectedElement);
+    if (this.altHeld) this.scheduleMeasureUpdate();
+    else this.overlay.show(this.selectedElement);
   }
 
   // ── Modes ──
@@ -565,18 +618,66 @@ class UIAnnotator extends HTMLElement {
 
   private exitMeasureMode() {
     this.altHeld = false;
-    this.shiftHeld = false;
+    this.markModeSwitch();
+    this.boxLayer = false;
     this.dragging = false;
     this.dragStart = null;
     this.highlightLocked = false;
     document.body.style.cursor = '';
     this.inspector.hide();
+    this.boxCache = null;
     if (this.active) this.guideBar.show(this.pickMode ? 'pick' : 'annotate');
     if (this.measureRafId !== null) {
       cancelAnimationFrame(this.measureRafId);
       this.measureRafId = null;
     }
     this.handleLayoutChange();
+  }
+
+  private boxModelOf(el: Element): BoxModelData | null {
+    // A moved or resized box (transitions, shadow-DOM scrolling) isn't reported by layout events
+    const rect = el.getBoundingClientRect();
+    const cached = this.boxCache;
+    if (cached?.el === el && cached.rect.x === rect.x && cached.rect.y === rect.y
+      && cached.rect.width === rect.width && cached.rect.height === rect.height) return cached.data;
+    this.boxCache = { el, rect, data: computeBoxModel(el) };
+    return this.boxCache.data;
+  }
+
+  /** Shift switches inspect to text metrics, so it's read from every key and mouse event */
+  private syncModifiers(e: KeyboardEvent | MouseEvent) {
+    if (e.shiftKey === this.shiftHeld) return;
+    this.shiftHeld = e.shiftKey;
+    if (!this.altHeld) return;
+    this.markModeSwitch();
+    this.refreshMeasure();
+  }
+
+  /**
+   * The walked selection survives a mode switch while the pointer stays still (the user is
+   * still looking at that element); `handleMouseMove` drops it on the first real move.
+   */
+  private markModeSwitch() {
+    if (this.walkedUp) this.modeSwitchAt = { ...this.lastMousePos };
+  }
+
+  private refreshMeasure() {
+    this.guideBar.updateKeys(this.measureKeys());
+    if (!this.dragging && !this.highlightLocked) this.scheduleMeasureUpdate();
+  }
+
+  private measureKeys(): KeyId[] {
+    const keys: KeyId[] = ['alt'];
+    if (this.shiftHeld) keys.push('shift');
+    if (this.boxLayer) keys.push('ctrl');
+    return keys;
+  }
+
+  /** Whether the viewport point shows `el` or a descendant; kai's own UI is see-through */
+  private pointShows(el: Element, x: number, y: number): boolean {
+    if (document.elementFromPoint(x, y) === this) return true;
+    const hit = this.hitTest(x, y);
+    return !!hit && composedContains(el, hit);
   }
 
   private scheduleMeasureUpdate() {
@@ -599,21 +700,41 @@ class UIAnnotator extends HTMLElement {
       return;
     }
 
-    if (this.shiftHeld) {
-      const el = document.elementFromPoint(cx, cy);
-      if (el && el !== this) {
-        const textData = computeTextInspectData(el);
-        if (textData) {
-          this.inspector.showTextInfo(cx, cy, textData);
-          return;
-        }
-      }
+    const hit = this.hitTest(cx, cy);
+    const target = hit ? this.retarget(hit) : null;
+    if (!target) {
       this.inspector.hide();
       return;
     }
+    // Box model layer (Ctrl tap), drawn under the crosshair or text metrics
+    const box = this.boxLayer ? this.boxModelOf(target) : null;
 
-    const data = computeCrosshair(cx, cy, this);
-    this.inspector.showCrosshair(data);
+    let textData: TextInspectData | null = null;
+    if (this.shiftHeld) {
+      textData = computeTextInspectData(target);
+      if (textData) this.inspector.showTextInfo(cx, cy, textData, box?.rows);
+      else this.inspector.hide();
+    } else {
+      this.inspector.showCrosshair(computeCrosshair(cx, cy, (x, y) => this.pointShows(target, x, y)));
+    }
+    // Once walked up, outline what's measured; the box model already draws it
+    this.inspector.showTarget(this.walkedUp && !box ? target.getBoundingClientRect() : null);
+    // With text metrics showing, the box rows already sit in that card
+    if (box) this.inspector.showBoxModel(box, !textData);
+    else this.inspector.hideBoxModel();
+  }
+
+  /**
+   * Focus rings appear once the user tabs and go away on pointer use or a kai shortcut,
+   * which moves focus itself (e.g. `,` focuses the theme radio).
+   */
+  private handleFocusModality = (e: Event) => {
+    if (e.type === 'pointerdown') this.hideFocusRing();
+    else if ((e as KeyboardEvent).key === 'Tab') this.setAttribute('data-focus-ring', '');
+  };
+
+  private hideFocusRing() {
+    this.removeAttribute('data-focus-ring');
   }
 
   private applyTheme = () => {
@@ -629,6 +750,9 @@ class UIAnnotator extends HTMLElement {
     applyAccent(this, this.accent);
     this.systemDark.addEventListener('change', this.applyTheme);
     document.addEventListener('keydown', this.handleGlobalKeydown);
+    // Capture, ahead of the annotator's blockers, so Tab and clicks register even when swallowed
+    window.addEventListener('keydown', this.handleFocusModality, true);
+    window.addEventListener('pointerdown', this.handleFocusModality, true);
   }
 
   disconnectedCallback() {
@@ -636,6 +760,8 @@ class UIAnnotator extends HTMLElement {
     this.deactivate();
     this.systemDark.removeEventListener('change', this.applyTheme);
     document.removeEventListener('keydown', this.handleGlobalKeydown);
+    window.removeEventListener('keydown', this.handleFocusModality, true);
+    window.removeEventListener('pointerdown', this.handleFocusModality, true);
     this.markers.destroy();
     this.overlay.destroy();
     this.inspector.destroy();
@@ -668,6 +794,7 @@ class UIAnnotator extends HTMLElement {
     window.addEventListener('mousemove', this.handleMouseMove, true);
     window.addEventListener('mousedown', this.handleMouseDown, true);
     window.addEventListener('mouseup', this.handleMouseUp, true);
+    window.addEventListener('wheel', this.handleWheel, { capture: true, passive: false });
     window.addEventListener('scroll', this.handleLayoutChange, { capture: true, passive: true });
     window.addEventListener('resize', this.handleLayoutChange);
     window.addEventListener('blur', this.handleWindowBlur);
@@ -700,6 +827,7 @@ class UIAnnotator extends HTMLElement {
     window.removeEventListener('mousemove', this.handleMouseMove, true);
     window.removeEventListener('mousedown', this.handleMouseDown, true);
     window.removeEventListener('mouseup', this.handleMouseUp, true);
+    window.removeEventListener('wheel', this.handleWheel, { capture: true });
     window.removeEventListener('scroll', this.handleLayoutChange, { capture: true });
     window.removeEventListener('resize', this.handleLayoutChange);
     window.removeEventListener('blur', this.handleWindowBlur);

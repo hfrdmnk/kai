@@ -83,6 +83,7 @@ export const styles = `
   height: 0;
   overflow: visible;
   z-index: var(--z-host);
+  pointer-events: auto;
 }
 
 :host([data-theme="dark"]) {
@@ -343,6 +344,23 @@ export const styles = `
 .kai-settings-accent[aria-checked="true"] {
   box-shadow: 0 0 0 2px var(--bg-1), 0 0 0 3.5px var(--swatch);
 }
+
+.kai-settings-shortcuts {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0 0;
+  border: 0;
+  border-top: 1px solid var(--bg-4);
+  background: none;
+  font: inherit;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.kai-settings-shortcuts:hover { color: var(--text-primary); }
+.kai-settings-shortcuts kbd { font: 11px var(--font-mono); }
+.kai-settings-shortcuts:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 4px; }
 
 /* ── Overlay ─────────────────────────────────────── */
 
@@ -869,6 +887,14 @@ export const styles = `
   z-index: var(--z-fab);
   pointer-events: none;
   white-space: nowrap;
+  opacity: 1;
+  transition: opacity 140ms ease;
+}
+
+.kai-guide-bar[data-obscured] { opacity: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .kai-guide-bar { transition-duration: 0ms; }
 }
 
 .kai-guide-bar-content {
@@ -897,11 +923,64 @@ export const styles = `
   transition: background 0.15s ease;
 }
 
+.kai-shortcuts-close:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
 .kai-guide-bar-kbd[data-pressed] {
   background: var(--color-accent);
 }
 
 .kai-guide-bar-hint {
   color: var(--inv-text-muted);
+}
+
+.kai-shortcuts {
+  position: fixed;
+  top: 58px;
+  left: 50%;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  width: min(420px, calc(100vw - 24px));
+  max-height: calc(100vh - 74px);
+  overflow-y: auto;
+  padding: 20px;
+  border: 1px solid var(--bg-4);
+  border-radius: var(--radius-lg);
+  background: var(--bg-1);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-xl);
+  font: 12px/1.5 var(--font-sans);
+  z-index: var(--z-fab);
+}
+
+.kai-shortcuts[hidden] { display: none; }
+.kai-shortcuts h2 { margin: 0 32px 16px 0; font-size: 15px; font-weight: 600; }
+.kai-shortcuts h3 { margin: 16px 0 8px; font-size: 11px; color: var(--text-secondary); }
+.kai-shortcuts p { margin: 16px 0 0; color: var(--text-secondary); }
+.kai-shortcuts-row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 4px 0; }
+.kai-shortcuts-row kbd { flex-shrink: 0; font: 11px var(--font-mono); color: var(--text-secondary); }
+.kai-shortcuts-row span { text-align: right; }
+.kai-shortcuts-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--bg-3);
+  color: var(--text-secondary);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+@media (max-width: 600px) {
+  .kai-guide-bar { box-sizing: border-box; width: calc(100vw - 24px); border-radius: var(--radius-lg); }
+  .kai-guide-bar-content { flex-wrap: wrap; justify-content: center; }
+  .kai-guide-bar-content > span:first-child { width: 100%; text-align: center; }
+  .kai-guide-bar-content > .kai-guide-bar-sep:nth-child(2) { display: none; }
+  .kai-shortcuts { top: 84px; max-height: calc(100vh - 100px); }
 }
 `;

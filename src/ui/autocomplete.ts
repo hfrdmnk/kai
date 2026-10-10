@@ -201,5 +201,5 @@ export const attachAutocomplete = (
     close();
   };
 
-  return { destroy };
+  return { destroy, close };
 };

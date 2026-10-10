@@ -1,7 +1,6 @@
 export const isMac = /Mac|iPhone|iPad/.test(navigator.platform ?? navigator.userAgent);
 
-/** Modifier that switches the annotator into pass-through mode while held. */
-export const PASS_THROUGH_KEY = isMac ? 'Meta' : 'Control';
+export const INTERACTION_KEY = 'I';
 
 /**
  * Single-key shortcuts for the FAB actions, live while the annotator is active and no text

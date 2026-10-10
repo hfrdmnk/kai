@@ -41,7 +41,12 @@ No React, no Svelte, no Vue. Pure vanilla TypeScript compiled to a single IIFE b
 - Hit testing runs on pointer position (`elementFromPoint`), so the box follows scroll and DOM changes; SVG internals snap to their root `<svg>`; inline elements get one box per line fragment
 - Open shadow roots are pierced: hover, ↑/↓ walking and paths cross the boundary, and selectors for shadow content read `host-selector >>> inner-selector` (see `resolveSelector` in `src/core/selector.ts`)
 - `↑` / `↓` walk the ancestor chain when the wanted parent is fully covered by a child
-- Page interactions (click, pointerdown, dblclick) are swallowed while active; hold `Cmd`/`Ctrl` to pass them through, e.g. to open a modal before annotating it
+- Page clicks, pointer actions, and keyboard input are swallowed in annotation mode, before document-level host handlers; scrolling remains available
+- `I` toggles interaction mode with no held modifier, e.g. to open a modal before annotating it. In interaction mode, page controls and keyboard shortcuts behave normally. `I` / `?` are ignored in text fields; the interaction button and Keyboard shortcuts in settings remain available
+- Kai's own controls do not trigger host outside-click dismissal or modal focus traps; toggling back preserves the open host overlay
+- Interaction and selector-pick buttons sit next to each other beside the FAB, using Hugeicons Stroke Rounded PointerIcon (pointing hand) and cursor-02 SVGs respectively; optical-centering offsets live in the SVG viewBoxes
+- The HUD omits ancestor-arrow, interaction-toggle, and shortcut-reference hints. `?` or the Keyboard shortcuts link in settings opens a compact panel listing shortcuts for all modes; there is no separate help button
+- The HUD is pointer-transparent and fades out over 140 ms when the pointer enters its bounds, then returns on leaving; reduced motion disables the fade. Elements underneath remain inspectable and annotatable
 - Click any element to open the annotation panel
 - Panel displays:
   - CSS selector (short, readable) plus a hidden positional locator so markers stay on the exact element in repeated lists (see `resolveAnnotation` in `src/core/selector.ts`)
@@ -134,13 +139,18 @@ All kai UI layers sit at the top of the stacking context, above any host page co
 | `Ctrl+Shift+A` | Global | Toggle annotator on/off. Extension command (`_execute_action` in `extension/manifest.json`, Ctrl on Mac too); kai itself doesn't listen for it, so the two can't double-toggle |
 | `Escape` | Panel open | Close panel |
 | `Escape` | Settings open | Close settings |
+| `Escape` | Shortcut reference open | Close shortcut reference |
 | `Escape` | Pick mode armed | Cancel pick mode |
-| `Escape` | Annotator active, no panel | Deactivate annotator |
+| `Escape` | Annotation mode, no panel | Deactivate annotator |
+| `Escape` | Interaction mode | Pass to the page (e.g. dismiss its dialog) |
 | `S` | Annotator active, no text field focused | Toggle copy-selector pick mode |
 | `M` | Annotator active, no text field focused | Copy all annotations as Markdown |
 | `Backspace` / `Delete` | Annotator active, no text field focused | Clear all (second press within 3 s confirms) |
 | `,` | Annotator active, no text field focused | Toggle settings |
-| `Cmd` (Mac) / `Ctrl` (Win), held | Annotator active | Pass-through: interact with the page normally |
+| `I` | Annotator active, no text field focused | Toggle interaction / annotation mode |
+| `?` | Annotator active, no text field focused | Toggle shortcut reference for all modes |
+| `Alt`, held | Annotation mode | Inspect / drag to measure |
+| `Alt+Shift`, held | Annotation mode | Inspect text metrics |
 | `↑` / `↓` | Element hovered | Move the highlight to the parent / back toward the hovered element |
 | `Cmd/Ctrl+Enter` | Panel textarea focused | Submit annotation |
 | `Tab` | Autocomplete visible | Accept selected suggestion |
@@ -149,7 +159,7 @@ All kai UI layers sit at the top of the stacking context, above any host page co
 | `Enter` | Annotation list item focused | Scroll to element |
 | `Delete` / `Backspace` | Annotation list item focused | Remove annotation |
 
-Single-key shortcuts are the keys in `SHORTCUTS` (`src/core/platform.ts`). They are handled in the capture phase and swallowed so the host page's own shortcuts never fire; they are ignored while any text field (page or kai) has focus and while a modifier is held. The FAB tooltips show the key next to the label. The README table is the user-facing list and must stay in sync.
+FAB single-key shortcuts are the keys in `SHORTCUTS` (`src/core/platform.ts`). They apply outside interaction mode, are handled in the capture phase, and are swallowed so the host page's own shortcuts never fire; they are ignored while any text field (page or kai) has focus and while a modifier is held. `I` and `?` also work in interaction mode outside text fields. The FAB tooltips show the key next to the label. The README table and shortcut reference must stay in sync.
 
 </section>
 

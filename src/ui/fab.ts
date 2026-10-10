@@ -1,7 +1,7 @@
 import type { AccentId, FabCorner, Theme } from '../types.ts';
-import { iconKai, iconCopy, iconTrash, iconCheck, iconHelp, iconCursor, iconSettings, createIcon } from '../icons.ts';
+import { iconKai, iconCopy, iconTrash, iconCheck, iconHelp, iconCursor, iconPointer, iconSettings, createIcon } from '../icons.ts';
 import { SPRING, SNAP, EASE_OUT } from '../core/easing.ts';
-import { SHORTCUTS, type ShortcutAction } from '../core/platform.ts';
+import { INTERACTION_KEY, SHORTCUTS, type ShortcutAction } from '../core/platform.ts';
 import { createSettingsPanel } from './settings.ts';
 
 const setIcon = (el: HTMLElement, svg: string) => {
@@ -17,6 +17,8 @@ type FabOptions = {
   onCopyMarkdown: () => void;
   onClearAll: () => void;
   onPickToggle: (armed: boolean) => void;
+  onInteractionToggle: () => void;
+  onHelpToggle: () => void;
   onCornerChange: (corner: FabCorner) => void;
   onSettingsToggle: (open: boolean) => void;
   settings: {
@@ -203,6 +205,13 @@ export const createFab = (
   actions.className = 'kai-fab-actions';
   actions.style.display = 'none';
 
+  const interactionBtn = document.createElement('button');
+  interactionBtn.className = 'kai-fab-action';
+  interactionBtn.setAttribute('aria-label', 'Toggle interaction mode');
+  interactionBtn.setAttribute('aria-pressed', 'false');
+  setIcon(interactionBtn, iconPointer);
+  interactionBtn.addEventListener('click', opts.onInteractionToggle);
+
   const pickBtn = document.createElement('button');
   pickBtn.className = 'kai-fab-action';
   pickBtn.setAttribute('aria-label', 'Copy selector');
@@ -258,6 +267,8 @@ export const createFab = (
     tooltip.style.display = 'none';
   };
 
+  interactionBtn.addEventListener('mouseenter', () => showTooltip(interactionBtn, 'Toggle interaction mode', INTERACTION_KEY));
+  interactionBtn.addEventListener('mouseleave', hideTooltip);
   pickBtn.addEventListener('mouseenter', () => showTooltip(pickBtn, 'Copy selector', SHORTCUTS.pick.label));
   pickBtn.addEventListener('mouseleave', hideTooltip);
   copyBtn.addEventListener('mouseenter', () => showTooltip(copyBtn, 'Copy as Markdown', SHORTCUTS.copy.label));
@@ -267,7 +278,7 @@ export const createFab = (
   settingsBtn.addEventListener('mouseenter', () => { if (!settingsOpen) showTooltip(settingsBtn, 'Settings', SHORTCUTS.settings.label); });
   settingsBtn.addEventListener('mouseleave', hideTooltip);
 
-  const actionBtns = [pickBtn, copyBtn, clearBtn, settingsBtn];
+  const actionBtns = [interactionBtn, pickBtn, copyBtn, clearBtn, settingsBtn];
   for (const btn of actionBtns) actions.appendChild(btn);
 
   // Copy and clear only exist once there is something to copy or clear
@@ -276,7 +287,7 @@ export const createFab = (
   const visibleActionBtns = () => actionBtns.filter(b => b.style.display !== 'none');
 
   // ── Settings panel ──
-  const settings = createSettingsPanel(opts.settings);
+  const settings = createSettingsPanel({ ...opts.settings, onShortcuts: opts.onHelpToggle });
   const panel = settings.el;
   panel.style.display = 'none';
   let settingsOpen = false;
@@ -317,6 +328,7 @@ export const createFab = (
     shadowRoot.addEventListener('pointerdown', onInsidePointerDown);
     window.addEventListener('resize', closeSettings);
     opts.onSettingsToggle(true);
+    panel.querySelector<HTMLButtonElement>('[role="radio"][aria-checked="true"]')!.focus();
   };
 
   const closeSettings = (): boolean => {
@@ -328,6 +340,7 @@ export const createFab = (
     shadowRoot.removeEventListener('pointerdown', onInsidePointerDown);
     window.removeEventListener('resize', closeSettings);
     opts.onSettingsToggle(false);
+    if (panel.contains(shadowRoot.activeElement)) settingsBtn.focus();
     settingsAnim?.cancel();
     settingsAnim = panel.animate(
       [
@@ -774,5 +787,12 @@ export const createFab = (
     copyStatus.remove();
   };
 
-  return { updateBadge, setActive, updateActionStates, confirmCopy, confirmPick, setPickArmed, closeSettings, pressAction, destroy };
+  const setInteractionActive = (interacting: boolean) => {
+    interactionBtn.setAttribute('aria-pressed', String(interacting));
+    interactionBtn.classList.toggle('kai-fab-action--armed', interacting);
+  };
+
+  const focusToolbar = (backward: boolean) => (backward ? settingsBtn : interactionBtn).focus();
+
+  return { updateBadge, setActive, setInteractionActive, updateActionStates, confirmCopy, confirmPick, setPickArmed, closeSettings, focusToolbar, pressAction, destroy };
 };

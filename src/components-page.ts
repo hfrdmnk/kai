@@ -6,11 +6,13 @@ import iconCopy from './icons/copy.svg?raw';
 import iconCheck from './icons/check.svg?raw';
 import iconHelp from './icons/help.svg?raw';
 import iconCursor from './icons/cursor.svg?raw';
+import iconPointer from './icons/pointer.svg?raw';
 import iconSettings from './icons/settings.svg?raw';
 import type { AccentId, Theme } from './types';
 import { applyAccent } from './core/accents';
 import { loadAccent, saveAccent, loadTheme, saveTheme } from './core/session';
 import { createSettingsPanel } from './ui/settings';
+import { createGuideBar } from './ui/guide-bar';
 
 // ── Helpers ────────────────────────────────────────
 
@@ -197,7 +199,7 @@ mountSpecimen('icons', '', (shadow) => {
   const icons: [string, string][] = [
     ['kai', iconKai], ['close', iconClose], ['trash', iconTrash],
     ['copy', iconCopy], ['check', iconCheck], ['help', iconHelp],
-    ['cursor', iconCursor], ['settings', iconSettings],
+    ['cursor', iconCursor], ['pointer', iconPointer], ['settings', iconSettings],
   ];
   const sizes = [24, 16, 12];
 
@@ -843,10 +845,12 @@ mountSpecimen('settings', `
   `, (shadow) => {
 
   shadow.appendChild(makeLabel('Panel'));
+  const guide = createGuideBar(shadow);
   const panel = createSettingsPanel({
     version: __KAI_VERSION__,
     theme: loadTheme(),
     accent: loadAccent(),
+    onShortcuts: guide.toggleHelp,
     onThemeChange: (t: Theme) => {
       saveTheme(t);
       settingsPanels.forEach(p => p.setTheme(t));

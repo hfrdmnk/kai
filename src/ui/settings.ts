@@ -11,6 +11,7 @@ type SettingsOptions = {
   accent: AccentId;
   onThemeChange: (theme: Theme) => void;
   onAccentChange: (accent: AccentId) => void;
+  onShortcuts: () => void;
 };
 
 const makeRadioGroup = (label: string, className: string): HTMLElement => {
@@ -93,6 +94,16 @@ export const createSettingsPanel = (opts: SettingsOptions) => {
     accents.appendChild(btn);
   }
 
+  const shortcuts = document.createElement('button');
+  shortcuts.type = 'button';
+  shortcuts.className = 'kai-settings-shortcuts';
+  shortcuts.textContent = 'Keyboard shortcuts';
+  const key = document.createElement('kbd');
+  key.textContent = '?';
+  key.setAttribute('aria-hidden', 'true');
+  shortcuts.appendChild(key);
+  shortcuts.addEventListener('click', opts.onShortcuts);
+
   const setTheme = (theme: Theme, emit = false) => {
     checkOne(themeBtns, theme);
     if (emit) opts.onThemeChange(theme);
@@ -112,6 +123,7 @@ export const createSettingsPanel = (opts: SettingsOptions) => {
   panel.appendChild(header);
   panel.appendChild(themes);
   panel.appendChild(accents);
+  panel.appendChild(shortcuts);
 
   return { el: panel, setTheme, setAccent };
 };

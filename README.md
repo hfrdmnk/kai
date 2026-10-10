@@ -16,7 +16,8 @@ The name 回 (kai) is Japanese for "turn," as in a turn in a cycle. Annotate wha
 - Smart element selection with hover highlight, breadcrumb paths, and computed styles (px→rem)
 - CSS variable autocomplete — type `--` to browse the page's custom properties
 - Measurement mode (<kbd>Alt</kbd>): crosshair with dimensions, text metrics, selection rectangle
-- Pass-through mode (hold <kbd>Cmd</kbd> / <kbd>Ctrl</kbd>): interact with the page without leaving the annotator
+- Interaction mode (<kbd>I</kbd>): interact with the page without leaving the annotator
+- Shortcut reference (<kbd>?</kbd>): see shortcuts for every mode in one panel
 - Copy any element's selector with the cursor action bubble
 - Markers with automatic clustering for dense annotations
 - Session persistence via localStorage — survives reloads
@@ -55,6 +56,9 @@ orbs skip setup; when setup runs again, Bun reuses installed dependencies and it
 No secrets, backing services, or resume hook are required. Run `bun run build` to validate the
 checkout or `bun run dev` to start the development server.
 
+To run the browser regression check, install `agent-browser` and its Chromium browser, then run
+`bun run build && bun scripts/check-interaction.ts`. It tests the packaged extension bundle.
+
 ## How it works
 
 1. **Activate** — click the kai icon in the toolbar (click again to turn it off)
@@ -67,9 +71,18 @@ checkout or `bun run dev` to start the development server.
 
 Hold <kbd>Alt</kbd> to enter measurement mode. A crosshair follows your cursor showing element dimensions. Hold <kbd>Shift</kbd> additionally to see text metrics. Click and drag to measure arbitrary distances.
 
-### Pass-through mode
+### Interaction mode
 
-While kai is active, clicks never reach the page. Hold <kbd>Cmd</kbd> (Mac) or <kbd>Ctrl</kbd> (Windows/Linux) to interact with the page normally, for example to open a modal, then release to annotate what appeared.
+While kai is in annotation mode, page clicks and keyboard input are blocked. Press <kbd>I</kbd> to
+switch to interaction mode: links, inputs, popovers, and dialogs work normally, with no modifier
+held. Press <kbd>I</kbd> again to annotate what appeared. In a text field, use the
+pointer button beside kai instead; typing `I` or `?` does not switch modes or open help.
+
+Press <kbd>?</kbd> (or choose **Keyboard shortcuts** in settings) for shortcuts in every mode. Escape closes the
+shortcut panel. In interaction mode, other shortcuts—including Escape—belong to the page.
+The HUD fades out when hovered and never intercepts pointer events, so elements beneath it
+remain selectable. Interaction and selector-pick buttons sit together beside the FAB; their
+pointer-hand and selector icons use Hugeicons Stroke Rounded, embedded as local SVGs with no runtime dependency.
 
 ### Selecting a covered parent
 
@@ -81,17 +94,21 @@ Click the cursor bubble next to the FAB, then click any element. Its selector la
 
 ## Keyboard shortcuts
 
-Every action has a keyboard path. The single-key shortcuts apply while kai is active and no text field has focus; the FAB button tooltips show them too.
+Every action has a keyboard path. Annotation shortcuts apply in annotation/inspection/selector
+mode with no text field focused; the FAB button tooltips show them too. `I` and `?` also work in
+interaction mode outside text fields.
 
 | Shortcut | Context | Action |
 |---|---|---|
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> | Any tab | Toggle kai on / off (extension shortcut, change it at `chrome://extensions/shortcuts`) |
-| <kbd>Esc</kbd> | Active | Close settings → cancel pick mode → deactivate, whichever applies first |
+| <kbd>Esc</kbd> | Annotation mode | Close help / panel / settings → cancel pick mode → deactivate, whichever applies first |
+| <kbd>Esc</kbd> | Interaction mode | Dismiss the page's topmost overlay |
 | <kbd>S</kbd> | Active | Toggle copy-selector pick mode |
 | <kbd>M</kbd> | Active, has annotations | Copy all annotations as Markdown |
 | <kbd>⌫</kbd> / <kbd>Del</kbd> | Active, has annotations | Clear all: first press arms, second press within 3 s confirms |
 | <kbd>,</kbd> | Active | Toggle settings |
-| <kbd>Cmd</kbd> / <kbd>Ctrl</kbd> (hold) | Active | Pass-through: interact with the page |
+| <kbd>I</kbd> | Active, outside text fields | Toggle interaction / annotation mode (also a button beside kai) |
+| <kbd>?</kbd> | Active, outside text fields | Toggle shortcut reference for all modes |
 | <kbd>Alt</kbd> (hold) | Active | Measurement mode |
 | <kbd>Alt</kbd>+<kbd>Shift</kbd> (hold) | Active | Measurement mode with text metrics |
 | <kbd>↑</kbd> / <kbd>↓</kbd> | Element hovered | Move highlight to parent / back down |

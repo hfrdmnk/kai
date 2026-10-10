@@ -5,9 +5,12 @@ import iconCopy from './icons/copy.svg?raw';
 import iconCheck from './icons/check.svg?raw';
 import iconHelp from './icons/help.svg?raw';
 import iconCursor from './icons/cursor.svg?raw';
+import iconPointer from './icons/pointer.svg?raw';
 import iconSettings from './icons/settings.svg?raw';
 
-export { iconKai, iconClose, iconTrash, iconCopy, iconCheck, iconHelp, iconCursor, iconSettings };
+// Hugeicons Stroke Rounded: cursor-02 (select) / PointerIcon (interact).
+// Individual SVG viewBoxes include optical-centering offsets, shared by every consumer.
+export { iconKai, iconClose, iconTrash, iconCopy, iconCheck, iconHelp, iconCursor, iconPointer, iconSettings };
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const TAG = /<(\w+)((?:\s+[\w:-]+="[^"]*")*)\s*\/?>/g;

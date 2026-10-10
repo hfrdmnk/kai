@@ -3,7 +3,7 @@ import { styles } from './styles.ts';
 import { generateSelector, generateLocator, generatePath, resolveAnnotation, composedParent, composedChildren, composedContains } from './core/selector.ts';
 import { getComputedStyles } from './core/styles.ts';
 import { getNearbyText } from './core/text.ts';
-import { isMac, PASS_THROUGH_KEY, SHORTCUTS, type ShortcutAction } from './core/platform.ts';
+import { INTERACTION_KEY, SHORTCUTS, type ShortcutAction } from './core/platform.ts';
 import { loadSession, saveSession, clearSession, loadFabCorner, saveFabCorner, loadTheme, saveTheme, loadAccent, saveAccent } from './core/session.ts';
 import { applyAccent } from './core/accents.ts';
 import { computeCrosshair, computeTextInspectData, findLargestEnclosedElement } from './core/measure.ts';
@@ -16,6 +16,11 @@ import { createInspector } from './ui/inspector.ts';
 import { createGuideBar } from './ui/guide-bar.ts';
 
 const DRAG_THRESHOLD = 5;
+const BLOCKED_POINTER_EVENTS = [
+  'dblclick', 'auxclick', 'contextmenu', 'dragstart',
+  'pointerdown', 'pointerup', 'pointermove', 'pointerover', 'pointerout',
+  'mouseover', 'mouseout', 'mouseenter', 'mouseleave',
+] as const;
 
 /** SVG internals (path, g, use…) are never what a user means to annotate; snap to the root <svg>. */
 const snapToSvgRoot = (el: Element): Element => {
@@ -25,9 +30,6 @@ const snapToSvgRoot = (el: Element): Element => {
   }
   return current;
 };
-
-/** The modifier state on the mouse event is the source of truth; keydown can be missed when focus sits in an iframe or our own UI. */
-const isPassThroughEvent = (e: MouseEvent): boolean => isMac ? e.metaKey : e.ctrlKey;
 
 const isEditable = (t: EventTarget | null): boolean =>
   t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
@@ -82,6 +84,8 @@ class UIAnnotator extends HTMLElement {
   private handleMouseMove!: (e: MouseEvent) => void;
   private handleMouseDown!: (e: MouseEvent) => void;
   private handleMouseUp!: (e: MouseEvent) => void;
+  private handleBeforeInput!: (e: Event) => void;
+  private handleHostFocus!: (e: FocusEvent) => void;
 
   constructor() {
     super();
@@ -93,6 +97,14 @@ class UIAnnotator extends HTMLElement {
     instance = this;
 
     this.shadow = this.attachShadow({ mode: 'closed' });
+    // Kai controls are not outside clicks or keyboard commands for the host app.
+    for (const type of ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'dblclick', 'auxclick', 'contextmenu', 'keyup']) {
+      this.shadow.addEventListener(type, e => e.stopPropagation());
+    }
+    this.shadow.addEventListener('keydown', e => {
+      this.handleGlobalKeydown(e as KeyboardEvent);
+      if (!this.passThrough || (e as KeyboardEvent).key !== 'Escape') e.stopPropagation();
+    });
 
     // A <style> element is blocked by the page's style-src CSP; a constructed sheet is not
     const sheet = new CSSStyleSheet();
@@ -122,8 +134,16 @@ class UIAnnotator extends HTMLElement {
       },
       onPickToggle: (armed) => {
         this.pickMode = armed;
+        if (this.passThrough) this.exitPassThrough();
         if (armed) this.closePopover();
         this.guideBar.show(armed ? 'pick' : 'annotate');
+      },
+      onInteractionToggle: () => this.toggleInteraction(),
+      onHelpToggle: () => {
+        this.fab.closeSettings();
+        this.clearHover();
+        this.inspector.hide();
+        this.guideBar.toggleHelp();
       },
       onCornerChange: (c) => {
         this.fabCorner = c;
@@ -135,7 +155,7 @@ class UIAnnotator extends HTMLElement {
           this.clearHover();
           this.guideBar.hide();
         } else if (this.active) {
-          this.guideBar.show(this.pickMode ? 'pick' : 'annotate');
+          this.guideBar.show(this.passThrough ? 'interact' : this.pickMode ? 'pick' : 'annotate');
           this.handleLayoutChange();
         }
       },
@@ -183,18 +203,22 @@ class UIAnnotator extends HTMLElement {
       if (e.relatedTarget) return;
       this.hasPointer = false;
       this.clearHover();
+      this.guideBar.updatePointer(-1, -1);
     };
 
     this.handleLayoutChange = () => {
+      // Host modals may hide their siblings, but kai remains a separate set of controls.
+      if (this.getAttribute('aria-hidden') === 'true') this.removeAttribute('aria-hidden');
       this.hoverDirty = true;
       this.scheduleHoverUpdate();
     };
 
     this.handleClick = (e: MouseEvent) => {
       if (this.isOwnElement(e)) return;
-      if (this.passThrough || isPassThroughEvent(e)) return;
+      if (this.passThrough) return;
       e.preventDefault();
       e.stopImmediatePropagation();
+      if (this.fab.closeSettings()) return;
       if (this.altHeld) return;
 
       const target = this.selectedElement ?? this.hitTest(e.clientX, e.clientY);
@@ -222,18 +246,36 @@ class UIAnnotator extends HTMLElement {
       }
     };
 
-    // Libraries like Radix and React Aria act on pointerdown, not click, so
-    // those have to be swallowed too. No preventDefault: that would suppress
-    // the compat mouse events our own handlers rely on.
+    // Keep compatibility mouse events for measurement drags; mousedown below
+    // prevents native focus. Window capture also precedes Radix's document listeners.
     this.handleBlockedPointer = (e: MouseEvent) => {
       if (this.isOwnElement(e)) return;
-      if (this.passThrough || isPassThroughEvent(e)) return;
+      if (this.passThrough) return;
+      if (['contextmenu', 'auxclick', 'dblclick', 'dragstart'].includes(e.type)) e.preventDefault();
       e.stopImmediatePropagation();
+      if (e.type === 'pointerdown') this.closePopover();
+      if (e.type === 'mouseout') this.handleMouseLeave(e);
+    };
+
+    this.handleBeforeInput = (e: Event) => {
+      if (this.isOwnElement(e)) {
+        e.stopImmediatePropagation();
+        return;
+      }
+      if (this.passThrough) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    };
+
+    this.handleHostFocus = (e: FocusEvent) => {
+      // Host modal focus traps must not pull focus out of kai's closed shadow root.
+      if (this.isOwnElement(e) || (e.type === 'focusout' && e.relatedTarget === this) || !this.passThrough) e.stopImmediatePropagation();
     };
 
     this.handleGlobalKeydown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && this.active && !this.activePopover) {
         if (this.fab.closeSettings()) return;
+        if (this.passThrough) return;
         if (this.pickMode) {
           this.disarmPick();
         } else {
@@ -243,6 +285,30 @@ class UIAnnotator extends HTMLElement {
     };
 
     this.handleKeydown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && (this.guideBar.closeHelp() || this.fab.closeSettings())) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
+      const editable = e.composedPath().some(isEditable) || isEditable(this.shadow.activeElement);
+      if (!e.repeat && !e.metaKey && !e.ctrlKey && !editable
+        && (e.key === '?' || (!e.altKey && e.key.toUpperCase() === INTERACTION_KEY))) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (e.key === '?') {
+          this.fab.closeSettings();
+          this.clearHover();
+          this.inspector.hide();
+          this.guideBar.toggleHelp();
+        } else this.toggleInteraction();
+        return;
+      }
+      const own = this.isOwnElement(e);
+      if (this.passThrough) {
+        // Escape still dismisses page overlays after using the interaction button.
+        if (own && e.key !== 'Escape') this.forwardKeyEvent(e);
+        return;
+      }
       const action = this.shortcutFor(e);
       if (action) {
         e.preventDefault();
@@ -251,14 +317,24 @@ class UIAnnotator extends HTMLElement {
         this.fab.pressAction(action);
         return;
       }
-      if (e.key === PASS_THROUGH_KEY) {
-        // Cmd+Enter in the popover textarea must not flip modes
-        if (this.passThrough || this.altHeld || isEditable(this.shadow.activeElement)) return;
-        this.enterPassThrough();
+      if (e.key === 'Escape') {
+        if (this.activePopover) this.activePopover.handleEscape();
+        else this.handleGlobalKeydown(e);
+        e.preventDefault();
+        e.stopImmediatePropagation();
         return;
       }
-      if (e.key === 'Alt') {
-        if (this.altHeld || this.passThrough) return;
+      if (e.key === 'Tab' && !own) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        this.fab.focusToolbar(e.shiftKey);
+        return;
+      }
+      if (own && (editable || this.settingsOpen || this.activePopover || this.guideBar.isHelpOpen())) {
+        this.forwardKeyEvent(e);
+        return;
+      }
+      if (e.key === 'Alt' && !this.altHeld) {
         this.altHeld = true;
         this.clearHover();
         document.body.style.cursor = 'crosshair';
@@ -273,21 +349,19 @@ class UIAnnotator extends HTMLElement {
         }
       }
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-        if (!this.altHeld && !this.passThrough) {
-          this.guideBar.updateKeys([e.key === 'ArrowUp' ? 'up' : 'down']);
-        }
         this.walkAncestors(e);
       }
+      if (own) {
+        if (['Alt', 'Shift', 'ArrowUp', 'ArrowDown'].includes(e.key)) e.preventDefault();
+        this.forwardKeyEvent(e);
+        return;
+      }
+      e.preventDefault();
+      e.stopImmediatePropagation();
     };
 
     this.handleKeyup = (e: KeyboardEvent) => {
-      if (e.key === PASS_THROUGH_KEY && this.passThrough) {
-        this.exitPassThrough();
-      }
-      if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !this.altHeld && !this.passThrough) {
-        this.guideBar.updateKeys([]);
-      }
-      if (e.key === 'Alt') {
+      if (e.key === 'Alt' && this.altHeld) {
         this.exitMeasureMode();
       }
       if (e.key === 'Shift') {
@@ -297,20 +371,24 @@ class UIAnnotator extends HTMLElement {
           this.scheduleMeasureUpdate();
         }
       }
+      if (this.isOwnElement(e)) this.forwardKeyEvent(e);
+      else if (!this.passThrough) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
     };
 
     this.handleWindowBlur = () => {
       if (this.altHeld) {
         this.exitMeasureMode();
       }
-      if (this.passThrough) {
-        this.exitPassThrough();
-      }
     };
 
     this.handleMouseMove = (e: MouseEvent) => {
       this.lastMousePos = { x: e.clientX, y: e.clientY };
       this.hasPointer = true;
+      this.guideBar.updatePointer(e.clientX, e.clientY);
+      if (!this.isOwnElement(e) && !this.passThrough) e.stopImmediatePropagation();
 
       if (!this.altHeld) {
         this.scheduleHoverUpdate();
@@ -331,7 +409,7 @@ class UIAnnotator extends HTMLElement {
 
     this.handleMouseDown = (e: MouseEvent) => {
       if (this.isOwnElement(e)) return;
-      if (this.passThrough || isPassThroughEvent(e)) return;
+      if (this.passThrough) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       if (!this.altHeld) return;
@@ -343,7 +421,7 @@ class UIAnnotator extends HTMLElement {
 
     this.handleMouseUp = (e: MouseEvent) => {
       if (this.isOwnElement(e)) return;
-      if (this.passThrough || isPassThroughEvent(e)) return;
+      if (this.passThrough) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       if (!this.altHeld) return;
@@ -399,7 +477,7 @@ class UIAnnotator extends HTMLElement {
   }
 
   private updateHover() {
-    if (!this.active || this.altHeld || this.passThrough || this.settingsOpen || !this.hasPointer) return;
+    if (!this.active || this.altHeld || this.passThrough || this.settingsOpen || this.guideBar.isHelpOpen() || !this.hasPointer) return;
 
     const dirty = this.hoverDirty;
     this.hoverDirty = false;
@@ -454,14 +532,25 @@ class UIAnnotator extends HTMLElement {
 
   // ── Modes ──
 
+  private toggleInteraction() {
+    this.guideBar.closeHelp();
+    this.fab.closeSettings();
+    if (this.passThrough) this.exitPassThrough();
+    else this.enterPassThrough();
+  }
+
   private enterPassThrough() {
+    if (this.altHeld) this.exitMeasureMode();
+    this.closePopover();
     this.passThrough = true;
+    this.fab.setInteractionActive(true);
     this.clearHover();
-    this.guideBar.show('interact', ['meta']);
+    this.guideBar.show('interact');
   }
 
   private exitPassThrough() {
     this.passThrough = false;
+    this.fab.setInteractionActive(false);
     if (!this.active) return;
     this.guideBar.show(this.pickMode ? 'pick' : 'annotate');
     this.handleLayoutChange();
@@ -499,7 +588,7 @@ class UIAnnotator extends HTMLElement {
   }
 
   private updateMeasure() {
-    if (!this.altHeld) return;
+    if (!this.altHeld || this.guideBar.isHelpOpen()) return;
 
     if (this.highlightLocked) return;
 
@@ -569,15 +658,16 @@ class UIAnnotator extends HTMLElement {
     this.guideBar.show('annotate');
 
     document.addEventListener('mouseout', this.handleMouseLeave, true);
-    document.addEventListener('click', this.handleClick, true);
-    document.addEventListener('dblclick', this.handleBlockedPointer, true);
-    document.addEventListener('pointerdown', this.handleBlockedPointer, true);
-    document.addEventListener('pointerup', this.handleBlockedPointer, true);
-    document.addEventListener('keydown', this.handleKeydown, true);
-    document.addEventListener('keyup', this.handleKeyup);
-    document.addEventListener('mousemove', this.handleMouseMove, true);
-    document.addEventListener('mousedown', this.handleMouseDown, true);
-    document.addEventListener('mouseup', this.handleMouseUp, true);
+    window.addEventListener('click', this.handleClick, true);
+    for (const type of BLOCKED_POINTER_EVENTS) window.addEventListener(type, this.handleBlockedPointer, true);
+    window.addEventListener('keydown', this.handleKeydown, true);
+    window.addEventListener('keyup', this.handleKeyup, true);
+    window.addEventListener('beforeinput', this.handleBeforeInput, true);
+    window.addEventListener('focusin', this.handleHostFocus, true);
+    window.addEventListener('focusout', this.handleHostFocus, true);
+    window.addEventListener('mousemove', this.handleMouseMove, true);
+    window.addEventListener('mousedown', this.handleMouseDown, true);
+    window.addEventListener('mouseup', this.handleMouseUp, true);
     window.addEventListener('scroll', this.handleLayoutChange, { capture: true, passive: true });
     window.addEventListener('resize', this.handleLayoutChange);
     window.addEventListener('blur', this.handleWindowBlur);
@@ -596,18 +686,20 @@ class UIAnnotator extends HTMLElement {
       this.exitMeasureMode();
     }
     this.passThrough = false;
+    this.fab.setInteractionActive(false);
     this.disarmPick();
 
     document.removeEventListener('mouseout', this.handleMouseLeave, true);
-    document.removeEventListener('click', this.handleClick, true);
-    document.removeEventListener('dblclick', this.handleBlockedPointer, true);
-    document.removeEventListener('pointerdown', this.handleBlockedPointer, true);
-    document.removeEventListener('pointerup', this.handleBlockedPointer, true);
-    document.removeEventListener('keydown', this.handleKeydown, true);
-    document.removeEventListener('keyup', this.handleKeyup);
-    document.removeEventListener('mousemove', this.handleMouseMove, true);
-    document.removeEventListener('mousedown', this.handleMouseDown, true);
-    document.removeEventListener('mouseup', this.handleMouseUp, true);
+    window.removeEventListener('click', this.handleClick, true);
+    for (const type of BLOCKED_POINTER_EVENTS) window.removeEventListener(type, this.handleBlockedPointer, true);
+    window.removeEventListener('keydown', this.handleKeydown, true);
+    window.removeEventListener('keyup', this.handleKeyup, true);
+    window.removeEventListener('beforeinput', this.handleBeforeInput, true);
+    window.removeEventListener('focusin', this.handleHostFocus, true);
+    window.removeEventListener('focusout', this.handleHostFocus, true);
+    window.removeEventListener('mousemove', this.handleMouseMove, true);
+    window.removeEventListener('mousedown', this.handleMouseDown, true);
+    window.removeEventListener('mouseup', this.handleMouseUp, true);
     window.removeEventListener('scroll', this.handleLayoutChange, { capture: true });
     window.removeEventListener('resize', this.handleLayoutChange);
     window.removeEventListener('blur', this.handleWindowBlur);
@@ -632,7 +724,7 @@ class UIAnnotator extends HTMLElement {
   /** Runs in the capture phase so the host page's own single-key shortcuts never see the keystroke. */
   private shortcutFor(e: KeyboardEvent): ShortcutAction | null {
     if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return null;
-    if (isEditable(e.target) || isEditable(this.shadow.activeElement)) return null;
+    if (e.composedPath().some(isEditable) || isEditable(this.shadow.activeElement)) return null;
     const key = e.key.length === 1 ? e.key.toUpperCase() : e.key;
     for (const action of Object.keys(SHORTCUTS) as ShortcutAction[]) {
       if ((SHORTCUTS[action].keys as readonly string[]).includes(key)) return action;
@@ -644,6 +736,19 @@ class UIAnnotator extends HTMLElement {
     return e.composedPath().some(
       el => el === this || el === this.shadow
     );
+  }
+
+  private forwardKeyEvent(e: KeyboardEvent) {
+    // Stop before host capture; deliver a local copy to kai's controls without
+    // crossing the shadow boundary. Native editing/navigation still uses the original.
+    e.stopImmediatePropagation();
+    const local = new KeyboardEvent(e.type, {
+      key: e.key, code: e.code, location: e.location,
+      altKey: e.altKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey, shiftKey: e.shiftKey,
+      repeat: e.repeat, isComposing: e.isComposing,
+      bubbles: true, cancelable: true, composed: false,
+    });
+    if (!(this.shadow.activeElement ?? this.shadow).dispatchEvent(local)) e.preventDefault();
   }
 
   private openPopover(element: Element, anchorRect?: DOMRect) {

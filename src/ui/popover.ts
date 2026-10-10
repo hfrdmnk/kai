@@ -201,6 +201,11 @@ export const createPopover = (
   // Autocomplete
   const ac = attachAutocomplete(textarea, shadowRoot, () => opts.element);
 
+  const handleEscape = () => {
+    if (shadowRoot.querySelector('.kai-autocomplete')) ac.close();
+    else opts.onClose();
+  };
+
   // Escape to close (if autocomplete not open)
   const onKeydown = (e: KeyboardEvent) => {
     if (e.key === 'Escape' && !shadowRoot.querySelector('.kai-autocomplete')) {
@@ -220,5 +225,5 @@ export const createPopover = (
     if (previousFocus instanceof HTMLElement) previousFocus.focus();
   };
 
-  return { destroy };
+  return { destroy, handleEscape };
 };

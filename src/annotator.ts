@@ -49,8 +49,8 @@ class UIAnnotator extends HTMLElement {
   private readonly systemDark = window.matchMedia('(prefers-color-scheme: dark)');
   private altHeld = false;
   private shiftHeld = false;
-  /** Box model layer: a Ctrl tap toggles it for the rest of the Alt hold (Ctrl+Alt+arrows are OS shortcuts on some systems) */
-  private boxLayer = false;
+  /** Ctrl adds the box model layer while inspecting */
+  private ctrlHeld = false;
   private passThrough = false;
   private pickMode = false;
   private settingsOpen = false;
@@ -358,17 +358,11 @@ class UIAnnotator extends HTMLElement {
       if (e.key === 'Alt' && !this.altHeld) {
         this.altHeld = true;
         this.markModeSwitch();
-        // Ctrl already held counts as the tap
-        this.boxLayer = e.ctrlKey;
         // The selection carries over; inspect mode draws it its own way
         this.overlay.hide();
         document.body.style.cursor = 'crosshair';
         this.guideBar.show('measure', this.measureKeys());
         this.scheduleMeasureUpdate();
-      } else if (e.key === 'Control' && !e.repeat && this.altHeld) {
-        this.boxLayer = !this.boxLayer;
-        this.markModeSwitch();
-        this.refreshMeasure();
       }
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         this.walkAncestors(e);
@@ -399,6 +393,7 @@ class UIAnnotator extends HTMLElement {
         this.exitMeasureMode();
       }
       this.shiftHeld = false;
+      this.ctrlHeld = false;
     };
 
     this.handleMouseMove = (e: MouseEvent) => {
@@ -619,7 +614,6 @@ class UIAnnotator extends HTMLElement {
   private exitMeasureMode() {
     this.altHeld = false;
     this.markModeSwitch();
-    this.boxLayer = false;
     this.dragging = false;
     this.dragStart = null;
     this.highlightLocked = false;
@@ -644,10 +638,11 @@ class UIAnnotator extends HTMLElement {
     return this.boxCache.data;
   }
 
-  /** Shift switches inspect to text metrics, so it's read from every key and mouse event */
+  /** Shift (text metrics) and Ctrl (box model) switch inspect modes, so they're read from every key and mouse event */
   private syncModifiers(e: KeyboardEvent | MouseEvent) {
-    if (e.shiftKey === this.shiftHeld) return;
+    if (e.shiftKey === this.shiftHeld && e.ctrlKey === this.ctrlHeld) return;
     this.shiftHeld = e.shiftKey;
+    this.ctrlHeld = e.ctrlKey;
     if (!this.altHeld) return;
     this.markModeSwitch();
     this.refreshMeasure();
@@ -669,7 +664,7 @@ class UIAnnotator extends HTMLElement {
   private measureKeys(): KeyId[] {
     const keys: KeyId[] = ['alt'];
     if (this.shiftHeld) keys.push('shift');
-    if (this.boxLayer) keys.push('ctrl');
+    if (this.ctrlHeld) keys.push('ctrl');
     return keys;
   }
 
@@ -706,8 +701,8 @@ class UIAnnotator extends HTMLElement {
       this.inspector.hide();
       return;
     }
-    // Box model layer (Ctrl tap), drawn under the crosshair or text metrics
-    const box = this.boxLayer ? this.boxModelOf(target) : null;
+    // Box model layer (Ctrl), drawn under the crosshair or text metrics
+    const box = this.ctrlHeld ? this.boxModelOf(target) : null;
 
     let textData: TextInspectData | null = null;
     if (this.shiftHeld) {

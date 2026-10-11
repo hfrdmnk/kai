@@ -40,7 +40,7 @@ No React, no Svelte, no Vue. Pure vanilla TypeScript compiled to a single IIFE b
 - Hover highlights elements with a bounding box overlay and a tooltip showing `tag#id.class`
 - Hit testing runs on pointer position (`elementFromPoint`), so the box follows scroll and DOM changes; SVG internals snap to their root `<svg>`; inline elements get one box per line fragment
 - Open shadow roots are pierced: hover, ↑/↓ walking and paths cross the boundary, and selectors for shadow content read `host-selector >>> inner-selector` (see `resolveSelector` in `src/core/selector.ts`)
-- `↑` / `↓` walk the ancestor chain when the wanted parent is fully covered by a child. Annotate, inspect and the box model share one selection: each mode draws it its own way. A walked selection carries across mode switches (Alt, a Ctrl tap, Shift while inspecting) while the pointer stays still; the first move of at least 4px afterwards returns it to the innermost element. A fresh `↑` / `↓` after the switch is deliberate and isn't reset. Without a mode switch, a walked ancestor stays selected while the cursor stays inside it
+- `↑` / `↓` walk the ancestor chain when the wanted parent is fully covered by a child. Annotate, inspect and the box model share one selection: each mode draws it its own way. A walked selection carries across mode switches (Alt, Ctrl or Shift while inspecting) while the pointer stays still; the first move of at least 4px afterwards returns it to the innermost element. A fresh `↑` / `↓` after the switch is deliberate and isn't reset. Without a mode switch, a walked ancestor stays selected while the cursor stays inside it
 - Page clicks, pointer actions, and keyboard input are swallowed in annotation mode, before document-level host handlers; scrolling remains available
 - `I` toggles interaction mode with no held modifier, e.g. to open a modal before annotating it. In interaction mode, page controls and keyboard shortcuts behave normally. `I` / `?` are ignored in text fields; the interaction button and Keyboard shortcuts in settings remain available
 - Kai's own controls do not trigger host outside-click dismissal or modal focus traps; toggling back preserves the open host overlay
@@ -57,7 +57,7 @@ No React, no Svelte, no Vue. Pure vanilla TypeScript compiled to a single IIFE b
   - Computed styles (font-size, color, padding, margin, border-radius, etc.) with px→rem conversion shown inline
 
 ### Box Model Overlay
-- Tapping `Ctrl` while holding Alt toggles a box model layer for the selected element, on top of the crosshair, or of text metrics with Shift. It stays on until Alt is released; Ctrl already held when Alt goes down counts as a tap. A tap rather than a hold keeps `↑` / `↓` free of Ctrl+Alt+arrow, which some systems reserve (screen rotation, workspace switching)
+- Holding `Ctrl` while holding Alt shows a box model layer for the selected element, on top of the crosshair, or of text metrics with Shift, like Shift it lasts only while held. Some systems reserve Ctrl+Alt+arrow (screen rotation, workspace switching), so walk with `↑` / `↓` before pressing Ctrl: the walked selection carries across the switch
 - Padding is accent at 32% opacity. Margin is accent at 12% with a 1px diagonal hatch, so empty space reads apart from padding at every accent. The border and any classic scrollbar are part of the padding band, with the border's outer edge outlined. The content box gets a 1px accent outline and no fill
 - Flex and grid containers with a `gap` also hatch their gutters. Each gutter is drawn at the `gap` width, centered in the space between items or tracks (`justify-content` / `align-content` can widen that space). Flex gutters come from the in-flow children's margin boxes plus text runs, which become anonymous items; `nowrap` containers are one line. Grid gutters come from the resolved `grid-template-columns` / `grid-template-rows`, minus the 0px tracks `auto-fit` collapses. Gutters are clipped to the container's padding box and the viewport
 - Bands at least 16px wide show their value inline. A card below the element (or above it, or pinned inside the viewport) lists `Box` (`tag#id.class` W×H), `Margin`, `Border` (when non-zero), `Padding` and `Gap` in CSS shorthand order with rem equivalents, and replaces the crosshair's size pill. With text metrics on, they describe the same element as the box model, and the rows join the text-metrics card
@@ -165,7 +165,7 @@ All kai UI layers sit at the top of the stacking context, above any host page co
 | `?` | Annotator active, no text field focused | Toggle shortcut reference for all modes |
 | `Alt`, held | Annotation mode | Inspect / drag to measure |
 | `Alt+Shift`, held | Annotation mode | Inspect text metrics |
-| `Ctrl`, tapped while `Alt` is held | Inspect mode | Toggle the box model (padding, margin, flex/grid gaps); combines with `Shift` |
+| `Alt+Ctrl`, held | Annotation mode | Inspect the box model (padding, margin, flex/grid gaps); combines with `Shift` |
 | `↑` / `↓` | Element hovered, annotation or inspect mode | Move the selection (highlight, measurement or box model) to the parent / back toward the hovered element |
 | `Cmd/Ctrl+Enter` | Panel textarea focused | Submit annotation |
 | `Tab` | Autocomplete visible | Accept selected suggestion |

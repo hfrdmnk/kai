@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- The box model shows only while Ctrl is held with Alt, like Shift for text metrics, instead of toggling on a Ctrl tap
+
 ## 1.1.0 — 2026-10-10
 
 Inspect mode now shows the box model, and ↑/↓ walk to parents in every mode. Interaction mode has a persistent toggle instead of a held key, there's a full shortcut reference, and keyboard use is calmer: focus rings only appear once you press Tab.

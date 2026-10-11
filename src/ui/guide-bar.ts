@@ -112,7 +112,7 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
       ['?', 'Toggle this panel'],
       ['Alt (hold)', 'Inspect / drag to measure'],
       ['Alt + Shift (hold)', 'Inspect text metrics'],
-      ['Alt (hold) + Ctrl (tap)', 'Toggle box model (add Shift for text metrics)'],
+      ['Alt + Ctrl (hold)', 'Inspect box model (add Shift for text metrics)'],
     ]],
     ['Annotation & selector', [
       ['↑ / ↓', 'Select parent / child, also while inspecting'],

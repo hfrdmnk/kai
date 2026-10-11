@@ -177,22 +177,22 @@ try {
   await key('keydown', 'ArrowDown', { altKey: true });
   assert(near(await pillSize(), await rectSize('#box-child')), 'ArrowDown while inspecting goes back to the hovered element');
   await key('keydown', 'Control', { altKey: true, ctrlKey: true });
-  await key('keyup', 'Control', { altKey: true });
   const boxRows = await overlayText();
   assert(/Box button#box-child [\d.]+×[\d.]+/.test(boxRows) && boxRows.includes('Margin 4 (0.25rem)')
-    && boxRows.includes('Padding 6 10 (0.375rem 0.625rem)'), 'A Ctrl tap turns the box model on and it stays after release');
-  await key('keydown', 'Shift', { altKey: true, shiftKey: true });
+    && boxRows.includes('Padding 6 10 (0.375rem 0.625rem)'), 'Holding Ctrl shows the box model');
+  await key('keydown', 'Shift', { altKey: true, ctrlKey: true, shiftKey: true });
   const merged = await overlayText();
   assert(merged.includes('Font') && merged.includes('Box button#box-child'), 'Shift puts text metrics and box model in one card');
-  await key('keyup', 'Shift', { altKey: true });
-  await key('keydown', 'ArrowUp', { altKey: true });
-  const parentRows = await overlayText();
-  assert(parentRows.includes('Box div#box-parent') && parentRows.includes('Gap 12 (0.75rem)'), 'ArrowUp with Alt alone moves the box model to the parent');
-  await key('keydown', 'Control', { altKey: true, ctrlKey: true });
+  await key('keyup', 'Shift', { altKey: true, ctrlKey: true });
   await key('keyup', 'Control', { altKey: true });
-  const toggledOff = await overlayText();
-  assert(!toggledOff.includes('Box div#box-parent') && near(await pillSize(), await rectSize('#box-parent')),
-    'A second Ctrl tap hides the box model and keeps measuring the selection');
+  const released = await overlayText();
+  assert(!released.includes('Box button#box-child') && near(await pillSize(), await rectSize('#box-child')),
+    'Releasing Ctrl hides the box model and keeps measuring the selection');
+  await key('keydown', 'ArrowUp', { altKey: true });
+  await key('keydown', 'Control', { altKey: true, ctrlKey: true });
+  const parentRows = await overlayText();
+  assert(parentRows.includes('Box div#box-parent') && parentRows.includes('Gap 12 (0.75rem)'), 'A walk made with Alt alone carries into the box model');
+  await key('keyup', 'Control', { altKey: true });
   await key('keyup', 'Alt', {});
   await browser('eval', frames);
   await browser('click', '#box-child');
@@ -237,10 +237,10 @@ try {
   await browser('hover', '#rotated');
   await key('keydown', 'Alt', { altKey: true });
   await key('keydown', 'Control', { altKey: true, ctrlKey: true });
-  await key('keyup', 'Control', { altKey: true });
   // The card lists padding 20; an in-band label would be a text piece of its own
   const rotatedRows = await browser('snapshot');
   assert(rotatedRows.includes('div#rotated') && !rotatedRows.includes('StaticText "20"'), 'A rotated element gets only its outline, no in-band values');
+  await key('keyup', 'Control', { altKey: true });
   await key('keyup', 'Alt', {});
 
   await reset();

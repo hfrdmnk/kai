@@ -4,6 +4,8 @@ import { composedParent, elementLabel } from './selector.ts';
 export type Edges = { top: number; right: number; bottom: number; left: number };
 export type Box = { left: number; top: number; width: number; height: number };
 export type Row = [label: string, value: string];
+/** A flex/grid gutter; `axis` names the gap that sizes it (`column` separates items side by side) */
+export type Gutter = Box & { axis: 'row' | 'column' };
 
 export type BoxModelData = {
   /** Border box in viewport coordinates */
@@ -13,7 +15,7 @@ export type BoxModelData = {
   /** CSS values for the in-band labels */
   values: { margin: Edges; padding: Edges };
   /** Flex/grid gutters in viewport coordinates, clipped to the padding box and viewport */
-  gaps: Box[];
+  gaps: Gutter[];
   rows: Row[];
 };
 
@@ -194,11 +196,17 @@ export const parseTracks = (value: string): number[] => {
 };
 
 /** Gutters in viewport px; `content` is the content box, gaps and `scale` already applied by the caller */
-const computeGaps = (el: Element, cs: CSSStyleDeclaration, content: Box, rowGap: number, columnGap: number, scale: number): Box[] => {
+const computeGaps = (el: Element, cs: CSSStyleDeclaration, content: Box, rowGap: number, columnGap: number, scale: number): Gutter[] => {
   if (cs.display.includes('flex')) {
     const horizontal = cs.flexDirection.startsWith('row');
     const items = flexItems(el, scale);
-    return flexGutters(items, horizontal, cs.flexWrap !== 'nowrap', horizontal ? columnGap : rowGap, horizontal ? rowGap : columnGap, content);
+    const wraps = cs.flexWrap !== 'nowrap';
+    const [main, cross] = horizontal ? ['column', 'row'] as const : ['row', 'column'] as const;
+    // One pass per gap, so each gutter knows which gap sizes it
+    return [
+      ...flexGutters(items, horizontal, wraps, horizontal ? columnGap : rowGap, 0, content).map(box => ({ ...box, axis: main })),
+      ...flexGutters(items, horizontal, wraps, 0, horizontal ? rowGap : columnGap, content).map(box => ({ ...box, axis: cross })),
+    ];
   }
 
   // Grid: the resolved template lists every track (implicit ones included) in px
@@ -215,8 +223,8 @@ const computeGaps = (el: Element, cs: CSSStyleDeclaration, content: Box, rowGap:
   // Columns run right to left in RTL
   const left = (offset: number, width: number) => rtl ? originX + content.width - offset - width : originX + offset;
   return [
-    ...x.gutters.map(gx => ({ left: left(gx, columnGap), top: originY + y.start, width: columnGap, height: y.end - y.start })),
-    ...y.gutters.map(gy => ({ left: left(x.start, x.end - x.start), top: originY + gy, width: x.end - x.start, height: rowGap })),
+    ...x.gutters.map(gx => ({ left: left(gx, columnGap), top: originY + y.start, width: columnGap, height: y.end - y.start, axis: 'column' as const })),
+    ...y.gutters.map(gy => ({ left: left(x.start, x.end - x.start), top: originY + gy, width: x.end - x.start, height: rowGap, axis: 'row' as const })),
   ];
 };
 
@@ -303,13 +311,16 @@ export const computeBoxModel = (el: Element): BoxModelData | null => {
     edges.margin[endSide] = edges.border[endSide] = edges.padding[endSide] = 0;
   }
 
-  let gaps: Box[] = [];
+  let gaps: Gutter[] = [];
   if (rowGap > 0 || columnGap > 0) {
     const paddingBox = inset(inset(border, edges.border), edges.scrollbar);
     const visible = intersect(paddingBox, { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight });
     gaps = visible
       ? computeGaps(el, cs, inset(paddingBox, edges.padding), rowGap * scale, columnGap * scale, scale)
-        .flatMap(gap => intersect(gap, visible) ?? [])
+        .flatMap(gap => {
+          const clipped = intersect(gap, visible);
+          return clipped ? [{ ...clipped, axis: gap.axis }] : [];
+        })
       : [];
   }
 

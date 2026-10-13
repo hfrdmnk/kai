@@ -136,6 +136,18 @@ export const resolveSelector = (selector: string): Element | null => {
   return el;
 };
 
+/** Every element a selector matches, following each `>>>` hop into every matching host's open shadow root. */
+export const resolveSelectorAll = (selector: string): Element[] => {
+  const parts = selector.split(SHADOW_SEP);
+  let scopes: (Document | ShadowRoot)[] = [document];
+  let found: Element[] = [];
+  parts.forEach((part, i) => {
+    found = scopes.flatMap(scope => Array.from(scope.querySelectorAll(part)));
+    if (i < parts.length - 1) scopes = found.flatMap(el => el.shadowRoot ?? []);
+  });
+  return found;
+};
+
 /**
  * The locator wins while it still lands on the same kind of element; a shifted
  * tree falls back to the readable selector, which may hit an earlier sibling.
@@ -150,6 +162,21 @@ export const resolveAnnotation = (a: Pick<Annotation, 'selector' | 'locator' | '
   } catch {
     return null;
   }
+};
+
+/**
+ * Everything an annotation's fix would change: all matches of its readable selector, plus the
+ * annotated element itself when a shifted tree no longer matches it.
+ */
+export const resolveAnnotationMatches = (a: Pick<Annotation, 'selector' | 'locator' | 'element'>): Element[] => {
+  const target = resolveAnnotation(a);
+  let matches: Element[] = [];
+  try {
+    matches = resolveSelectorAll(a.selector);
+  } catch {
+    // An unparsable selector matches nothing
+  }
+  return target && !matches.includes(target) ? [target, ...matches] : matches;
 };
 
 export const generatePath = (el: Element): string => {

@@ -115,7 +115,10 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
   };
 
   /** A confirmation for a moment; display only, hover and keys work right away */
-  const showNotice = (text: string, check = false) => guideBar.notify(text, check, () => guideBar.show(deps.baseMode()));
+  const showNotice = (text: string, check = false) => guideBar.notify(text, check, () => {
+    if (armed) update();
+    else guideBar.show(deps.baseMode());
+  });
 
   /** Drops the scale when the page's stylesheets changed, so the next use reads it again */
   const checkScale = () => {
@@ -201,9 +204,12 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
     } else {
       Object.assign(armed, pickParts(prop, { rect: target.getBoundingClientRect(), x, y, ...held, flexAxis }));
       const values = readValues(target, prop);
-      guideBar.showAdjust(nudges?.shown
-        ? dragHud(prop, nudges.shown.parts, nudges.shown.anchor, nudges.from, values, nudges.shown.refs, snapping(prop))
-        : armedHud(prop, values, armed.parts, held, { available: canSnap(prop), on: snapOn }));
+      // A notice (Nothing to undo) stays its moment; the hints come back after it
+      if (!guideBar.noticeShowing()) {
+        guideBar.showAdjust(nudges?.shown
+          ? dragHud(prop, nudges.shown.parts, nudges.shown.anchor, nudges.from, values, nudges.shown.refs, snapping(prop))
+          : armedHud(prop, values, armed.parts, held, { available: canSnap(prop), on: snapOn }));
+      }
     }
     setCursor(cursorFor(prop, armed.parts, !!drag));
     overlay.show(target, { matches: armed.matches.length, exact: true, tooltip: !drag });
@@ -228,6 +234,7 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
     if (!target) return;
     endNudges();
     checkScale();
+    guideBar.clearNotice();
     const wasArmed = !!armed;
     armed = { prop, target, matches: matchesOf(target), parts: [], anchor: null, drag: null, nudges: null };
     if (!wasArmed) deps.onArmedChange(true);
@@ -324,6 +331,7 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
     const changes = changesBetween(prop, start, cur, refs, deps.readOwn(target, () => readValues(target, prop)));
     if (!Object.keys(changes).length) return;
     save(target, prop, changes, getComputedStyles(target));
+    guideBar.clearNotice();
     // The save replaced the annotations; the target and its matches are the same elements
     if (a.nudges?.timer) clearTimeout(a.nudges.timer);
     a.nudges = {
@@ -358,6 +366,7 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
   const toggleSnap = () => {
     if (!armed || !canSnap(armed.prop)) return false;
     snapOn = !snapOn;
+    guideBar.clearNotice();
     // Back to the hints, which show the chip; later nudges still count from this arming's first
     if (armed.nudges?.timer) clearTimeout(armed.nudges.timer);
     if (armed.nudges) armed.nudges = { ...armed.nudges, shown: null, timer: null };

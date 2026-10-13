@@ -394,6 +394,15 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
     }, NOTICE_MS);
   };
 
+  /** Whether a notice is up; armed hints wait for it rather than replacing it on every pointer or modifier change */
+  const noticeShowing = () => noticeTimer !== null && visible && currentMode === 'adjust' && adjustHud?.kind === 'notice';
+
+  /** Ends a notice's wait early, so new content (an arming, a nudge) shows at once */
+  const clearNotice = () => {
+    if (noticeTimer) clearTimeout(noticeTimer);
+    noticeTimer = null;
+  };
+
   const hide = () => {
     closeHelp();
     bar.removeAttribute('data-obscured');
@@ -432,5 +441,5 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
     help.remove();
   };
 
-  return { show, showAdjust, notify, hide, updateKeys, updatePointer, toggleHelp, closeHelp, isHelpOpen: () => !help.hidden, mode: () => currentMode, destroy };
+  return { show, showAdjust, notify, noticeShowing, clearNotice, hide, updateKeys, updatePointer, toggleHelp, closeHelp, isHelpOpen: () => !help.hidden, mode: () => currentMode, destroy };
 };

@@ -75,7 +75,7 @@ const formatGap = (row: number, column: number): string =>
  * and end, and the offset of each gutter. Gutters are `gap` wide and centered in the space
  * between two tracks, which content distribution (`justify-content` / `align-content`) may widen.
  */
-export const gridAxis = (tracks: number[], gap: number, size: number, distribution: string) => {
+export const gridAxis = (tracks: number[], gap: number, size: number, distribution: string, includeEmpty = false) => {
   const n = tracks.length;
   if (n === 0) return { start: 0, end: size, gutters: [] };
   const used = tracks.reduce((a, b) => a + b, 0) + gap * Math.max(0, n - 1);
@@ -92,7 +92,7 @@ export const gridAxis = (tracks: number[], gap: number, size: number, distributi
   let pos = start;
   for (let i = 0; i < n - 1; i++) {
     pos += tracks[i];
-    if (gap > 0) gutters.push(pos + extra / 2);
+    if (gap > 0 || includeEmpty) gutters.push(pos + extra / 2);
     pos += gap + extra;
   }
   return { start, end: pos + tracks[n - 1], gutters };
@@ -111,6 +111,8 @@ export const flexGutters = (
   mainGap: number,
   crossGap: number,
   content: Box,
+  /** Also the 0-wide boundaries of a gap that is 0, per axis (drag to adjust marks where it would open) */
+  includeEmpty = { main: false, cross: false },
 ): Box[] => {
   // Map to a row-oriented frame so one algorithm covers both directions
   const toFrame = (b: Box): Box => horizontal ? b : { left: b.top, top: b.left, width: b.height, height: b.width };
@@ -131,7 +133,7 @@ export const flexGutters = (
 
   const out: Box[] = [];
   const single = lines.length === 1;
-  if (mainGap > 0) {
+  if (mainGap > 0 || includeEmpty.main) {
     for (const line of lines) {
       // A single-line container's line spans its whole cross size
       const cross = single ? { start: frame.top, end: frame.top + frame.height } : line.cross;
@@ -144,7 +146,7 @@ export const flexGutters = (
       }
     }
   }
-  if (crossGap > 0) {
+  if (crossGap > 0 || includeEmpty.cross) {
     for (let i = 0; i < lines.length - 1; i++) {
       const space = lines[i + 1].cross.start - lines[i].cross.end;
       if (space < crossGap - 0.5) continue;
@@ -196,7 +198,7 @@ export const parseTracks = (value: string): number[] => {
 };
 
 /** Gutters in viewport px; `content` is the content box, gaps and `scale` already applied by the caller */
-const computeGaps = (el: Element, cs: CSSStyleDeclaration, content: Box, rowGap: number, columnGap: number, scale: number): Gutter[] => {
+const computeGaps = (el: Element, cs: CSSStyleDeclaration, content: Box, rowGap: number, columnGap: number, scale: number, includeEmpty: boolean): Gutter[] => {
   if (cs.display.includes('flex')) {
     const horizontal = cs.flexDirection.startsWith('row');
     const items = flexItems(el, scale);
@@ -204,8 +206,8 @@ const computeGaps = (el: Element, cs: CSSStyleDeclaration, content: Box, rowGap:
     const [main, cross] = horizontal ? ['column', 'row'] as const : ['row', 'column'] as const;
     // One pass per gap, so each gutter knows which gap sizes it
     return [
-      ...flexGutters(items, horizontal, wraps, horizontal ? columnGap : rowGap, 0, content).map(box => ({ ...box, axis: main })),
-      ...flexGutters(items, horizontal, wraps, 0, horizontal ? rowGap : columnGap, content).map(box => ({ ...box, axis: cross })),
+      ...flexGutters(items, horizontal, wraps, horizontal ? columnGap : rowGap, 0, content, { main: includeEmpty, cross: false }).map(box => ({ ...box, axis: main })),
+      ...flexGutters(items, horizontal, wraps, 0, horizontal ? rowGap : columnGap, content, { main: false, cross: includeEmpty }).map(box => ({ ...box, axis: cross })),
     ];
   }
 
@@ -216,8 +218,8 @@ const computeGaps = (el: Element, cs: CSSStyleDeclaration, content: Box, rowGap:
     .replace(/\bright\b/, rtl ? 'start' : 'end')
     .replace(/\bleft\b/, rtl ? 'end' : 'start');
   const tracks = (value: string) => parseTracks(value).map(t => t * scale);
-  const x = gridAxis(tracks(cs.gridTemplateColumns), columnGap, content.width, justify);
-  const y = gridAxis(tracks(cs.gridTemplateRows), rowGap, content.height, cs.alignContent);
+  const x = gridAxis(tracks(cs.gridTemplateColumns), columnGap, content.width, justify, includeEmpty);
+  const y = gridAxis(tracks(cs.gridTemplateRows), rowGap, content.height, cs.alignContent, includeEmpty);
   const originX = content.left - el.scrollLeft * scale;
   const originY = content.top - el.scrollTop * scale;
   // Columns run right to left in RTL
@@ -267,7 +269,8 @@ const scrollbarOf = (el: Element, cs: CSSStyleDeclaration, border: Edges): Edges
   return { top: 0, right: rtl ? 0 : vertical, bottom: horizontal, left: rtl ? vertical : 0 };
 };
 
-export const computeBoxModel = (el: Element): BoxModelData | null => {
+/** `emptyGutters`: a flex or grid container's 0-wide gutters too, where a gap of 0 would open (drag to adjust) */
+export const computeBoxModel = (el: Element, { emptyGutters = false } = {}): BoxModelData | null => {
   const rects = el.getClientRects();
   if (rects.length === 0) return null;
   const cs = getComputedStyle(el);
@@ -312,13 +315,15 @@ export const computeBoxModel = (el: Element): BoxModelData | null => {
   }
 
   let gaps: Gutter[] = [];
-  if (rowGap > 0 || columnGap > 0) {
+  if (rowGap > 0 || columnGap > 0 || (container && emptyGutters)) {
     const paddingBox = inset(inset(border, edges.border), edges.scrollbar);
     const visible = intersect(paddingBox, { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight });
     gaps = visible
-      ? computeGaps(el, cs, inset(paddingBox, edges.padding), rowGap * scale, columnGap * scale, scale)
+      ? computeGaps(el, cs, inset(paddingBox, edges.padding), rowGap * scale, columnGap * scale, scale, emptyGutters)
         .flatMap(gap => {
-          const clipped = intersect(gap, visible);
+          // A 0-wide gutter has no area to clip; it's kept while it crosses the visible box
+          const clipped = gap.width > 0 && gap.height > 0 ? intersect(gap, visible)
+            : intersect({ ...gap, width: Math.max(gap.width, 1), height: Math.max(gap.height, 1) }, visible) && gap;
           return clipped ? [{ ...clipped, axis: gap.axis }] : [];
         })
       : [];

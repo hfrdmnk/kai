@@ -98,3 +98,20 @@ describe('parseTracks', () => {
     expect(gridAxis(parseTracks('100px 0px 100px 100px'), 10, 400, 'normal').gutters).toEqual([100, 110, 220]);
   });
 });
+
+describe('empty gutters (drag to adjust)', () => {
+  const content = box(0, 0, 400, 100);
+
+  test('a gap of 0 yields 0-wide boundaries only when asked, per axis', () => {
+    const items = [box(0, 0, 80, 40), box(80, 0, 80, 40), box(160, 0, 80, 40)];
+    expect(flexGutters(items, true, false, 0, 0, content)).toEqual([]);
+    expect(flexGutters(items, true, false, 0, 0, content, { main: true, cross: false })).toEqual([box(80, 0, 0, 100), box(160, 0, 0, 100)]);
+    const lines = [box(0, 0, 80, 30), box(0, 30, 80, 30)];
+    expect(flexGutters(lines, true, true, 0, 0, content, { main: false, cross: true })).toEqual([box(0, 30, 400, 0)]);
+  });
+
+  test('grid tracks without a gap', () => {
+    expect(gridAxis([100, 100, 100], 0, 300, 'normal').gutters).toEqual([]);
+    expect(gridAxis([100, 100, 100], 0, 300, 'normal', true).gutters).toEqual([100, 200]);
+  });
+});

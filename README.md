@@ -89,6 +89,10 @@ its own scale (Tailwind-style utility classes, or `:root` variables like `--spac
 snaps drags and nudges to it and the line names the class: `padding-right: 24px → 32px (2rem, pr-8)`.
 Snapping stays on until you press <kbd>T</kbd> again.
 
+Every change can be undone with <kbd>⌘</kbd>+<kbd>Z</kbd> (<kbd>Ctrl</kbd>+<kbd>Z</kbd> elsewhere) and
+redone with <kbd>⇧</kbd>+<kbd>⌘</kbd>+<kbd>Z</kbd>: drags, nudges, resets, notes, deletes and
+clear all. The HUD says what it undid. In a text field, the shortcut undoes typing as usual.
+
 ### Interaction mode
 
 While kai is in annotation mode, page clicks and keyboard input are blocked. Press <kbd>I</kbd> to
@@ -123,6 +127,7 @@ interaction mode outside text fields.
 | <kbd>Esc</kbd> | Interaction mode | Dismiss the page's topmost overlay |
 | <kbd>S</kbd> | Active | Toggle copy-selector pick mode |
 | <kbd>C</kbd> | Active, has annotations | Copy all annotations as Markdown |
+| <kbd>⌘</kbd>+<kbd>Z</kbd> / <kbd>⇧</kbd>+<kbd>⌘</kbd>+<kbd>Z</kbd> (Mac), <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> | Annotation mode, outside text fields | Undo / redo the last edit or annotation (drags, nudges, resets, notes, deletes, clear all) |
 | <kbd>P</kbd> / <kbd>M</kbd> / <kbd>G</kbd> / <kbd>F</kbd> / <kbd>L</kbd> / <kbd>B</kbd> | Annotation mode, element hovered | Arm padding / margin / gap / font size / line height / border radius; the same key or <kbd>Esc</kbd> disarms |
 | Drag | Property armed | Adjust the nearest side or corner; release adds it to the annotation |
 | <kbd>Alt</kbd> / <kbd>Shift</kbd> (hold) | Dragging | That side and its opposite / all sides, corners or gaps |

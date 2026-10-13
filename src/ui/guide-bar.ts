@@ -177,6 +177,7 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
       ['↑ / ↓', 'Select parent / child, also while inspecting'],
       [SHORTCUTS.pick.label, 'Toggle copy-selector mode'],
       [SHORTCUTS.copy.label, 'Copy annotations as Markdown'],
+      [isMac ? '⌘Z / ⇧⌘Z' : 'Ctrl + Z / Ctrl + Shift + Z', 'Undo / redo the last edit or annotation'],
       [SHORTCUTS.clear.label, 'Clear all (press twice within 3 s)'],
       [SHORTCUTS.settings.label, 'Toggle settings'],
       ['Esc', 'Close panel / settings, cancel pick, or exit kai'],

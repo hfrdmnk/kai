@@ -3,9 +3,17 @@ import { elementLabel } from '../core/selector.ts';
 
 const GAP = 4;
 
+type ShowOptions = {
+  /** > 1 adds `×N` to the tooltip: the selector matches that many elements, all changed by an adjustment */
+  matches?: number;
+  /** Hug the element with a thin outline and its own radius, leaving the space around it to drag-to-adjust drawings */
+  exact?: boolean;
+};
+
 export const createOverlay = (shadowRoot: ShadowRoot) => {
   const boxes: HTMLElement[] = [];
   let current: Element | null = null;
+  let currentOptions: ShowOptions = {};
 
   const tooltip = document.createElement('div');
   tooltip.className = 'kai-tooltip';
@@ -34,28 +42,42 @@ export const createOverlay = (shadowRoot: ShadowRoot) => {
     return label;
   };
 
-  const placeBox = (box: HTMLElement, rect: DOMRect) => {
+  const placeBox = (box: HTMLElement, rect: DOMRect, gap: number) => {
     box.style.display = 'block';
-    box.style.top = `${rect.top - GAP}px`;
-    box.style.left = `${rect.left - GAP}px`;
-    box.style.width = `${rect.width + GAP * 2}px`;
-    box.style.height = `${rect.height + GAP * 2}px`;
+    box.style.top = `${rect.top - gap}px`;
+    box.style.left = `${rect.left - gap}px`;
+    box.style.width = `${rect.width + gap * 2}px`;
+    box.style.height = `${rect.height + gap * 2}px`;
   };
 
-  const show = (el: Element) => {
+  const show = (el: Element, options: ShowOptions = {}) => {
     current = el;
+    currentOptions = options;
+    const { matches = 1, exact = false } = options;
     const bounding = el.getBoundingClientRect();
 
     // Inline elements wrapping across lines get one box per line fragment
     const fragments = Array.from(el.getClientRects()).filter(r => r.width > 0 && r.height > 0);
     const rects = fragments.length > 1 ? fragments : [bounding];
 
-    rects.forEach((rect, i) => placeBox(getBox(i), rect));
+    const radius = exact ? getComputedStyle(el).borderRadius : '';
+    rects.forEach((rect, i) => {
+      const box = getBox(i);
+      placeBox(box, rect, exact ? 0 : GAP);
+      box.toggleAttribute('data-exact', exact);
+      box.style.borderRadius = radius;
+    });
     for (let i = rects.length; i < boxes.length; i++) {
       boxes[i].style.display = 'none';
     }
 
     tooltip.textContent = describeElement(el);
+    if (matches > 1) {
+      const count = document.createElement('span');
+      count.className = 'kai-tooltip-count';
+      count.textContent = ` ×${matches}`;
+      tooltip.appendChild(count);
+    }
     tooltip.style.display = 'block';
 
     const tw = tooltip.offsetWidth;
@@ -92,7 +114,7 @@ export const createOverlay = (shadowRoot: ShadowRoot) => {
       hide();
       return;
     }
-    show(current);
+    show(current, currentOptions);
   };
 
   const destroy = () => {

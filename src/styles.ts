@@ -393,6 +393,13 @@ export const styles = `
   transition: all 0.08s ease;
 }
 
+/* Drag to adjust: hugs the element, its bands and corner arcs drawn around it */
+.kai-overlay[data-exact] {
+  border: 1px solid var(--color-accent);
+  background: none;
+  transition: none;
+}
+
 /* ── Tooltip ─────────────────────────────────────── */
 
 .kai-tooltip {
@@ -408,6 +415,10 @@ export const styles = `
   white-space: nowrap;
   z-index: var(--z-tooltip);
   box-shadow: var(--shadow-sm);
+}
+
+.kai-tooltip-count {
+  color: var(--inv-text-muted);
 }
 
 .kai-tooltip-kbd {
@@ -941,6 +952,54 @@ export const styles = `
   z-index: var(--z-tooltip);
 }
 
+/* ── Drag to adjust ─────────────────────────────── */
+
+.kai-adjust-band,
+.kai-adjust-arc,
+.kai-adjust-ghost {
+  position: fixed;
+  pointer-events: none;
+  box-sizing: border-box;
+  z-index: var(--z-overlay);
+}
+
+.kai-adjust-band[data-kind="padding"] {
+  background: hsl(from var(--color-accent) h s l / 32%);
+}
+
+/* Empty space is hatched, like the box model */
+.kai-adjust-band[data-kind="margin"],
+.kai-adjust-band[data-kind="gap"] {
+  background:
+    repeating-linear-gradient(-45deg, hsl(from var(--color-accent) h s l / 45%) 0 1px, transparent 1px 6px),
+    hsl(from var(--color-accent) h s l / 12%);
+}
+
+.kai-adjust-band[data-kind="line"] {
+  background: hsl(from var(--color-accent) h s l / 16%);
+  border-top: 1px dashed hsl(from var(--color-accent) h s l / 70%);
+}
+
+/* The sides and gutters the drag changes */
+.kai-adjust-band[data-hot] {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
+}
+
+.kai-adjust-band[data-kind="padding"][data-hot] {
+  background: hsl(from var(--color-accent) h s l / 45%);
+}
+
+/* A second rounded border just outside a changing corner's own curve */
+.kai-adjust-arc {
+  border: 0 solid var(--color-accent);
+}
+
+/* The selector's other matches, which the same fix changes */
+.kai-adjust-ghost {
+  border: 1px dashed hsl(from var(--color-accent) h s l / 70%);
+}
+
 /* ── Guide Bar ──────────────────────────────────── */
 
 .kai-guide-bar {
@@ -954,7 +1013,9 @@ export const styles = `
   color: var(--inv-text);
   font-family: var(--font-sans);
   font-size: 13px;
-  padding: 6px 14px;
+  box-sizing: border-box;
+  height: 32px;
+  padding: 0 14px;
   border-radius: var(--radius-full);
   box-shadow: var(--shadow-lg);
   z-index: var(--z-fab);
@@ -974,7 +1035,66 @@ export const styles = `
   display: flex;
   align-items: center;
   gap: 8px;
+  /* Text gets the 20px line box of the key chips, so everything shares a baseline and sits centered */
+  line-height: 20px;
 }
+
+/* Drag to adjust: values in fixed-width cells with tabular figures, so the HUD doesn't jitter */
+.kai-guide-bar-value,
+.kai-guide-bar-name,
+.kai-guide-bar-num {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.kai-guide-bar-num {
+  min-width: 6ch;
+  text-align: right;
+}
+
+.kai-guide-bar-delta {
+  min-width: 7ch;
+  color: var(--color-accent);
+}
+
+.kai-guide-bar-check {
+  color: var(--color-success);
+}
+
+/* Which sides or corners a drag changes; the changing ones in accent */
+.kai-guide-bar-glyph {
+  position: relative;
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.kai-guide-bar-glyph i {
+  position: absolute;
+  border-radius: 1px;
+  background: var(--inv-bg-4);
+}
+
+.kai-guide-bar-glyph i[data-on] { background: var(--color-accent); }
+.kai-guide-bar-glyph i:nth-child(1) { top: 0; left: 3px; right: 3px; height: 2px; }
+.kai-guide-bar-glyph i:nth-child(2) { top: 3px; right: 0; bottom: 3px; width: 2px; }
+.kai-guide-bar-glyph i:nth-child(3) { bottom: 0; left: 3px; right: 3px; height: 2px; }
+.kai-guide-bar-glyph i:nth-child(4) { top: 3px; bottom: 3px; left: 0; width: 2px; }
+
+.kai-guide-bar-glyph[data-corners] i {
+  width: 6px;
+  height: 6px;
+  border: 0 solid var(--inv-bg-4);
+  border-radius: 0;
+  background: none;
+}
+
+.kai-guide-bar-glyph[data-corners] i[data-on] { border-color: var(--color-accent); background: none; }
+.kai-guide-bar-glyph[data-corners] i:nth-child(1) { inset: 0 auto auto 0; border-width: 2px 0 0 2px; border-top-left-radius: 5px; }
+.kai-guide-bar-glyph[data-corners] i:nth-child(2) { inset: 0 0 auto auto; border-width: 2px 2px 0 0; border-top-right-radius: 5px; }
+.kai-guide-bar-glyph[data-corners] i:nth-child(3) { inset: auto 0 0 auto; border-width: 0 2px 2px 0; border-bottom-right-radius: 5px; }
+.kai-guide-bar-glyph[data-corners] i:nth-child(4) { inset: auto auto 0 0; border-width: 0 0 2px 2px; border-bottom-left-radius: 5px; }
 
 .kai-guide-bar-sep {
   color: var(--inv-text-muted);
@@ -1061,7 +1181,8 @@ export const styles = `
 }
 
 @media (max-width: 600px) {
-  .kai-guide-bar { box-sizing: border-box; width: calc(100vw - 24px); border-radius: var(--radius-lg); }
+  /* Narrow viewports wrap the hints onto a second line */
+  .kai-guide-bar { width: calc(100vw - 24px); height: auto; min-height: 32px; padding: 6px 14px; border-radius: var(--radius-lg); }
   .kai-guide-bar-content { flex-wrap: wrap; justify-content: center; }
   .kai-guide-bar-content > span:first-child { width: 100%; text-align: center; }
   .kai-guide-bar-content > .kai-guide-bar-sep:nth-child(2) { display: none; }

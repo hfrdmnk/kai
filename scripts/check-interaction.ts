@@ -8,7 +8,7 @@ const server = Bun.serve({
   hostname: '127.0.0.1',
   fetch: req => new URL(req.url).pathname === '/kai.js'
     ? new Response(bundle, { headers: { 'Content-Type': 'text/javascript' } })
-    : new Response(`<!doctype html><meta charset="utf-8"><title>Interaction regression</title><style>:root { --proof-color: #336699; }</style>
+    : new Response(`<!doctype html><meta charset="utf-8"><title>Interaction regression</title><style>:root { --proof-color: #336699; } .px-2 { padding-inline: 8px; } .px-4 { padding-inline: 16px; } .px-6 { padding-inline: 24px; } .px-8 { padding-inline: 32px; }</style>
       <main style="padding:80px">
         <section id="parent"><button id="action">Page action</button></section>
         <button id="under-hud" style="position:fixed;top:16px;left:50%;transform:translateX(-50%);height:32px">Behind HUD</button>
@@ -22,6 +22,8 @@ const server = Bun.serve({
         <div id="rotated" style="width:40px;height:40px;padding:20px;margin:40px;transform:rotate(45deg);background:#ccc"></div>
         <!-- Siblings with the same tag and classes: the selector pins one (:nth-of-type), an adjustment previews on both -->
         <section class="twin"><p class="t" style="margin:0;padding:4px">Twin A</p><p class="t" style="margin:0;padding:4px">Twin B</p><p style="margin:0;padding:4px">Plain</p></section>
+        <!-- Utility classes give the page a spacing scale: 8, 16, 24, 32 (px-2 … px-8) -->
+        <button id="snap" class="px-4">Snap me</button>
       </main>
       <script>
         let events = 0;
@@ -367,6 +369,67 @@ try {
   await browser('press', 'Backspace');
   await browser('eval', frames);
   assert(await browser('eval', `getComputedStyle(document.querySelector('#box-parent')).columnGap`) === '"12px"', 'Clear all reverts every edit');
+
+  // ── Snapping, nudging and resetting ──
+  const snapPadding = async () => await browser('eval', `getComputedStyle(document.querySelector('#snap')).paddingRight`);
+  /**
+   * Arms padding on #snap from its middle, then moves just inside its right edge: once it has an
+   * annotation, the marker covers that corner, and kai's own UI selects nothing. Armed, the target stays.
+   */
+  const armSnap = async () => {
+    await browser('hover', '#snap');
+    await browser('eval', frames);
+    await browser('press', 'p');
+    const [x, y] = JSON.parse(await browser('eval',
+      `(r => [Math.round(r.right - 3), Math.round(r.top + r.height / 2)])(document.querySelector('#snap').getBoundingClientRect())`)) as number[];
+    await browser('mouse', 'move', String(x), String(y));
+    await browser('eval', frames);
+    return [x, y];
+  };
+
+  await reset();
+  at = await armSnap();
+  await browser('press', 't');
+  // 30px of travel is two 12px steps along 8, 16, 24, 32
+  await dragRight(at, 30);
+  assert(await snapPadding() === '"32px"', 'T snaps the drag to the page\'s utility-class scale');
+  await browser('mouse', 'up', 'left');
+  await browser('eval', frames);
+  saved = await stored();
+  assert(saved.length === 1 && saved[0].comment === 'padding-right: 16px → 32px (2rem, pr-8)' && saved[0].edits?.[0].className === 'pr-8',
+    'A snapped edit names its class in the comment line and the data');
+
+  // Snapping stays on: one ← steps back down the scale, saved without a release
+  await armSnap();
+  await browser('press', 'ArrowLeft');
+  await browser('eval', frames);
+  saved = await stored();
+  assert(await snapPadding() === '"24px"' && saved[0].comment === 'padding-right: 16px → 24px (1.5rem, pr-6)', 'Snapping is sticky and ← nudges one scale step, saved right away');
+  await browser('press', 't');
+  await browser('press', 'ArrowRight');
+  await browser('press', 'ArrowRight');
+  await browser('eval', frames);
+  saved = await stored();
+  assert(await snapPadding() === '"26px"' && saved.length === 1 && saved[0].comment === 'padding-right: 16px → 26px (1.625rem)',
+    'With T off, → nudges 1px at a time into the same annotation');
+
+  // A second annotation, so a stray Clear all would show
+  await browser('press', 'Escape');
+  await browser('click', '#action');
+  await browser('snapshot', '-i');
+  await browser('keyboard', 'type', 'Keep me');
+  await browser('press', 'Control+Enter');
+  await armSnap();
+  await browser('press', 'Backspace');
+  await browser('press', 'Backspace');
+  await browser('eval', frames);
+  saved = await stored();
+  assert(await snapPadding() === '"16px"' && saved.length === 1 && saved[0].comment === 'Keep me',
+    'Backspace while armed resets the property instead of clearing all');
+  await browser('press', 'Backspace');
+  await browser('press', 'Backspace');
+  await browser('eval', frames);
+  assert(!(await stored()).length, 'Backspace unarmed still clears all on the second press');
 
   await reset();
   await browser('focus', '#input');

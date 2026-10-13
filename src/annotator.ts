@@ -209,7 +209,7 @@ class UIAnnotator extends HTMLElement {
       commit: (next, label) => this.commit(next, label),
       createAnnotation: (element, styles) => this.createAnnotation(element, '', styles),
       applyEdits: (preview) => this.applyEdits(preview),
-      readOwn: (el, read) => this.editStyles.readOwn(el, read),
+      readOwn: (el, read, longhands) => this.editStyles.readOwn(el, read, longhands),
       baseMode: () => this.baseMode(),
       isActive: () => this.active,
       onArmedChange: (armed) => this.markers.setPassive(armed),
@@ -1081,7 +1081,9 @@ class UIAnnotator extends HTMLElement {
    * shows the new list and records an undo step labelled for the HUD.
    */
   private commit(next: Annotation[], label: string) {
-    this.history = record(this.history, { label, before: this.annotations, after: next });
+    // An unchanged list is no step; every step has a name for the HUD
+    if (JSON.stringify(next) === JSON.stringify(this.annotations)) return;
+    this.history = record(this.history, { label: label || 'change', before: this.annotations, after: next });
     this.showAnnotations(next);
   }
 

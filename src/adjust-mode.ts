@@ -1,7 +1,7 @@
 import type { Annotation } from './types.ts';
 import {
   ADJUST, adjustPropertyFor, adjustValue, cursorFor, dragAxisOf, dragTravel, editDeclarations, flexAxisOf, gapContainer,
-  changeLabel, kindOf, longhandOf, nudgeValue, partsOf, pickParts, propertyOfDeclaration, readValues, shortestEdits, withChanges,
+  editsLabel, kindOf, longhandOf, nudgeValue, partsOf, pickParts, propertyOfDeclaration, readValues, shortestEdits, withChanges,
   withoutProperty, type AdjustProperty, type Change, type Part, type ScaleRef, type Values,
 } from './core/adjust.ts';
 import type { StylePreview } from './core/edit-styles.ts';
@@ -68,8 +68,8 @@ export type AdjustModeDeps = {
   createAnnotation: (element: Element, styles: Record<string, string>) => Annotation;
   /** Re-derives kai's styles from the annotations, a drag's preview on top */
   applyEdits: (preview?: StylePreview) => void;
-  /** Reads an element with kai's styles lifted: the page's own values, what an edit's `from` is */
-  readOwn: <T>(el: Element, read: () => T) => T;
+  /** Reads an element with kai's styles for `longhands` lifted: the page's own values, what an edit's `from` is */
+  readOwn: <T>(el: Element, read: () => T, longhands: string[]) => T;
   baseMode: () => GuideMode;
   isActive: () => boolean;
   /** Armed or not, e.g. to let the pointer through markers while armed */
@@ -152,19 +152,26 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
 
   /**
    * Writes changes into the target's annotation, creating it when there's none, and saves.
-   * Returns the annotation's 1-based number and whether it's new; 0 when it went away
-   * (back at the original values with nothing else said).
+   * Returns the annotation's 1-based number (0 when it went away: back at the page's values with
+   * nothing else said) and whether it's new; null when the edits come out the same, e.g. a look-alike
+   * dragged back to its own value. That's no change and no undo step.
    */
   const save = (target: Element, prop: AdjustProperty, changes: Record<string, Change>, styles: Record<string, string>) => {
     const list = deps.annotations();
     const existing = annotationFor(target);
     const base = existing ?? deps.createAnnotation(target, styles);
     const updated: Annotation = { ...base, ...withChanges(base, prop, changes) };
+    const label = editsLabel(base.edits ?? [], updated.edits ?? []);
+    if (!label) return null;
     let next = existing ? list.map(a => a === existing ? updated : a) : [...list, updated];
     if (!updated.comment.trim()) next = next.filter(a => a !== updated);
-    deps.commit(next, changeLabel(prop, changes));
+    deps.commit(next, label);
     return { number: next.indexOf(updated) + 1, created: !existing };
   };
+
+  /** The page's own values of the armed property, kai's styles for it lifted */
+  const ownValues = (target: Element, prop: AdjustProperty) =>
+    deps.readOwn(target, () => readValues(target, prop), partsOf(prop).map(p => longhandOf(prop, p)));
 
   /** Picks what the pointer and modifiers would change; mid-drag, previews the new values on every match */
   const update = () => {
@@ -280,7 +287,7 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
       origin: { x: e.clientX, y: e.clientY },
       rect: a.target.getBoundingClientRect(),
       start,
-      own: deps.readOwn(a.target, () => readValues(a.target, a.prop)),
+      own: ownValues(a.target, a.prop),
       cur: { ...start },
       refs: {},
       axis: null,
@@ -298,9 +305,9 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
       guideBar.show(deps.baseMode());
       return;
     }
-    const { number, created } = save(target, prop, changes, drag!.styles);
-    if (!number) guideBar.show(deps.baseMode());
-    else showNotice(created ? `Annotation ${number}` : `Added to annotation ${number}`, true);
+    const saved = save(target, prop, changes, drag!.styles);
+    if (!saved?.number) guideBar.show(deps.baseMode());
+    else showNotice(saved.created ? `Annotation ${saved.number}` : `Added to annotation ${saved.number}`, true);
   };
 
   /**
@@ -328,9 +335,8 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
       cur[part] = step.value;
       if (step.ref) refs[part] = step.ref;
     }
-    const changes = changesBetween(prop, start, cur, refs, deps.readOwn(target, () => readValues(target, prop)));
-    if (!Object.keys(changes).length) return;
-    save(target, prop, changes, getComputedStyles(target));
+    const changes = changesBetween(prop, start, cur, refs, ownValues(target, prop));
+    if (!Object.keys(changes).length || !save(target, prop, changes, getComputedStyles(target))) return;
     guideBar.clearNotice();
     // The save replaced the annotations; the target and its matches are the same elements
     if (a.nudges?.timer) clearTimeout(a.nudges.timer);
@@ -423,7 +429,8 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
       rafId = null;
     }
     update();
-    commitDrag();
+    // The update can disarm (the target left the page); the release is still ours
+    if (armed?.drag) commitDrag();
     return true;
   };
 

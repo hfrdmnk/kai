@@ -5,7 +5,10 @@ import { resolveAnnotationMatches } from './selector.ts';
 type Styled = Element & ElementCSSInlineStyle;
 type Original = { value: string; priority: string };
 type Entry = {
+  /** The element's style attribute before kai touched it */
   attribute: string | null;
+  /** The style attribute as kai last left it: if it still reads so, the page hasn't touched it since */
+  written: string | null;
   /** Each longhand kai set, with the element's own inline value before */
   originals: Map<string, Original>;
   /**
@@ -29,7 +32,8 @@ const shorthandOf = (longhand: string): string | null =>
  * kai's changes to the page are derived from the annotations' edits. `apply` sets each annotation's
  * edits, as `!important` inline longhands, on every element its fix changes, then puts every other
  * longhand kai touched back to the element's own inline value, captured the first time kai touched
- * it. A drag in progress is layered on top as `preview`.
+ * it. On each element its own annotation wins; look-alike annotations fill in only the longhands it
+ * doesn't set (the later look-alike winning among them), and a drag in progress is layered on top.
  */
 export const createEditStyles = () => {
   const touched = new Map<Styled, Entry>();
@@ -63,27 +67,41 @@ export const createEditStyles = () => {
   };
 
   const apply = (annotations: Annotation[], preview?: StylePreview) => {
-    const wanted = new Map<Styled, Record<string, string>>();
-    const want = (elements: Element[], declarations: Record<string, string>) => {
-      for (const el of elements) {
-        if (!('style' in el)) continue;
-        wanted.set(el as Styled, { ...wanted.get(el as Styled), ...declarations });
-      }
+    const own = new Map<Styled, Record<string, string>>();
+    const borrowed = new Map<Styled, Record<string, string>>();
+    const add = (to: Map<Styled, Record<string, string>>, el: Element, declarations: Record<string, string>) => {
+      if ('style' in el) to.set(el as Styled, { ...to.get(el as Styled), ...declarations });
     };
     for (const a of annotations) {
-      if (a.edits?.length) want(resolveAnnotationMatches(a), editDeclarations(a.edits));
+      if (!a.edits?.length) continue;
+      const declarations = editDeclarations(a.edits);
+      // The annotated element comes first
+      resolveAnnotationMatches(a).forEach((el, i) => add(i === 0 ? own : borrowed, el, declarations));
     }
-    if (preview) want(preview.elements, preview.declarations);
+    const wanted = new Map<Styled, Record<string, string>>();
+    for (const el of new Set([...borrowed.keys(), ...own.keys()])) wanted.set(el, { ...borrowed.get(el), ...own.get(el) });
+    if (preview) for (const el of preview.elements) add(wanted, el, preview.declarations);
 
     for (const [el, entry] of touched) {
       const declarations = wanted.get(el);
       const unwanted = [...entry.originals.keys()].filter(name => !declarations || !(name in declarations));
+      // None of kai's longhands left, and the page hasn't touched the attribute since: put it back as it was.
+      // Covers what per-longhand restores can't, like `padding: var(--p); padding-top: 4px`
+      if (!declarations && el.getAttribute('style') === entry.written) {
+        if (entry.attribute === null) el.removeAttribute('style');
+        else el.setAttribute('style', entry.attribute);
+        touched.delete(el);
+        continue;
+      }
       putBack(el, entry, unwanted);
       for (const name of unwanted) entry.originals.delete(name);
       for (const shorthand of entry.shorthands.keys()) {
         if (![...entry.originals.keys()].some(name => shorthandOf(name) === shorthand)) entry.shorthands.delete(shorthand);
       }
-      if (entry.originals.size) continue;
+      if (entry.originals.size) {
+        entry.written = el.getAttribute('style');
+        continue;
+      }
       // Leave no empty style attribute behind on an element that had none
       if (entry.attribute === null && !el.style.length) el.removeAttribute('style');
       touched.delete(el);
@@ -92,7 +110,7 @@ export const createEditStyles = () => {
     for (const [el, declarations] of wanted) {
       let entry = touched.get(el);
       if (!entry) {
-        entry = { attribute: el.getAttribute('style'), originals: new Map(), shorthands: new Map() };
+        entry = { attribute: el.getAttribute('style'), written: null, originals: new Map(), shorthands: new Map() };
         touched.set(el, entry);
       }
       for (const [name, value] of Object.entries(declarations)) {
@@ -102,24 +120,29 @@ export const createEditStyles = () => {
         if (el.style.getPropertyValue(name) === value && el.style.getPropertyPriority(name) === 'important') continue;
         el.style.setProperty(name, value, 'important');
       }
+      entry.written = el.getAttribute('style');
     }
   };
 
   /**
-   * Reads an element the way the page styles it, with kai's longhands lifted for the moment: what a
-   * new edit's `from` is. A look-alike already showing another annotation's edit would read kai's value.
+   * Reads an element the way the page styles it, with kai's `longhands` lifted for the moment: what a
+   * new edit's `from` is. A look-alike already showing another annotation's edit would read kai's
+   * value. Only the adjusted property's longhands are lifted, so a line-height still reads against
+   * kai's font size.
    */
-  const readOwn = <T>(el: Element, read: () => T): T => {
+  const readOwn = <T>(el: Element, read: () => T, longhands: string[]): T => {
     const entry = touched.get(el as Styled);
-    if (!entry) return read();
+    const names = longhands.filter(name => entry?.originals.has(name));
+    if (!entry || !names.length) return read();
     const styled = el as Styled;
-    const names = [...entry.originals.keys()];
-    const kai = names.map(name => [name, styled.style.getPropertyValue(name), styled.style.getPropertyPriority(name)] as const);
+    // A shorthand put back resets its other longhands too; all of kai's go back on afterwards
+    const kai = [...entry.originals.keys()].map(name => [name, styled.style.getPropertyValue(name), styled.style.getPropertyPriority(name)] as const);
     putBack(styled, entry, names);
     try {
       return read();
     } finally {
       for (const [name, value, priority] of kai) styled.style.setProperty(name, value, priority);
+      entry.written = styled.getAttribute('style');
     }
   };
 

@@ -24,6 +24,7 @@ const server = Bun.serve({
         <output id="own-events">0</output>
         <output id="focus-events">0</output>
         <output id="escapes">0</output>
+        <output id="clicks">0</output>
         <div id="box-parent" style="display:flex;gap:12px;padding:8px"><button id="box-child" style="margin:4px;padding:6px 10px">Box child</button><button>Two</button></div>
         <div id="rotated" style="width:40px;height:40px;padding:20px;margin:40px;transform:rotate(45deg);background:#ccc"></div>
         <!-- Siblings with the same tag and classes: the selector pins one (:nth-of-type), an adjustment previews on both -->
@@ -31,6 +32,17 @@ const server = Bun.serve({
         <!-- Utility classes give the page a spacing scale: 8, 16, 24, 32 (px-2 … px-8) -->
         <button id="snap" class="px-4">Snap me</button>
       </main>
+      <!-- Below main, so main's own size (measured by the inspect checks) stays put -->
+      <section id="review" style="padding:0 80px 80px">
+          <!-- Matching: identical utility-only siblings change together, a lone look-alike elsewhere doesn't;
+               component-class look-alikes change wherever they are, whatever their utilities -->
+          <ul id="tpl"><li class="px-2 py-1">One</li><li class="px-2 py-1">Two</li></ul>
+          <ul><li class="px-2 py-1" id="lone">Lone</li></ul>
+          <div><article class="card px-2" id="card-a">Card A</article></div>
+          <div><article class="card px-4" id="card-b">Card B</article></div>
+          <!-- Padding from a variable through the shorthand: its longhands read empty inline -->
+          <div id="shorthand" style="--pad: 20px; padding: var(--pad); background: #eee">Shorthand</div>
+      </section>
       <script>
         let events = 0;
         let ownEvents = 0;
@@ -46,6 +58,11 @@ const server = Bun.serve({
             if (e.key === 'Escape' || e.target.closest?.('main')) document.querySelector('#events').textContent = String(++events);
           }, true);
         }
+        // Clicks that reach the page (kai swallows them in annotation mode)
+        let clicks = 0;
+        document.addEventListener('click', e => {
+          if (e.target.closest?.('main, #review')) document.querySelector('#clicks').textContent = String(++clicks);
+        }, true);
         document.addEventListener('focusin', e => {
           if (e.target.id === 'input') document.querySelector('#focus-events').textContent = String(++focuses);
         }, true);
@@ -62,6 +79,8 @@ const assert = (condition: boolean, message: string) => {
   console.log(`${condition ? 'PASS' : 'FAIL'} ${message}`);
 };
 const reset = async () => {
+  // The plain page and closed build, also after checks that used the open build (?open)
+  await browser('open', `http://127.0.0.1:${server.port}/`);
   await browser('eval', 'localStorage.clear()');
   await browser('reload');
   await browser('find', 'role', 'button', 'click', '--name', 'Toggle UI annotator');
@@ -468,13 +487,16 @@ try {
   await browser('eval', frames);
   assert((await hudText()).includes('Annotation 1'), 'Release confirms the annotation in the HUD');
 
-  // A nudge right after arming lands mid-crossfade; the HUD used to stay blank (opacity 0)
+  // A nudge right after arming lands mid-crossfade (150ms out, then in); the HUD used to stay blank (opacity 0).
+  // Both keys come from one in-page script, so the nudge reliably lands 200ms after arming.
   await browser('wait', '1300');
   await browser('hover', '#snap');
   await browser('eval', frames);
-  await browser('press', 'p');
-  await browser('wait', '250');
-  await browser('press', 'ArrowRight');
+  await browser('eval', `(() => {
+    const fire = key => document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, composed: true, cancelable: true }));
+    fire('p');
+    return new Promise(r => setTimeout(() => { fire('ArrowRight'); r(true); }, 200));
+  })()`);
   await browser('eval', frames);
   assert(await hudVisible() && (await hudText()).startsWith('padding-'), 'A nudge during the arming crossfade leaves the HUD visible');
   await browser('press', 'Escape');
@@ -569,6 +591,103 @@ try {
   saved = await stored();
   assert(saved[0].comment !== before && !(await browser('snapshot', '-i')).includes('Annotation comment'),
     'While armed, a press on a marker adjusts the element under it instead of opening the editor');
+
+  // ── Review fixes ──
+  const px = async (selector: string, property = 'paddingRight') =>
+    JSON.parse(await browser('eval', `[...document.querySelectorAll('${selector}')].map(e => getComputedStyle(e).${property}).join()`)) as string;
+  /** Arms `key` on an element from its middle, then moves just inside its right edge */
+  const armEl = async (selector: string, key = 'p') => {
+    await browser('hover', selector);
+    await browser('eval', frames);
+    await browser('press', key);
+    const [x, y] = JSON.parse(await browser('eval',
+      `(r => [Math.round(r.right - 3), Math.round(r.top + r.height / 2)])(document.querySelector('${selector}').getBoundingClientRect())`)) as number[];
+    await browser('mouse', 'move', String(x), String(y));
+    await browser('eval', frames);
+    return [x, y];
+  };
+  const release = async () => {
+    await browser('mouse', 'up', 'left');
+    await browser('eval', frames);
+  };
+
+  // A marker opens the current annotation: note, then a drag, then the marker shows the edit and keeps it on save
+  await resetOpen();
+  await browser('click', '#card-a');
+  await browser('snapshot', '-i');
+  await browser('keyboard', 'type', 'Card note');
+  await browser('press', 'Control+Enter');
+  await dragRight(await armEl('#card-a'), 20);
+  await release();
+  await browser('wait', '1300');
+  const markerAt = await inShadow(`(r => [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)])(root.querySelector('.kai-marker').getBoundingClientRect())`) as number[];
+  await browser('mouse', 'move', String(markerAt[0]), String(markerAt[1]));
+  await browser('mouse', 'down', 'left');
+  await browser('mouse', 'up', 'left');
+  await browser('snapshot', '-i');
+  const opened = await inShadow(`root.querySelector('.kai-popover-textarea').value`) as string;
+  await browser('press', 'Control+End');
+  await browser('press', 'Enter');
+  await browser('keyboard', 'type', 'Roomier');
+  await browser('press', 'Control+Enter');
+  await browser('eval', frames);
+  saved = await stored();
+  assert(opened === 'Card note\npadding-right: 8px → 18px (1.125rem)' && saved[0].comment === `${opened}\nRoomier`
+    && saved[0].edits?.length === 1 && await px('#card-a') === '18px', 'A marker opens the current annotation, and saving keeps its edit and style');
+
+  // Matching: component look-alikes change; a look-alike's own edit starts from the page's value, not kai's
+  assert(await px('#card-b') === '18px', 'A component-class look-alike in another parent changes too, whatever its utilities');
+  await dragRight(await armEl('#card-b'), 10);
+  await release();
+  saved = await stored();
+  const cardB = saved.find(a => a.selector.includes('card-b'));
+  assert(cardB?.edits?.[0].from === 16 && cardB.edits[0].to === 23, 'A look-alike already showing another edit records the page\'s own value as from');
+
+  await resetOpen();
+  await dragRight(await armEl('#tpl li'), 20);
+  assert(await px('#tpl li') === '18px,18px' && await px('#lone') === '8px',
+    'Identical utility-only siblings preview together; a lone look-alike elsewhere does not');
+  await release();
+
+  // An inline shorthand with a variable: the longhands read empty; undo must bring the shorthand back
+  await dragRight(await armEl('#shorthand'), 20);
+  await release();
+  const sides = () => px('#shorthand', 'padding');
+  assert(await sides() === '20px 30px 20px 20px', 'A drag on a var() shorthand changes one side and keeps the others');
+  await browser('press', 'Control+z');
+  await browser('eval', frames);
+  assert(await sides() === '20px', 'Undo puts the var() shorthand back on every side');
+
+  // I mid-drag is ignored: the release stays kai's, not a page click
+  const clicksBefore = await browser('get', 'text', '#clicks');
+  at = await armEl('#lone');
+  await dragRight(at, 20);
+  await browser('press', 'i');
+  await release();
+  await settle();
+  assert(!(await hudText()).includes('Interacting') && await px('#lone') === '18px' && (await stored()).some(a => a.selector.includes('lone')),
+    'I mid-drag is ignored and the drag commits');
+  assert(await browser('get', 'text', '#clicks') === clicksBefore, 'The release after I never reaches the page as a click');
+
+  // Nothing to undo while armed: the notice gives way to the armed hints again
+  await resetOpen();
+  await armEl('#snap');
+  await settle();
+  await browser('press', 'Control+z');
+  await browser('eval', frames);
+  const notice = await hudText();
+  await browser('wait', '1400');
+  assert(notice === 'Nothing to undo' && (await hudText()).startsWith('Padding'), 'After a notice while armed, the armed hints come back');
+  await browser('press', 'Escape');
+
+  // A narrow viewport keeps the adjust HUD to one 32px line
+  await browser('set', 'viewport', '500', '800', '2');
+  await armEl('#snap');
+  await settle();
+  const [barHeight, glyphWidth] = await inShadow(`[root.querySelector('.kai-guide-bar').getBoundingClientRect().height, root.querySelector('.kai-guide-bar-glyph').getBoundingClientRect().width]`) as number[];
+  assert(barHeight === 32 && glyphWidth === 16, 'At 500px wide the armed HUD stays one 32px line with a 16px glyph');
+  await browser('press', 'Escape');
+  await browser('set', 'viewport', '1280', '800', '2');
 
   await reset();
   await browser('focus', '#input');

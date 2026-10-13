@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { formatChanges } from '../src/export/markdown.ts';
+import { formatChanges, formatSiblings } from '../src/export/markdown.ts';
 
 describe('Markdown changes', () => {
   test('one bullet per edit: the change in code, then rem and the class or token', () => {
@@ -16,5 +16,12 @@ describe('Markdown changes', () => {
       '- `line-height: 1.5 → 1.625` (`leading-relaxed`)',
       '- `line-height: 1.5 → 1.6`',
     ]);
+  });
+});
+
+describe('Markdown siblings', () => {
+  test('a shared edit says which siblings it applies to', () => {
+    expect(formatSiblings(3, 'article.card.px-2', '#cards'))
+      .toBe('Applies to all 3 identical siblings (`article.card.px-2` under `#cards`)');
   });
 });

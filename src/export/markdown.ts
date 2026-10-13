@@ -1,5 +1,19 @@
 import type { Annotation, StyleEdit } from '../types.ts';
 import { describeEdit } from '../core/adjust.ts';
+import { generateSelector, resolveAnnotation, resolveAnnotationMatches } from '../core/selector.ts';
+
+/** For a shared edit: the annotation's selector names one element, the fix should change them all */
+export const formatSiblings = (count: number, key: string, parent: string): string =>
+  `Applies to all ${count} identical siblings (\`${key}\` under \`${parent}\`)`;
+
+/** The siblings line for an annotation whose fix covers several elements, counted now; null otherwise */
+const siblingsLine = (a: Annotation): string | null => {
+  const matches = resolveAnnotationMatches(a);
+  const target = resolveAnnotation(a);
+  if (matches.length < 2 || !target?.parentElement) return null;
+  const classes = Array.from(target.classList).filter(c => !c.startsWith('kai-'));
+  return formatSiblings(matches.length, [target.localName, ...classes].join('.'), generateSelector(target.parentElement));
+};
 
 /** `- \`padding-right: 24px → 32px\` (2rem, \`pr-8\`)`: the change in code, then its rem and class or token */
 export const formatChanges = (edits: StyleEdit[]): string[] => edits.map(edit => {
@@ -77,7 +91,8 @@ export const toMarkdown = (annotations: Annotation[]): string => {
     }
 
     if (a.edits?.length) {
-      lines.push('**Changes:**', ...formatChanges(a.edits), '');
+      const siblings = siblingsLine(a);
+      lines.push('**Changes:**', ...formatChanges(a.edits), ...(siblings ? ['', siblings] : []), '');
     }
   });
 

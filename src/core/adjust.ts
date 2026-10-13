@@ -12,7 +12,10 @@ export type GapAxis = 'row' | 'column';
 /** What one drag can change: a side, a corner, one of the two gaps, or the single value of F / L */
 export type Part = Side | Corner | GapAxis | 'value';
 export type Values = Partial<Record<Part, number>>;
-export type Change = { from: number; to: number };
+/** A value on the project's scale: a utility class's suffix (`8` of `pr-8`, `''` of bare `rounded`) or a CSS variable */
+export type ScaleRef = { suffix: string } | { token: string };
+/** One longhand's change; `ref` when it was snapped to the scale */
+export type Change = { from: number; to: number; ref?: ScaleRef };
 type Rect = { left: number; top: number; width: number; height: number };
 
 /** `perUnit` is pointer travel in px per px (per 1 for line-height); `step` the value's resolution */
@@ -134,6 +137,36 @@ export const adjustValue = (prop: AdjustProperty, start: number, travel: number)
 
 // ── Declarations ──
 
+/** Utility class prefix per declaration, Tailwind's naming: `pr-8`, `px-4`, `gap-y-2`, `rounded-tl-lg` */
+const CLASS_PREFIX: Record<string, string> = {
+  padding: 'p', 'padding-inline': 'px', 'padding-block': 'py',
+  'padding-top': 'pt', 'padding-right': 'pr', 'padding-bottom': 'pb', 'padding-left': 'pl',
+  margin: 'm', 'margin-inline': 'mx', 'margin-block': 'my',
+  'margin-top': 'mt', 'margin-right': 'mr', 'margin-bottom': 'mb', 'margin-left': 'ml',
+  gap: 'gap', 'column-gap': 'gap-x', 'row-gap': 'gap-y',
+  'font-size': 'text', 'line-height': 'leading',
+  'border-radius': 'rounded',
+  'border-top-left-radius': 'rounded-tl', 'border-top-right-radius': 'rounded-tr',
+  'border-bottom-right-radius': 'rounded-br', 'border-bottom-left-radius': 'rounded-bl',
+};
+
+/** The class a declaration gets for a scale step: the declaration's own prefix, `-` for negative margins */
+export const utilityClass = (declaration: string, value: number, suffix: string): string =>
+  `${value < 0 ? '-' : ''}${CLASS_PREFIX[declaration]}${suffix ? `-${suffix}` : ''}`;
+
+/** Back from an edit's class or token to its scale step, so a merge can rename it for another declaration */
+const refOfEdit = (e: StyleEdit): ScaleRef | undefined => {
+  if (e.token) return { token: e.token };
+  if (!e.className) return undefined;
+  const name = e.className.replace(/^-/, '');
+  const prefix = CLASS_PREFIX[e.property];
+  if (name === prefix) return { suffix: '' };
+  return name.startsWith(`${prefix}-`) ? { suffix: name.slice(prefix.length + 1) } : undefined;
+};
+
+const refKey = (r?: ScaleRef) => !r ? '' : 'token' in r ? `token:${r.token}` : `class:${r.suffix}`;
+const sameRef = (a?: ScaleRef, b?: ScaleRef) => refKey(a) === refKey(b);
+
 /** padding-inline → padding, row-gap → gap, border-top-left-radius → border-radius */
 export const propertyOfDeclaration = (name: string): AdjustProperty | null => {
   if (name.startsWith('padding')) return 'padding';
@@ -154,12 +187,17 @@ export const longhandsOfDeclaration = (name: string): string[] => {
   return [name];
 };
 
-const same = (a: Change, b: Change) => Math.abs(a.from - b.from) < 1e-6 && Math.abs(a.to - b.to) < 1e-6;
+const same = (a: Change, b: Change) => Math.abs(a.from - b.from) < 1e-6 && Math.abs(a.to - b.to) < 1e-6 && sameRef(a.ref, b.ref);
 const changed = (c: Change) => Math.abs(c.from - c.to) >= 1e-6;
 
 /** Groups the given parts into the shortest declarations; parts sharing `from` and `to` merge */
 const group = (prop: AdjustProperty, changes: Partial<Record<Part, Change>>): StyleEdit[] => {
-  const edit = (property: string, c: Change): StyleEdit => ({ property, from: c.from, to: c.to });
+  const edit = (property: string, c: Change): StyleEdit => {
+    const e: StyleEdit = { property, from: c.from, to: c.to };
+    if (c.ref && 'token' in c.ref) e.token = c.ref.token;
+    else if (c.ref) e.className = utilityClass(property, c.to, c.ref.suffix);
+    return e;
+  };
   const all = partsOf(prop);
   const covers = (parts: Part[]) => parts.every(p => changes[p] && same(changes[p]!, changes[parts[0]]!));
   if (covers(all)) return [edit(prop, changes[all[0]]!)];
@@ -192,25 +230,27 @@ export const shortestEdits = (prop: AdjustProperty, longhands: Record<string, Ch
   return group(prop, changes);
 };
 
-/** The longhands behind a property's edits, each with its original `from` */
+/** The longhands behind a property's edits, each with its original `from` and its scale step */
 const editLonghands = (edits: StyleEdit[], prop: AdjustProperty): Record<string, Change> => {
   const out: Record<string, Change> = {};
   for (const e of edits) {
     if (propertyOfDeclaration(e.property) !== prop) continue;
-    for (const name of longhandsOfDeclaration(e.property)) out[name] = { from: e.from, to: e.to };
+    const ref = refOfEdit(e);
+    for (const name of longhandsOfDeclaration(e.property)) out[name] = ref ? { from: e.from, to: e.to, ref } : { from: e.from, to: e.to };
   }
   return out;
 };
 
 /**
  * Folds a drag's longhand changes into an annotation's edits. Longhands already edited keep their
- * original `from`; one back at its original value drops out. The property's edits are re-derived
- * in their shortest form, where the property's first edit was.
+ * original `from`; one back at its original value drops out. A changed longhand takes the change's
+ * scale step (or none); the others keep theirs, renamed for whatever declaration they end up in.
+ * The property's edits are re-derived in their shortest form, where the property's first edit was.
  */
 export const mergeEdits = (edits: StyleEdit[], prop: AdjustProperty, changes: Record<string, Change>): StyleEdit[] => {
   const existing = editLonghands(edits, prop);
   const merged = { ...existing };
-  for (const [name, c] of Object.entries(changes)) merged[name] = { from: existing[name]?.from ?? c.from, to: c.to };
+  for (const [name, c] of Object.entries(changes)) merged[name] = { ...c, from: existing[name]?.from ?? c.from };
   const at = edits.findIndex(e => propertyOfDeclaration(e.property) === prop);
   const others = edits.filter(e => propertyOfDeclaration(e.property) !== prop);
   others.splice(at === -1 ? others.length : at, 0, ...shortestEdits(prop, merged));
@@ -266,6 +306,13 @@ export const syncEditLines = (comment: string, before: StyleEdit[], after: Style
 export const editsInComment = (edits: StyleEdit[], comment: string): StyleEdit[] => {
   const names = new Set(comment.split('\n').map(lineProperty));
   return edits.filter(e => names.has(e.property));
+};
+
+/** An annotation's comment and edits after a drag or nudge: the changes merged in, their lines rewritten */
+export const withChanges = (a: { comment: string; edits?: StyleEdit[] }, prop: AdjustProperty, changes: Record<string, Change>) => {
+  const before = a.edits ?? [];
+  const edits = mergeEdits(before, prop, changes);
+  return { comment: syncEditLines(a.comment, before, edits), edits: edits.length ? edits : undefined };
 };
 
 // ── HUD text ──

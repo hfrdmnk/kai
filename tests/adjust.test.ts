@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   adjustPropertyFor, adjustValue, cursorFor, dragAxisOf, dragReadout, dragTravel, editDeclarations, editsInComment,
   formatEditLine, longhandsOfDeclaration, mergeEdits, nameWidth, nearestCorner, nearestSide, pickParts,
-  shorthandValue, shortestEdits, syncEditLines,
+  shorthandValue, shortestEdits, syncEditLines, withChanges,
 } from '../src/core/adjust.ts';
 import type { StyleEdit } from '../src/types.ts';
 
@@ -333,5 +333,68 @@ describe('cursor', () => {
   test('while dragging a single value or corner', () => {
     expect(cursorFor('font-size', ['value'], true)).toBe('ew-resize');
     expect(cursorFor('border-radius', ['top-left'], true)).toBe('move');
+  });
+});
+
+describe('snapped values through merges', () => {
+  test('the declaration names the class after its own prefix and the scale suffix', () => {
+    expect(shortestEdits('padding', {
+      'padding-left': { from: 16, to: 32, ref: { suffix: '8' } },
+      'padding-right': { from: 16, to: 32, ref: { suffix: '8' } },
+    })).toEqual([{ property: 'padding-inline', from: 16, to: 32, className: 'px-8' }]);
+    expect(shortestEdits('margin', { 'margin-top': { from: 0, to: -8, ref: { suffix: '2' } } }))
+      .toEqual([{ property: 'margin-top', from: 0, to: -8, className: '-mt-2' }]);
+    expect(shortestEdits('border-radius', { 'border-top-left-radius': { from: 4, to: 8, ref: { suffix: 'lg' } } }))
+      .toEqual([{ property: 'border-top-left-radius', from: 4, to: 8, className: 'rounded-tl-lg' }]);
+    expect(shortestEdits('gap', { 'row-gap': { from: 8, to: 24, ref: { token: 'var(--space-6)' } } }))
+      .toEqual([{ property: 'row-gap', from: 8, to: 24, token: 'var(--space-6)' }]);
+  });
+
+  test('longhands snapped differently do not share a declaration', () => {
+    expect(shortestEdits('padding', {
+      'padding-left': { from: 16, to: 32, ref: { suffix: '8' } },
+      'padding-right': { from: 16, to: 32 },
+    })).toEqual([{ property: 'padding-right', from: 16, to: 32 }, { property: 'padding-left', from: 16, to: 32, className: 'pl-8' }]);
+  });
+
+  test('merging keeps the class of untouched longhands, renamed for their new declaration', () => {
+    const edits = [{ property: 'padding-inline', from: 16, to: 32, className: 'px-8' }];
+    expect(mergeEdits(edits, 'padding', { 'padding-right': { from: 32, to: 40 } })).toEqual([
+      { property: 'padding-right', from: 16, to: 40 },
+      { property: 'padding-left', from: 16, to: 32, className: 'pl-8' },
+    ]);
+  });
+
+  test('a snapped change replaces a free one, and the other way round', () => {
+    const free = [{ property: 'font-size', from: 16, to: 17 }];
+    expect(mergeEdits(free, 'font-size', { 'font-size': { from: 17, to: 18, ref: { suffix: 'lg' } } }))
+      .toEqual([{ property: 'font-size', from: 16, to: 18, className: 'text-lg' }]);
+    const snapped = [{ property: 'line-height', from: 1.5, to: 1.625, className: 'leading-relaxed' }];
+    expect(mergeEdits(snapped, 'line-height', { 'line-height': { from: 1.625, to: 1.65 } }))
+      .toEqual([{ property: 'line-height', from: 1.5, to: 1.65 }]);
+  });
+
+  test('tokens survive a merge untouched', () => {
+    const edits = [{ property: 'gap', from: 8, to: 24, token: 'var(--space-6)' }];
+    expect(mergeEdits(edits, 'gap', { 'row-gap': { from: 24, to: 30 } })).toEqual([
+      { property: 'row-gap', from: 8, to: 30 },
+      { property: 'column-gap', from: 8, to: 24, token: 'var(--space-6)' },
+    ]);
+  });
+});
+
+describe('annotation updates', () => {
+  test('a drag merges its edit and rewrites the line', () => {
+    const a = { comment: 'Roomier\npadding-right: 24px → 34px (2.125rem)', edits: [{ property: 'padding-right', from: 24, to: 34 }] };
+    expect(withChanges(a, 'padding', { 'padding-right': { from: 34, to: 40 } })).toEqual({
+      comment: 'Roomier\npadding-right: 24px → 40px (2.5rem)',
+      edits: [{ property: 'padding-right', from: 24, to: 40 }],
+    });
+    expect(a.edits[0].to).toBe(34);
+  });
+
+  test('back to the original leaves no edits', () => {
+    expect(withChanges({ comment: 'font-size: 16px → 18px (1.125rem)', edits: [{ property: 'font-size', from: 16, to: 18 }] },
+      'font-size', { 'font-size': { from: 18, to: 16 } })).toEqual({ comment: '', edits: undefined });
   });
 });

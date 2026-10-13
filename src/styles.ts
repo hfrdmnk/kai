@@ -509,6 +509,81 @@ export const styles = `
   color: var(--text-tertiary);
 }
 
+/* Drag-to-adjust changes: one line per edit, a remove button fading in at the end */
+.kai-popover-edits {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kai-popover-edit {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow: hidden;
+}
+
+.kai-popover-edit:hover,
+.kai-popover-edit:focus-within {
+  background: var(--bg-2);
+}
+
+.kai-popover-edit-text {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kai-popover-edit-prop { color: var(--text-primary); }
+.kai-popover-edit-values { margin-left: 2ch; color: var(--text-secondary); }
+.kai-popover-edit-snap { margin-left: 2ch; color: var(--text-tertiary); }
+
+.kai-popover-edit-remove {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 8px 0 24px;
+  border: 0;
+  background: linear-gradient(to right, transparent, var(--bg-2) 40%);
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 140ms var(--ease-out);
+}
+
+.kai-popover-edit-remove svg {
+  width: 14px;
+  height: 14px;
+}
+
+.kai-popover-edit-remove:hover { color: var(--text-primary); }
+
+/* The row clips its overflow, so the ring sits inside */
+.kai-popover-edit-remove:focus-visible {
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
+
+.kai-popover-edit:hover .kai-popover-edit-remove,
+.kai-popover-edit:focus-within .kai-popover-edit-remove {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kai-popover-edit-remove { transition: none; }
+}
+
 .kai-popover-footer {
   display: flex;
   align-items: center;

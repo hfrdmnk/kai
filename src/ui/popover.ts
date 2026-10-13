@@ -1,5 +1,8 @@
+import type { StyleEdit } from '../types.ts';
 import { attachAutocomplete } from './autocomplete.ts';
 import { getDirectText } from '../core/text.ts';
+import { describeEdit } from '../core/adjust.ts';
+import { createIcon, iconClose } from '../icons.ts';
 
 const POPOVER_WIDTH = 320;
 const EDGE_GAP = 12;
@@ -14,6 +17,57 @@ type PopoverOptions = {
   existingComment?: string;
   onDelete?: () => void;
   anchorRect?: DOMRect;
+  /** Drag-to-adjust changes, listed below the note, one row each */
+  edits?: StyleEdit[];
+  /** A row's remove button; the row goes, the page reverts */
+  onRemoveEdit?: (property: string) => void;
+};
+
+/**
+ * The annotation's changes, one line per edit: `padding-right  24px → 32px  pr-8`. Hover or focus
+ * shows a remove button at the row's end, over a fade.
+ */
+const createEditList = (edits: StyleEdit[], onRemove: (property: string) => void, onEmpty: () => void): HTMLElement => {
+  const list = document.createElement('ul');
+  list.className = 'kai-popover-edits';
+  list.setAttribute('aria-label', 'Changes');
+  for (const edit of edits) {
+    const { property, from, to, snap } = describeEdit(edit);
+    const row = document.createElement('li');
+    row.className = 'kai-popover-edit';
+    const text = document.createElement('span');
+    text.className = 'kai-popover-edit-text';
+    const part = (className: string, value: string) => {
+      const el = document.createElement('span');
+      el.className = className;
+      el.textContent = value;
+      text.appendChild(el);
+    };
+    part('kai-popover-edit-prop', property);
+    part('kai-popover-edit-values', `${from} → ${to}`);
+    if (snap) part('kai-popover-edit-snap', snap);
+    // The full line, for one cut short by the popover's width
+    row.title = [property, `${from} → ${to}`, snap].filter(Boolean).join('  ');
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'kai-popover-edit-remove';
+    remove.setAttribute('aria-label', `Remove ${property} change`);
+    remove.appendChild(createIcon(iconClose));
+    remove.addEventListener('click', () => {
+      // Keep the keyboard in the list: the next row's button, else the previous one's
+      const next = (row.nextElementSibling ?? row.previousElementSibling)?.querySelector('button');
+      row.remove();
+      onRemove(property);
+      if (next instanceof HTMLElement) next.focus();
+      if (!list.children.length) {
+        list.remove();
+        onEmpty();
+      }
+    });
+    row.append(text, remove);
+    list.appendChild(row);
+  }
+  return list;
 };
 
 const positionPopover = (popover: HTMLElement, targetRect: DOMRect, anchorRect?: DOMRect) => {
@@ -89,6 +143,9 @@ export const createPopover = (
 
   body.appendChild(pathEl);
   body.appendChild(textarea);
+  if (opts.edits?.length && opts.onRemoveEdit) {
+    body.appendChild(createEditList(opts.edits, opts.onRemoveEdit, () => textarea.focus()));
+  }
   body.appendChild(descEl);
 
   // Footer

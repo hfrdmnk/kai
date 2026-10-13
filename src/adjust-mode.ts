@@ -1,17 +1,23 @@
 import type { Annotation } from './types.ts';
 import {
   ADJUST, adjustPropertyFor, adjustValue, cursorFor, dragAxisOf, dragTravel, editDeclarations, flexAxisOf, gapContainer,
-  editsLabel, kindOf, longhandOf, nudgeValue, partsOf, pickParts, propertyOfDeclaration, readValues, shortestEdits, withChanges,
+  editsLabel, kindOf, longhandOf, nudgeValue, routeChanges, partsOf, pickParts, propertyOfDeclaration, readValues, shortestEdits, withChanges,
   withoutProperty, type AdjustProperty, type Change, type Part, type ScaleRef, type Values,
 } from './core/adjust.ts';
 import type { StylePreview } from './core/edit-styles.ts';
 import type { HeldKeys } from './core/held-keys.ts';
 import { hasSteps, harvestScale, stepOnScale, styleSignature, STEP_TRAVEL, type Scale } from './core/scale.ts';
 import { composedParent, generateSelector, resolveAnnotation, resolveAnnotationMatches } from './core/selector.ts';
+import type { StyleEdit } from './types.ts';
 import { getComputedStyles } from './core/styles.ts';
 import { armedHud, createAdjustLayer, dragHud } from './ui/adjust.ts';
 import type { createGuideBar, GuideMode } from './ui/guide-bar.ts';
 import type { createOverlay } from './ui/highlight.ts';
+
+/** An empty edit list is no list */
+const orNone = (edits: StyleEdit[]) => edits.length ? edits : undefined;
+/** An annotation stays while it has a note or edits */
+const keep = (a: Annotation) => !!a.comment.trim() || !!a.edits?.length;
 
 /** How long the HUD shows a nudge's readout after the last ←/→ before going back to the hints */
 const NUDGE_MS = 1500;
@@ -150,23 +156,40 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
     return changes;
   };
 
+  /** Annotations of the target's siblings whose fix covers the target too (it's one of their matches) */
+  const siblingAnnotations = (target: Element) =>
+    deps.annotations().filter(a => resolveAnnotation(a) !== target && resolveAnnotationMatches(a).includes(target));
+
   /**
-   * Writes changes into the target's annotation, creating it when there's none, and saves.
-   * Returns the annotation's 1-based number (0 when it went away: back at the page's values with
-   * nothing else said) and whether it's new; null when the edits come out the same, e.g. a look-alike
-   * dragged back to its own value. That's no change and no undo step.
+   * Writes changes into annotations and saves, one edit per sibling group per longhand (see
+   * `routeChanges`): a longhand a sibling's annotation already edits updates that edit, the rest go to
+   * the target's own annotation, created when there's none. Returns the 1-based number of the
+   * annotation the change went to and whether it's new; null when the edits come out the same (a
+   * look-alike dragged back to its own value): no change and no undo step.
    */
   const save = (target: Element, prop: AdjustProperty, changes: Record<string, Change>, styles: Record<string, string>) => {
     const list = deps.annotations();
-    const existing = annotationFor(target);
-    const base = existing ?? deps.createAnnotation(target, styles);
-    const updated: Annotation = { ...base, ...withChanges(base, prop, changes) };
-    const label = editsLabel(base.edits ?? [], updated.edits ?? []);
+    const own = annotationFor(target);
+    const siblings = siblingAnnotations(target);
+    const routed = routeChanges(changes, own?.edits, siblings.map(a => a.edits));
+    const updates = new Map<Annotation, Annotation>();
+    const update = (a: Annotation, part: Record<string, Change>) => {
+      if (Object.keys(part).length) updates.set(a, { ...a, edits: orNone(withChanges(a.edits, prop, part)) });
+    };
+    siblings.forEach((a, i) => update(a, routed.siblings[i]));
+    const base = own ?? deps.createAnnotation(target, styles);
+    update(base, routed.own);
+    const names = [...updates].flatMap(([a, b]) => editsLabel(a.edits ?? [], b.edits ?? []).split(', ').filter(Boolean));
+    const label = [...new Set(names)].sort().join(', ');
     if (!label) return null;
-    let next = existing ? list.map(a => a === existing ? updated : a) : [...list, updated];
-    if (!updated.comment.trim()) next = next.filter(a => a !== updated);
+    let next = list.map(a => updates.get(a) ?? a);
+    if (!own && updates.has(base)) next = [...next, updates.get(base)!];
+    // An annotation goes only when it has neither a note nor edits
+    const touched = new Set(updates.values());
+    next = next.filter(a => !touched.has(a) || keep(a));
     deps.commit(next, label);
-    return { number: next.indexOf(updated) + 1, created: !existing };
+    const landed = updates.get(base) ?? updates.values().next().value!;
+    return { number: next.indexOf(landed) + 1, created: !own && landed === updates.get(base) };
   };
 
   /** The page's own values of the armed property, kai's styles for it lifted */
@@ -354,18 +377,25 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
   };
 
   /** Backspace while armed: the property's edits and their lines come off the element's annotation */
+  /**
+   * Backspace while armed: the property comes off what the element shows, its own annotation's edits
+   * and the edits of sibling annotations that cover it (one edit per group: the whole group goes back)
+   */
   const resetProperty = () => {
     const { prop, target } = armed!;
     const name = ADJUST[prop].title.toLowerCase();
-    const existing = annotationFor(target);
+    const own = annotationFor(target);
+    const affected = [...(own ? [own] : []), ...siblingAnnotations(target)]
+      .filter(a => a.edits?.some(e => propertyOfDeclaration(e.property) === prop));
     disarm(false);
-    if (!existing?.edits?.some(e => propertyOfDeclaration(e.property) === prop)) {
+    if (!affected.length) {
       showNotice(`No ${name} changes to reset`);
       return;
     }
-    const updated: Annotation = { ...existing, ...withoutProperty(existing, prop) };
-    const list = deps.annotations();
-    deps.commit(updated.comment.trim() ? list.map(a => a === existing ? updated : a) : list.filter(a => a !== existing), `reset ${name}`);
+    const next = deps.annotations()
+      .map(a => affected.includes(a) ? { ...a, edits: orNone(withoutProperty(a.edits, prop)) } : a)
+      .filter(a => !affected.some(b => b.id === a.id) || keep(a));
+    deps.commit(next, `reset ${name}`);
     showNotice(`Reset ${name}`);
   };
 

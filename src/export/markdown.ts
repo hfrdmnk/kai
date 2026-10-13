@@ -1,4 +1,12 @@
-import type { Annotation } from '../types.ts';
+import type { Annotation, StyleEdit } from '../types.ts';
+import { describeEdit } from '../core/adjust.ts';
+
+/** `- \`padding-right: 24px → 32px\` (2rem, \`pr-8\`)`: the change in code, then its rem and class or token */
+export const formatChanges = (edits: StyleEdit[]): string[] => edits.map(edit => {
+  const { property, from, to, rem, snap } = describeEdit(edit);
+  const notes = [...(rem ? [rem] : []), ...(snap ? [`\`${snap}\``] : [])];
+  return `- \`${property}: ${from} → ${to}\`${notes.length ? ` (${notes.join(', ')})` : ''}`;
+});
 
 const formatHeading = (a: Annotation): string => {
   const el = a.element ?? 'element';
@@ -66,6 +74,10 @@ export const toMarkdown = (annotations: Annotation[]): string => {
     if (a.comment) {
       lines.push(`**Annotation:** ${a.comment}`);
       lines.push('');
+    }
+
+    if (a.edits?.length) {
+      lines.push('**Changes:**', ...formatChanges(a.edits), '');
     }
   });
 

@@ -218,7 +218,7 @@ export const createMarkerManager = (
 
       btn.addEventListener('mouseenter', () => {
         onMarkerEnter?.(ann.id);
-        const label = ann.comment.trim() || ann.path || ann.selector;
+        const label = ann.comment.trim() || ann.edits?.map(e => e.property).join(', ') || ann.path || ann.selector;
         tooltip.textContent = label;
         tooltip.style.display = '';
         const btnRect = btn.getBoundingClientRect();
@@ -536,7 +536,9 @@ export const createMarkerManager = (
         markerMap.set(annotation.id, marker);
       }
       if (!marker.querySelector('svg')) marker.appendChild(createMarkerIcon());
-      marker.setAttribute('aria-label', `Annotation: ${annotation.comment.slice(0, 50)}`);
+      // An annotation with changes only is named by them
+      const summary = annotation.comment || annotation.edits?.map(e => e.property).join(', ') || '';
+      marker.setAttribute('aria-label', `Annotation: ${summary.slice(0, 50)}`);
 
       // Box
       let box = boxMap.get(annotation.id);

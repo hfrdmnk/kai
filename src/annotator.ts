@@ -8,7 +8,7 @@ import { loadSession, saveSession, clearSession, loadFabCorner, saveFabCorner, l
 import { applyAccent } from './core/accents.ts';
 import { computeCrosshair, computeTextInspectData, findLargestEnclosedElement, type TextInspectData } from './core/measure.ts';
 import { computeBoxModel, type BoxModelData } from './core/box-model.ts';
-import { editsInComment } from './core/adjust.ts';
+import { withoutEdit } from './core/adjust.ts';
 import { createEditStyles, type StylePreview } from './core/edit-styles.ts';
 import { nextHeld, NONE_HELD, type HeldKeys } from './core/held-keys.ts';
 import { emptyHistory, record, redo, undo, type History } from './core/history.ts';
@@ -1048,15 +1048,26 @@ class UIAnnotator extends HTMLElement {
       styles: computedStyles,
       existingComment: annotation.comment,
       anchorRect: markerRect,
+      edits: annotation.edits,
+      onRemoveEdit: (property) => {
+        const current = this.annotations.find(a => a.id === annotation.id);
+        if (!current) return;
+        const edits = withoutEdit(current.edits, property);
+        const updated: Annotation = { ...current, edits: edits.length ? edits : undefined };
+        // The last change of an annotation without a note takes the annotation with it
+        const gone = !updated.comment.trim() && !updated.edits;
+        this.commit(gone ? this.annotations.filter(a => a.id !== current.id) : this.annotations.map(a => a.id === current.id ? updated : a), property);
+        if (gone) this.closePopover();
+      },
       onSubmit: (comment) => {
         // The list may have moved on since the popover opened; save onto the current annotation
         const current = this.annotations.find(a => a.id === annotation.id) ?? annotation;
-        // Deleting an edit's line takes the edit off the page
-        const edits = current.edits && editsInComment(current.edits, comment);
-        const updated: Annotation = { ...current, comment, edits: edits?.length ? edits : undefined };
-        // Saving an unchanged comment isn't a step to undo; an emptied one deletes the annotation, edits included
-        if (comment && comment !== current.comment) this.commit(this.annotations.map(a => a.id === annotation.id ? updated : a), 'note');
-        else if (!comment) this.commit(this.annotations.filter(a => a.id !== annotation.id), 'delete annotation');
+        // Saving an unchanged note isn't a step to undo. An empty note keeps an annotation that still has
+        // changes; without changes the annotation goes
+        if (comment !== current.comment) {
+          if (comment || current.edits?.length) this.commit(this.annotations.map(a => a.id === current.id ? { ...current, comment } : a), 'note');
+          else this.commit(this.annotations.filter(a => a.id !== current.id), 'delete annotation');
+        }
         this.closePopover();
       },
       onDelete: () => {

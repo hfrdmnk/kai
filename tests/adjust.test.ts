@@ -1,8 +1,7 @@
-import { describe, expect, test } from 'bun:test';
 import {
-  adjustPropertyFor, adjustValue, cursorFor, dragAxisOf, dragReadout, dragTravel, editDeclarations, editsInComment,
-  formatEditLine, longhandsOfDeclaration, mergeEdits, nameWidth, nearestCorner, nearestSide, pickParts,
-  cornerRadii, editsLabel, gapPx, nudgeValue, shorthandValue, shortestEdits, syncEditLines, withChanges, withoutProperty,
+  adjustPropertyFor, adjustValue, cornerRadii, cursorFor, describeEdit, dragAxisOf, dragReadout, dragTravel, editDeclarations,
+  editsLabel, gapPx, longhandsOfDeclaration, mergeEdits, nameWidth, nearestCorner, nearestSide, nudgeValue, pickParts,
+  routeChanges, shorthandValue, shortestEdits, withChanges, withoutEdit, withoutProperty,
 } from '../src/core/adjust.ts';
 import type { StyleEdit } from '../src/types.ts';
 
@@ -215,55 +214,6 @@ describe('merging', () => {
   });
 });
 
-describe('comment lines', () => {
-  test('px with rem, unitless line height, negatives', () => {
-    expect(formatEditLine({ property: 'padding-right', from: 24, to: 34 })).toBe('padding-right: 24px → 34px (2.125rem)');
-    expect(formatEditLine({ property: 'line-height', from: 1.55, to: 1.6 })).toBe('line-height: 1.55 → 1.6');
-    expect(formatEditLine({ property: 'margin-top', from: 0, to: -8 })).toBe('margin-top: 0px → -8px (-0.5rem)');
-    expect(formatEditLine({ property: 'font-size', from: 13.33, to: 16 })).toBe('font-size: 13.33px → 16px (1rem)');
-  });
-
-  test('snapped values name the class or token', () => {
-    expect(formatEditLine({ property: 'padding-right', from: 24, to: 32, className: 'pr-8' })).toBe('padding-right: 24px → 32px (2rem, pr-8)');
-    expect(formatEditLine({ property: 'gap', from: 16, to: 24, token: 'var(--space-6)' })).toBe('gap: 16px → 24px (var(--space-6))');
-    expect(formatEditLine({ property: 'line-height', from: 1.5, to: 1.625, className: 'leading-relaxed' })).toBe('line-height: 1.5 → 1.625 (leading-relaxed)');
-  });
-
-  test('a new edit appends a line below the user text', () => {
-    expect(syncEditLines('Make it breathe', [], [{ property: 'padding-right', from: 24, to: 34 }]))
-      .toBe('Make it breathe\npadding-right: 24px → 34px (2.125rem)');
-    expect(syncEditLines('', [], [{ property: 'gap', from: 8, to: 12 }])).toBe('gap: 8px → 12px (0.75rem)');
-  });
-
-  test('an updated edit replaces its line in place', () => {
-    const before = [{ property: 'padding-right', from: 24, to: 34 }];
-    const comment = 'padding-right: 24px → 34px (2.125rem)\nand rounder corners';
-    expect(syncEditLines(comment, before, [{ property: 'padding-right', from: 24, to: 40 }]))
-      .toBe('padding-right: 24px → 40px (2.5rem)\nand rounder corners');
-  });
-
-  test('a removed edit drops its line; other lines stay', () => {
-    const before = [{ property: 'padding-right', from: 16, to: 24 }];
-    const comment = 'Tighter\npadding-right: 16px → 24px (1.5rem)';
-    expect(syncEditLines(comment, before, [{ property: 'padding-inline', from: 16, to: 24 }]))
-      .toBe('Tighter\npadding-inline: 16px → 24px (1.5rem)');
-    expect(syncEditLines(comment, before, [])).toBe('Tighter');
-  });
-
-  test('lines match by `property:` at the line start, not a prefix of another property', () => {
-    const before = [{ property: 'padding', from: 8, to: 16 }];
-    const comment = 'padding-right is fine\npadding: 8px → 16px (1rem)';
-    expect(syncEditLines(comment, before, [{ property: 'padding', from: 8, to: 12 }])).toBe('padding-right is fine\npadding: 8px → 12px (0.75rem)');
-  });
-
-  test('a comment keeps only the edits whose line is still there', () => {
-    const edits = [{ property: 'padding-right', from: 24, to: 34 }, { property: 'font-size', from: 16, to: 18 }];
-    expect(editsInComment(edits, 'font-size: 16px → 20px\nnote')).toEqual([edits[1]]);
-    expect(editsInComment(edits, '')).toEqual([]);
-    expect(editsInComment(edits, '  padding-right: 24px → 34px')).toEqual([edits[0]]);
-  });
-});
-
 describe('styles from edits', () => {
   test('longhand declarations, later edits winning', () => {
     expect(editDeclarations([
@@ -383,22 +333,6 @@ describe('snapped values through merges', () => {
   });
 });
 
-describe('annotation updates', () => {
-  test('a drag merges its edit and rewrites the line', () => {
-    const a = { comment: 'Roomier\npadding-right: 24px → 34px (2.125rem)', edits: [{ property: 'padding-right', from: 24, to: 34 }] };
-    expect(withChanges(a, 'padding', { 'padding-right': { from: 34, to: 40 } })).toEqual({
-      comment: 'Roomier\npadding-right: 24px → 40px (2.5rem)',
-      edits: [{ property: 'padding-right', from: 24, to: 40 }],
-    });
-    expect(a.edits[0].to).toBe(34);
-  });
-
-  test('back to the original leaves no edits', () => {
-    expect(withChanges({ comment: 'font-size: 16px → 18px (1.125rem)', edits: [{ property: 'font-size', from: 16, to: 18 }] },
-      'font-size', { 'font-size': { from: 18, to: 16 } })).toEqual({ comment: '', edits: undefined });
-  });
-});
-
 describe('nudge', () => {
   test('one whole px, or 0.05 of line height, in either direction', () => {
     expect(nudgeValue('padding', 24, 1)).toBe(25);
@@ -416,21 +350,6 @@ describe('nudge', () => {
   test('respects the minimum', () => {
     expect(nudgeValue('padding', 0, -1)).toBe(0);
     expect(nudgeValue('margin', 0, -1)).toBe(-1);
-  });
-});
-
-describe('reset', () => {
-  test("drops one property's edits and lines, keeping the rest", () => {
-    const a = {
-      comment: 'Tighter\npadding-inline: 16px → 24px (1.5rem)\nfont-size: 16px → 18px (1.125rem)',
-      edits: [{ property: 'padding-inline', from: 16, to: 24 }, { property: 'font-size', from: 16, to: 18 }],
-    };
-    expect(withoutProperty(a, 'padding')).toEqual({
-      comment: 'Tighter\nfont-size: 16px → 18px (1.125rem)',
-      edits: [{ property: 'font-size', from: 16, to: 18 }],
-    });
-    expect(withoutProperty({ comment: 'gap: 8px → 12px (0.75rem)', edits: [{ property: 'gap', from: 8, to: 12 }] }, 'gap'))
-      .toEqual({ comment: '', edits: undefined });
   });
 });
 
@@ -452,34 +371,6 @@ describe('review fixes', () => {
     expect(nearestSide(box, 360, 105)).toBe('right');
     expect(nearestSide(box, 150, 40)).toBe('top');
     expect(nearestSide(box, 200, 195)).toBe('bottom');
-  });
-
-  test("user lines that only start like a property aren't kai's", () => {
-    const before = [{ property: 'font-size', from: 16, to: 18 }];
-    const comment = 'font-size: should match the heading\nfont-size: 16px → 18px (1.125rem)';
-    // A changed edit replaces its generated line, not the user's
-    expect(syncEditLines(comment, before, [{ property: 'font-size', from: 16, to: 20 }]))
-      .toBe('font-size: should match the heading\nfont-size: 16px → 20px (1.25rem)');
-    // A removed edit drops only its generated line
-    expect(syncEditLines(comment, before, [])).toBe('font-size: should match the heading');
-    // A new edit appends instead of overwriting the user's line
-    expect(syncEditLines('font-size: should match the heading', [], before))
-      .toBe('font-size: should match the heading\nfont-size: 16px → 18px (1.125rem)');
-    // Deleting the generated line drops the edit even when the user's line stays
-    expect(editsInComment(before, 'font-size: should match the heading')).toEqual([]);
-    expect(editsInComment(before, comment)).toEqual(before);
-  });
-
-  test('generated lines in every format still count', () => {
-    const edits = [
-      { property: 'line-height', from: 1.5, to: 1.6 },
-      { property: 'margin-top', from: 0, to: -8 },
-      { property: 'gap', from: 8, to: 24, token: 'var(--space-6)' },
-    ];
-    const comment = edits.map(formatEditLine).join('\n');
-    expect(editsInComment(edits, comment)).toEqual(edits);
-    // A user who retyped the target value keeps the edit
-    expect(editsInComment([edits[0]], 'line-height: 1.5 → 1.7')).toEqual([edits[0]]);
   });
 
   test('radius values follow the CSS rule: all scaled down together only when a side is over-full', () => {
@@ -504,18 +395,6 @@ describe('review fixes', () => {
 });
 
 describe('second review', () => {
-  test("kai's line can carry the user's note after it", () => {
-    const before = [{ property: 'padding-left', from: 8, to: 16 }];
-    const comment = 'padding-left: 8px → 16px (1rem) check mobile';
-    expect(editsInComment(before, comment)).toEqual(before);
-    expect(syncEditLines(comment, before, [{ property: 'padding-left', from: 8, to: 20 }])).toBe('padding-left: 8px → 20px (1.25rem) check mobile');
-    // Nested parentheses in a token stay kai's part
-    const token = [{ property: 'gap', from: 8, to: 24, token: 'var(--space-6)' }];
-    expect(syncEditLines('gap: 8px → 24px (var(--space-6)) wider?', token, [{ property: 'gap', from: 8, to: 16, token: 'var(--space-4)' }]))
-      .toBe('gap: 8px → 16px (var(--space-4)) wider?');
-    expect(syncEditLines(comment, before, [])).toBe('');
-  });
-
   test('a change is labelled by the declarations whose edits differ', () => {
     const a = { property: 'padding-right', from: 8, to: 18 };
     expect(editsLabel([], [a])).toBe('padding-right');
@@ -523,5 +402,62 @@ describe('second review', () => {
     expect(editsLabel([a], [])).toBe('padding-right');
     expect(editsLabel([a], [a])).toBe('');
     expect(editsLabel([a], [{ property: 'padding-inline', from: 8, to: 18 }])).toBe('padding-inline, padding-right');
+  });
+});
+
+describe('edits as text', () => {
+  test('property, values, rem of the new value (not for line height), class or token', () => {
+    expect(describeEdit({ property: 'padding-right', from: 24, to: 34 }))
+      .toEqual({ property: 'padding-right', from: '24px', to: '34px', rem: '2.125rem', snap: null });
+    expect(describeEdit({ property: 'margin-top', from: 0, to: -8, className: '-mt-2' }))
+      .toEqual({ property: 'margin-top', from: '0px', to: '-8px', rem: '-0.5rem', snap: '-mt-2' });
+    expect(describeEdit({ property: 'gap', from: 16, to: 24, token: 'var(--space-6)' }).snap).toBe('var(--space-6)');
+    expect(describeEdit({ property: 'line-height', from: 1.5, to: 1.6 }))
+      .toEqual({ property: 'line-height', from: '1.5', to: '1.6', rem: null, snap: null });
+  });
+});
+
+describe('edit lists', () => {
+  const fontSize = { property: 'font-size', from: 16, to: 18 };
+
+  test('a drag merges into the edits; back to the original leaves none', () => {
+    expect(withChanges([{ property: 'padding-right', from: 24, to: 34 }], 'padding', { 'padding-right': { from: 34, to: 40 } }))
+      .toEqual([{ property: 'padding-right', from: 24, to: 40 }]);
+    expect(withChanges([fontSize], 'font-size', { 'font-size': { from: 18, to: 16 } })).toEqual([]);
+    expect(withChanges(undefined, 'gap', { 'row-gap': { from: 8, to: 12 } })).toEqual([{ property: 'row-gap', from: 8, to: 12 }]);
+  });
+
+  test("reset drops one property's edits; removing a row drops one declaration", () => {
+    const edits = [{ property: 'padding-inline', from: 16, to: 24 }, { property: 'padding-top', from: 8, to: 4 }, fontSize];
+    expect(withoutProperty(edits, 'padding')).toEqual([fontSize]);
+    expect(withoutEdit(edits, 'padding-top')).toEqual([edits[0], fontSize]);
+  });
+});
+
+describe('one edit per sibling group per longhand', () => {
+  const a = [{ property: 'padding-right', from: 8, to: 18 }];
+  const b = [{ property: 'padding-inline', from: 8, to: 12 }];
+  const change = (from: number, to: number) => ({ from, to });
+
+  test("a longhand a sibling's annotation edits goes to that annotation", () => {
+    expect(routeChanges({ 'padding-right': change(18, 23) }, undefined, [a]))
+      .toEqual({ own: {}, siblings: [{ 'padding-right': change(18, 23) }] });
+  });
+
+  test('longhands nobody edits go to the element itself', () => {
+    expect(routeChanges({ 'padding-left': change(8, 10) }, undefined, [a]))
+      .toEqual({ own: { 'padding-left': change(8, 10) }, siblings: [{}] });
+  });
+
+  test("the element's own edit comes first, then the last sibling's (the one it shows)", () => {
+    const own = [{ property: 'padding-right', from: 8, to: 30 }];
+    expect(routeChanges({ 'padding-right': change(30, 31) }, own, [a])).toEqual({ own: { 'padding-right': change(30, 31) }, siblings: [{}] });
+    expect(routeChanges({ 'padding-right': change(12, 14) }, undefined, [a, b]))
+      .toEqual({ own: {}, siblings: [{}, { 'padding-right': change(12, 14) }] });
+  });
+
+  test('one drag can split between a sibling and the element', () => {
+    expect(routeChanges({ 'padding-right': change(18, 20), 'padding-left': change(8, 10) }, undefined, [a]))
+      .toEqual({ own: { 'padding-left': change(8, 10) }, siblings: [{ 'padding-right': change(18, 20) }] });
   });
 });

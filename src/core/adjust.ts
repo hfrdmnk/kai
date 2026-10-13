@@ -284,56 +284,34 @@ export const editDeclarations = (edits: StyleEdit[]): Record<string, string> => 
   return out;
 };
 
-// ── Comment lines ──
+// ── Edits ──
 
-/** `padding-right: 24px → 34px (2.125rem)`, `line-height: 1.55 → 1.6`; snapped: `(2rem, pr-8)` or `(var(--space-6))` */
-export const formatEditLine = (e: StyleEdit): string => {
+/**
+ * An edit's parts for display (the popover's rows, the Markdown export): the declaration, its old and
+ * new value, the new value in rem (none for unitless line-height) and the class or token it snapped to
+ */
+export const describeEdit = (e: StyleEdit) => {
   const prop = propertyOfDeclaration(e.property);
-  const notes = e.token ? [e.token] : [...(unitless(prop) ? [] : [remFromPx(e.to)]), ...(e.className ? [e.className] : [])];
-  return `${e.property}: ${cssValue(prop, e.from)} → ${cssValue(prop, e.to)}${notes.length ? ` (${notes.join(', ')})` : ''}`;
+  return {
+    property: e.property,
+    from: cssValue(prop, e.from),
+    to: cssValue(prop, e.to),
+    rem: unitless(prop) ? null : remFromPx(e.to),
+    snap: e.className ?? e.token ?? null,
+  };
 };
 
-/**
- * The property of a line kai wrote: `padding-right: 24px → 34px (2.125rem)`, `line-height: 1.5 → 1.6`.
- * Only lines in that format belong to an edit; `font-size: should match the heading` is the user's.
- */
-const EDIT_LINE = /^\s*([a-z-]+):\s*-?[\d.]+(?:px)?\s*→\s*-?[\d.]+(?:px)?(?:\s*\((?:[^()]|\([^()]*\))*\))?/;
-const lineProperty = (line: string): string | null => line.match(EDIT_LINE)?.[1] ?? null;
-/** What the user wrote after kai's part of a line (`… (1rem) check mobile`); kept when kai rewrites it */
-const lineNote = (line: string): string => line.slice(line.match(EDIT_LINE)?.[0].length ?? line.length);
+/** An annotation's edits after a drag or nudge: the changes merged in */
+export const withChanges = (edits: StyleEdit[] | undefined, prop: AdjustProperty, changes: Record<string, Change>): StyleEdit[] =>
+  mergeEdits(edits ?? [], prop, changes);
 
-/**
- * Brings an annotation's comment in line with its edits: a changed edit replaces its line (matched by
- * `property:` at the line start), a new one appends, a removed one drops its line. User text stays.
- */
-export const syncEditLines = (comment: string, before: StyleEdit[], after: StyleEdit[]): string => {
-  const kept = new Set(after.map(e => e.property));
-  const lines = (comment ? comment.split('\n') : []).filter(line => {
-    const name = lineProperty(line);
-    return !name || kept.has(name) || !before.some(e => e.property === name);
-  });
-  for (const e of after) {
-    const prev = before.find(b => b.property === e.property);
-    if (prev && same(prev, e) && prev.className === e.className && prev.token === e.token) continue;
-    const i = lines.findIndex(line => lineProperty(line) === e.property);
-    if (i === -1) lines.push(formatEditLine(e));
-    else lines[i] = formatEditLine(e) + lineNote(lines[i]);
-  }
-  return lines.join('\n');
-};
+/** Without a property's edits (Backspace while armed) */
+export const withoutProperty = (edits: StyleEdit[] | undefined, prop: AdjustProperty): StyleEdit[] =>
+  (edits ?? []).filter(e => propertyOfDeclaration(e.property) !== prop);
 
-/** Edits whose line the user kept in the comment; deleting a line drops its edit */
-export const editsInComment = (edits: StyleEdit[], comment: string): StyleEdit[] => {
-  const names = new Set(comment.split('\n').map(lineProperty));
-  return edits.filter(e => names.has(e.property));
-};
-
-/** An annotation's comment and edits after a drag or nudge: the changes merged in, their lines rewritten */
-export const withChanges = (a: { comment: string; edits?: StyleEdit[] }, prop: AdjustProperty, changes: Record<string, Change>) => {
-  const before = a.edits ?? [];
-  const edits = mergeEdits(before, prop, changes);
-  return { comment: syncEditLines(a.comment, before, edits), edits: edits.length ? edits : undefined };
-};
+/** Without one declaration's edit (a row removed in the popover) */
+export const withoutEdit = (edits: StyleEdit[] | undefined, property: string): StyleEdit[] =>
+  (edits ?? []).filter(e => e.property !== property);
 
 /**
  * The declarations whose edits differ between two lists (added, changed or removed), sorted: what
@@ -347,11 +325,32 @@ export const editsLabel = (before: StyleEdit[], after: StyleEdit[]): string => {
   return [...names].sort().join(', ');
 };
 
-/** An annotation's comment and edits without a property's edits and their lines (Backspace while armed) */
-export const withoutProperty = (a: { comment: string; edits?: StyleEdit[] }, prop: AdjustProperty) => {
-  const before = a.edits ?? [];
-  const edits = before.filter(e => propertyOfDeclaration(e.property) !== prop);
-  return { comment: syncEditLines(a.comment, before, edits), edits: edits.length ? edits : undefined };
+const covers = (edits: StyleEdit[] | undefined, longhand: string) =>
+  !!edits?.some(e => longhandsOfDeclaration(e.property).includes(longhand));
+
+/**
+ * Where an adjustment's changes go, so a sibling group has one edit per longhand. A longhand the
+ * element's own annotation edits stays there; else one that a sibling's annotation edits (one whose
+ * matches include this element) goes to that annotation, keeping its `from`: the last such, whose
+ * edit the element shows. The rest go to the element's own annotation. `siblings` are those
+ * annotations' edits in list order; the result has one change set per sibling, in the same order.
+ */
+export const routeChanges = (
+  changes: Record<string, Change>, own: StyleEdit[] | undefined, siblings: (StyleEdit[] | undefined)[],
+): { own: Record<string, Change>; siblings: Record<string, Change>[] } => {
+  const toOwn: Record<string, Change> = {};
+  const toSiblings = siblings.map(() => ({}) as Record<string, Change>);
+  for (const [longhand, change] of Object.entries(changes)) {
+    let owner = -1;
+    if (!covers(own, longhand)) {
+      siblings.forEach((edits, i) => {
+        if (covers(edits, longhand)) owner = i;
+      });
+    }
+    if (owner === -1) toOwn[longhand] = change;
+    else toSiblings[owner][longhand] = change;
+  }
+  return { own: toOwn, siblings: toSiblings };
 };
 
 // ── HUD text ──

@@ -1,3 +1,16 @@
+/** One adjusted declaration, as written: the shortest form that covers the changed longhands */
+export type StyleEdit = {
+  /** padding | padding-inline | padding-block | padding-top… | margin… | gap | row-gap | column-gap | font-size | line-height | border-radius | border-top-left-radius… */
+  property: string;
+  /** px; unitless for line-height */
+  from: number;
+  to: number;
+  /** Project utility class when snapped to the project's scale */
+  className?: string;
+  /** `var(--x)` when snapped to a CSS custom property */
+  token?: string;
+};
+
 export type Annotation = {
   id: string;
   selector: string;
@@ -14,6 +27,8 @@ export type Annotation = {
   url: string;
   ariaAttributes: Record<string, string>;
   dataAttributes: Record<string, string>;
+  /** Drag-to-adjust changes; each has a line in `comment` and is applied to the page while the annotation exists */
+  edits?: StyleEdit[];
 };
 
 export type FabCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';

@@ -25,6 +25,7 @@ const server = Bun.serve({
         <output id="focus-events">0</output>
         <output id="escapes">0</output>
         <output id="clicks">0</output>
+        <output id="errors">0</output>
         <div id="box-parent" style="display:flex;gap:12px;padding:8px"><button id="box-child" style="margin:4px;padding:6px 10px">Box child</button><button>Two</button></div>
         <div id="rotated" style="width:40px;height:40px;padding:20px;margin:40px;transform:rotate(45deg);background:#ccc"></div>
         <!-- Siblings with the same tag and classes: the selector pins one (:nth-of-type), an adjustment previews on both -->
@@ -40,6 +41,10 @@ const server = Bun.serve({
           <ul><li class="px-2 py-1" id="lone">Lone</li></ul>
           <div><article class="card px-2" id="card-a">Card A</article></div>
           <div><article class="card px-4" id="card-b">Card B</article></div>
+          <div><article class="card px-2" id="card-c">Card C</article></div>
+          <div id="gone">Removed mid-drag</div>
+          <!-- A var() shorthand with a longhand after it: the shorthand reads empty inline -->
+          <div id="mixed" style="--p: 20px; padding: var(--p); padding-top: 4px; background: #eee">Mixed</div>
           <!-- Padding from a variable through the shorthand: its longhands read empty inline -->
           <div id="shorthand" style="--pad: 20px; padding: var(--pad); background: #eee">Shorthand</div>
       </section>
@@ -58,6 +63,9 @@ const server = Bun.serve({
             if (e.key === 'Escape' || e.target.closest?.('main')) document.querySelector('#events').textContent = String(++events);
           }, true);
         }
+        // Uncaught errors, kai's included (they surface on the page's window)
+        let errors = 0;
+        window.addEventListener('error', () => { document.querySelector('#errors').textContent = String(++errors); });
         // Clicks that reach the page (kai swallows them in annotation mode)
         let clicks = 0;
         document.addEventListener('click', e => {
@@ -688,6 +696,67 @@ try {
   assert(barHeight === 32 && glyphWidth === 16, 'At 500px wide the armed HUD stays one 32px line with a 16px glyph');
   await browser('press', 'Escape');
   await browser('set', 'viewport', '1280', '800', '2');
+
+  // ── Second review ──
+  // On each element its own annotation wins over look-alikes' edits
+  await resetOpen();
+  await dragRight(await armEl('#card-a'), 20);
+  await release();
+  await dragRight(await armEl('#card-b'), 10);
+  await release();
+  assert(await px('#card-a') === '18px' && await px('#card-b') === '23px', 'Each card renders its own edit, not a look-alike\'s');
+  await browser('wait', '1300');
+  await dragRight(await armEl('#card-a'), 24);
+  await release();
+  assert(await px('#card-a') === '30px', 'Dragging an element with its own edit keeps the new value after release');
+
+  // A look-alike dragged back to its own value: no annotation, no undo step
+  const before2 = (await stored()).length;
+  await browser('wait', '1300');
+  at = await armEl('#card-c');
+  await browser('mouse', 'down', 'left');
+  await browser('mouse', 'move', String(at[0] - 15), String(at[1]));
+  await browser('mouse', 'move', String(at[0] - 30), String(at[1]));
+  await release();
+  assert((await stored()).length === before2, 'A look-alike back at its own value adds no annotation');
+  await browser('wait', '1300');
+  await browser('press', 'Control+z');
+  await settle();
+  assert(await hudText() === 'Undid padding-right' && await px('#card-a') === '18px', 'Undo skips the no-op drag and takes back the last real change');
+
+  // The target leaves the page right before release: the release stays kai's, nothing throws
+  await resetOpen();
+  at = await armEl('#gone');
+  await browser('mouse', 'down', 'left');
+  await browser('mouse', 'move', String(at[0] + 10), String(at[1]));
+  await browser('eval', frames);
+  await browser('eval', `(() => {
+    document.querySelector('#gone').remove();
+    document.body.dispatchEvent(new MouseEvent('mouseup', { button: 0, clientX: ${at[0] + 20}, clientY: ${at[1]}, bubbles: true, composed: true }));
+    return true;
+  })()`);
+  await browser('mouse', 'up', 'left');
+  await browser('eval', frames);
+  assert(await browser('get', 'text', '#errors') === '0' && !(await stored()).length, 'A target removed mid-drag ends the drag without an error');
+
+  // var() shorthand followed by a longhand: undo brings the whole attribute back
+  await resetOpen();
+  await browser('hover', '#mixed');
+  await browser('eval', frames);
+  await browser('press', 'p');
+  const [lx, ly] = JSON.parse(await browser('eval',
+    `(r => [Math.round(r.left + 3), Math.round(r.top + r.height / 2)])(document.querySelector('#mixed').getBoundingClientRect())`)) as number[];
+  await browser('mouse', 'move', String(lx), String(ly));
+  await browser('eval', frames);
+  await browser('mouse', 'down', 'left');
+  await browser('mouse', 'move', String(lx - 10), String(ly));
+  await browser('mouse', 'move', String(lx - 20), String(ly));
+  await release();
+  const mixed = () => px('#mixed', 'padding');
+  assert(await mixed() === '4px 20px 20px 30px', 'A drag on the left side of the mixed var() padding');
+  await browser('press', 'Control+z');
+  await browser('eval', frames);
+  assert(await mixed() === '4px 20px 20px', 'Undo restores the var() shorthand and its longhand as written');
 
   await reset();
   await browser('focus', '#input');

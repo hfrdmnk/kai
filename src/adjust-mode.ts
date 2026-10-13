@@ -24,6 +24,8 @@ type Drag = {
   /** The target's border box at press time; the nearest side or corner is picked against it */
   rect: DOMRect;
   start: Values;
+  /** The page's own values, without kai's styles: the edit's `from` (a look-alike may show another annotation's edit) */
+  own: Values;
   cur: Values;
   /** The scale steps `cur` landed on while snapping */
   refs: Refs;
@@ -66,6 +68,8 @@ export type AdjustModeDeps = {
   createAnnotation: (element: Element, styles: Record<string, string>) => Annotation;
   /** Re-derives kai's styles from the annotations, a drag's preview on top */
   applyEdits: (preview?: StylePreview) => void;
+  /** Reads an element with kai's styles lifted: the page's own values, what an edit's `from` is */
+  readOwn: <T>(el: Element, read: () => T) => T;
   baseMode: () => GuideMode;
   isActive: () => boolean;
   /** Armed or not, e.g. to let the pointer through markers while armed */
@@ -111,7 +115,7 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
   };
 
   /** A confirmation for a moment; display only, hover and keys work right away */
-  const showNotice = (text: string, check = false) => guideBar.notify(text, check, deps.baseMode);
+  const showNotice = (text: string, check = false) => guideBar.notify(text, check, () => guideBar.show(deps.baseMode()));
 
   /** Drops the scale when the page's stylesheets changed, so the next use reads it again */
   const checkScale = () => {
@@ -128,13 +132,17 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
     });
   };
 
-  /** Longhands that differ between two sets of values, with the scale step each landed on */
-  const changesBetween = (prop: AdjustProperty, start: Values, cur: Values, refs: Refs): Record<string, Change> => {
+  /**
+   * Longhands that differ between what was on screen (`start`) and `cur`, with the scale step each
+   * landed on. `from` is the page's own value when given, else `start`.
+   */
+  const changesBetween = (prop: AdjustProperty, start: Values, cur: Values, refs: Refs, own: Values = start): Record<string, Change> => {
     const changes: Record<string, Change> = {};
     for (const part of partsOf(prop)) {
-      const from = start[part] ?? 0;
       const to = cur[part] ?? 0;
-      if (from !== to) changes[longhandOf(prop, part)] = refs[part] ? { from, to, ref: refs[part] } : { from, to };
+      if ((start[part] ?? 0) === to) continue;
+      const from = own[part] ?? start[part] ?? 0;
+      changes[longhandOf(prop, part)] = refs[part] ? { from, to, ref: refs[part] } : { from, to };
     }
     return changes;
   };
@@ -265,6 +273,7 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
       origin: { x: e.clientX, y: e.clientY },
       rect: a.target.getBoundingClientRect(),
       start,
+      own: deps.readOwn(a.target, () => readValues(a.target, a.prop)),
       cur: { ...start },
       refs: {},
       axis: null,
@@ -276,7 +285,7 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
   /** Release: the drag's changes go into the target's annotation, which it creates when there's none */
   const commitDrag = () => {
     const { prop, target, drag } = armed!;
-    const changes = changesBetween(prop, drag!.start, drag!.cur, drag!.refs);
+    const changes = changesBetween(prop, drag!.start, drag!.cur, drag!.refs, drag!.own);
     disarm(false);
     if (!Object.keys(changes).length) {
       guideBar.show(deps.baseMode());
@@ -312,7 +321,7 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
       cur[part] = step.value;
       if (step.ref) refs[part] = step.ref;
     }
-    const changes = changesBetween(prop, start, cur, refs);
+    const changes = changesBetween(prop, start, cur, refs, deps.readOwn(target, () => readValues(target, prop)));
     if (!Object.keys(changes).length) return;
     save(target, prop, changes, getComputedStyles(target));
     // The save replaced the annotations; the target and its matches are the same elements
@@ -399,6 +408,12 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
   /** A drag ends wherever it's released, over kai's own controls too; returns whether it was ours */
   const pointerUp = (e: MouseEvent): boolean => {
     if (!armed?.drag || e.button !== 0) return false;
+    // The last frame may be behind the release: bring the drag to where it ended first
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+    update();
     commitDrag();
     return true;
   };

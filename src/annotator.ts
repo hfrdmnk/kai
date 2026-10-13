@@ -209,6 +209,7 @@ class UIAnnotator extends HTMLElement {
       commit: (next, label) => this.commit(next, label),
       createAnnotation: (element, styles) => this.createAnnotation(element, '', styles),
       applyEdits: (preview) => this.applyEdits(preview),
+      readOwn: (el, read) => this.editStyles.readOwn(el, read),
       baseMode: () => this.baseMode(),
       isActive: () => this.active,
       onArmedChange: (armed) => this.markers.setPassive(armed),
@@ -339,7 +340,8 @@ class UIAnnotator extends HTMLElement {
       }
       const editable = e.composedPath().some(isEditable) || isEditable(this.shadow.activeElement);
       if (!e.repeat && !e.metaKey && !e.ctrlKey && !editable
-        && (e.key === '?' || (!e.altKey && e.key.toUpperCase() === INTERACTION_KEY))) {
+        // Mid-drag, I would let the release through to the page as a click
+        && (e.key === '?' || (!e.altKey && e.key.toUpperCase() === INTERACTION_KEY && !this.adjustMode.isDragging()))) {
         e.preventDefault();
         e.stopImmediatePropagation();
         this.hideFocusRing();
@@ -507,7 +509,8 @@ class UIAnnotator extends HTMLElement {
     };
 
     this.handleMouseUp = (e: MouseEvent) => {
-      // A drag ends wherever it's released, over kai's own controls too
+      // A drag ends wherever it's released, over kai's own controls too, at the release's position
+      if (this.adjustMode.isDragging()) this.lastMousePos = { x: e.clientX, y: e.clientY };
       if (this.adjustMode.pointerUp(e)) {
         e.preventDefault();
         e.stopImmediatePropagation();
@@ -1046,11 +1049,13 @@ class UIAnnotator extends HTMLElement {
       existingComment: annotation.comment,
       anchorRect: markerRect,
       onSubmit: (comment) => {
+        // The list may have moved on since the popover opened; save onto the current annotation
+        const current = this.annotations.find(a => a.id === annotation.id) ?? annotation;
         // Deleting an edit's line takes the edit off the page
-        const edits = annotation.edits && editsInComment(annotation.edits, comment);
-        const updated: Annotation = { ...annotation, comment, edits: edits?.length ? edits : undefined };
+        const edits = current.edits && editsInComment(current.edits, comment);
+        const updated: Annotation = { ...current, comment, edits: edits?.length ? edits : undefined };
         // Saving an unchanged comment isn't a step to undo; an emptied one deletes the annotation, edits included
-        if (comment && comment !== annotation.comment) this.commit(this.annotations.map(a => a.id === annotation.id ? updated : a), 'note');
+        if (comment && comment !== current.comment) this.commit(this.annotations.map(a => a.id === annotation.id ? updated : a), 'note');
         else if (!comment) this.commit(this.annotations.filter(a => a.id !== annotation.id), 'delete annotation');
         this.closePopover();
       },
@@ -1117,8 +1122,12 @@ class UIAnnotator extends HTMLElement {
     this.notify(`${action === 'undo' ? 'Undid' : 'Redid'} ${step.label}`);
   }
 
+  /** A notice, then back to the armed hints if a property is still armed, else to the mode's */
   private notify(text: string) {
-    this.guideBar.notify(text, false, () => this.baseMode());
+    this.guideBar.notify(text, false, () => {
+      if (this.adjustMode.isArmed()) this.adjustMode.refresh();
+      else this.guideBar.show(this.baseMode());
+    });
   }
 }
 

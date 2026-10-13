@@ -152,6 +152,30 @@ export const resolveAnnotation = (a: Pick<Annotation, 'selector' | 'locator' | '
   }
 };
 
+/**
+ * Which annotations own their element: for each target, the last annotation resolving to it, the one
+ * whose edits are painted on top. Indexes into `targets` (one per annotation, null when unresolved).
+ */
+export const ownerIndexes = <T>(targets: (T | null)[]): Set<number> => {
+  const seen = new Set<T>();
+  const owners = new Set<number>();
+  for (let i = targets.length - 1; i >= 0; i--) {
+    const target = targets[i];
+    if (target === null || seen.has(target)) continue;
+    seen.add(target);
+    owners.add(i);
+  }
+  return owners;
+};
+
+/** The element's own annotation: the last one resolving to it (see `ownerIndexes`) */
+export const ownAnnotationOf = <A>(annotations: A[], el: Element, resolve: (a: A) => Element | null): A | undefined => {
+  for (let i = annotations.length - 1; i >= 0; i--) {
+    if (resolve(annotations[i]) === el) return annotations[i];
+  }
+  return undefined;
+};
+
 /** Classes kai didn't add */
 const ownClasses = (el: Element) => Array.from(el.classList).filter(c => !c.startsWith('kai-'));
 const classKey = (classes: string[]) => [...classes].sort().join(' ');

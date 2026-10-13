@@ -1,6 +1,6 @@
 import type { Annotation } from '../types.ts';
 import { editDeclarations } from './adjust.ts';
-import { resolveAnnotationMatches } from './selector.ts';
+import { ownerIndexes, resolveAnnotationMatches } from './selector.ts';
 
 type Styled = Element & ElementCSSInlineStyle;
 type Original = { value: string; priority: string };
@@ -70,12 +70,15 @@ export const createEditStyles = () => {
     const add = (to: Map<Styled, Record<string, string>>, el: Element, declarations: Record<string, string>) => {
       if ('style' in el) to.set(el as Styled, { ...to.get(el as Styled), ...declarations });
     };
-    for (const a of annotations) {
-      if (!a.edits?.length) continue;
+    const matches = annotations.map(a => a.edits?.length ? resolveAnnotationMatches(a) : []);
+    // Owner: the last annotation resolving to an element. An earlier one on the same element only fills in, like a sibling's
+    const owners = ownerIndexes(annotations.map((a, i) => a.edits?.length ? matches[i][0] ?? null : null));
+    annotations.forEach((a, i) => {
+      if (!a.edits?.length) return;
       const declarations = editDeclarations(a.edits);
       // The annotated element comes first
-      resolveAnnotationMatches(a).forEach((el, i) => add(i === 0 ? own : borrowed, el, declarations));
-    }
+      matches[i].forEach((el, j) => add(j === 0 && owners.has(i) ? own : borrowed, el, declarations));
+    });
     const wanted = new Map<Styled, Record<string, string>>();
     for (const el of new Set([...borrowed.keys(), ...own.keys()])) wanted.set(el, { ...borrowed.get(el), ...own.get(el) });
     if (preview) for (const el of preview.elements) add(wanted, el, preview.declarations);

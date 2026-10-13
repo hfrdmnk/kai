@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { buildScale, familyOf, parseUtility, stepOnScale, variableFamily, STEP_TRAVEL } from '../src/core/scale.ts';
+import { buildScale, classScale, familyOf, isRootSelector, unitlessLeading, parseUtility, stepOnScale, variableFamily, STEP_TRAVEL } from '../src/core/scale.ts';
 
 describe('utility classes', () => {
   test('spacing, type, leading and radius utilities with the property they set', () => {
@@ -97,5 +97,36 @@ describe('scale', () => {
     expect(stepOnScale(scale, 'font-size', 16, 1)).toEqual({ value: 18, ref: { suffix: 'lg' } });
     expect(stepOnScale(scale, 'line-height', 1.55, -1)).toEqual({ value: 1.5, ref: { suffix: 'normal' } });
     expect(stepOnScale(scale, 'border-radius', 4, 1)).toEqual({ value: 4 });
+  });
+});
+
+describe('review fixes', () => {
+  test('leading utilities count only with a unitless value', () => {
+    const vars: Record<string, string> = { '--leading-snug': '1.375', '--leading-px': '28px', '--spacing': '0.25rem' };
+    const lookup = (name: string) => vars[name] ?? '';
+    expect(unitlessLeading('1.5', lookup)).toBe(true);
+    expect(unitlessLeading('var(--leading-snug)', lookup)).toBe(true);
+    expect(unitlessLeading('var(--missing, 1.25)', lookup)).toBe(true);
+    expect(unitlessLeading('1.75rem', lookup)).toBe(false);
+    expect(unitlessLeading('28px', lookup)).toBe(false);
+    expect(unitlessLeading('var(--leading-px)', lookup)).toBe(false);
+    expect(unitlessLeading('calc(var(--spacing) * 7)', lookup)).toBe(false);
+  });
+
+  test('variables come from :root-like rules, Tailwind v4 theme layers included', () => {
+    expect(isRootSelector(':root')).toBe(true);
+    expect(isRootSelector('html')).toBe(true);
+    expect(isRootSelector(':root, :host')).toBe(true);
+    expect(isRootSelector(':where(:root)')).toBe(true);
+    expect(isRootSelector(':where(html)')).toBe(true);
+    expect(isRootSelector(':root .card')).toBe(false);
+    expect(isRootSelector('body')).toBe(false);
+  });
+
+  test('the zero spacing step is added only for projects with spacing utilities', () => {
+    const text = { family: 'font-size' as const, value: 14, ref: { suffix: 'sm' } };
+    const pad = { family: 'spacing' as const, value: 16, ref: { suffix: '4' } };
+    expect(classScale([text]).spacing).toEqual([]);
+    expect(classScale([text, pad]).spacing.map(e => e.value)).toEqual([0, 16]);
   });
 });

@@ -83,6 +83,28 @@ export const buildScale = (samples: { family: ScaleFamily; value: number; ref: S
   return scale;
 };
 
+/** The scale from utility classes; with spacing utilities, Tailwind's `-0` step exists even when the project uses none */
+export const classScale = (samples: { family: ScaleFamily; value: number; ref: ScaleRef }[]): Scale =>
+  buildScale(samples.some(s => s.family === 'spacing') ? [{ family: 'spacing', value: 0, ref: { suffix: '0' } }, ...samples] : samples);
+
+/**
+ * Whether a `line-height` declaration is a ratio: a plain number, or a variable (followed through
+ * `lookup`, falling back to its default) that holds one. `28px`, `1.75rem` and `calc(…)` are not.
+ */
+export const unitlessLeading = (value: string, lookup: (name: string) => string): boolean => {
+  const v = value.trim();
+  const ref = v.match(/^var\(\s*(--[\w-]+)\s*(?:,\s*(.*))?\)$/);
+  if (ref) {
+    const resolved = lookup(ref[1]).trim();
+    return resolved ? unitlessLeading(resolved, lookup) : !!ref[2] && unitlessLeading(ref[2], lookup);
+  }
+  return /^\d*\.?\d+$/.test(v);
+};
+
+/** Rules that define page-wide variables: `:root`, `html`, Tailwind v4's `:root, :host`, `:where(:root)` */
+export const isRootSelector = (selector: string): boolean =>
+  selector.split(',').every(part => /^(:root|html|:host|:where\((:root|html)\))$/.test(part.trim()));
+
 /** A property's steps; margin continues into the negatives of the spacing scale */
 const stepsFor = (scale: Scale, prop: AdjustProperty): ScaleEntry[] => {
   const entries = scale[familyOf(prop)];
@@ -110,19 +132,35 @@ export const stepOnScale = (scale: Scale, prop: AdjustProperty, from: number, st
 
 // ── Reading the page ──
 
-/** Style rules of every readable sheet, through @layer / @media / @supports; cross-origin sheets throw and are skipped */
-const styleRules = (): CSSStyleRule[] => {
-  const collect = (rules: CSSRuleList): CSSStyleRule[] => Array.from(rules).flatMap(rule =>
-    rule instanceof CSSStyleRule ? [rule]
-      : 'cssRules' in rule ? collect((rule as CSSGroupingRule).cssRules)
-      : []);
-  return [...Array.from(document.styleSheets), ...document.adoptedStyleSheets].flatMap(sheet => {
-    try {
-      return collect(sheet.cssRules);
-    } catch {
-      return [];
+/** A sheet's rules, or none when it's cross-origin (reading throws) or still loading */
+const rulesOf = (sheet: CSSStyleSheet | null): CSSRule[] => {
+  try {
+    return sheet ? Array.from(sheet.cssRules) : [];
+  } catch {
+    return [];
+  }
+};
+
+/** Every readable sheet: the document's, adopted ones, and the sheets they `@import` */
+const allSheets = (): CSSStyleSheet[] => {
+  const out: CSSStyleSheet[] = [];
+  const visit = (sheet: CSSStyleSheet) => {
+    out.push(sheet);
+    for (const rule of rulesOf(sheet)) {
+      if (rule instanceof CSSImportRule && rule.styleSheet) visit(rule.styleSheet);
     }
-  });
+  };
+  for (const sheet of [...Array.from(document.styleSheets), ...document.adoptedStyleSheets]) visit(sheet);
+  return out;
+};
+
+/** Style rules of every readable sheet, through @layer / @media / @supports */
+const styleRules = (): CSSStyleRule[] => {
+  const collect = (rules: CSSRule[]): CSSStyleRule[] => rules.flatMap(rule =>
+    rule instanceof CSSStyleRule ? [rule]
+      : 'cssRules' in rule && !(rule instanceof CSSImportRule) ? collect(Array.from((rule as CSSGroupingRule).cssRules))
+      : []);
+  return allSheets().flatMap(sheet => collect(rulesOf(sheet)));
 };
 
 /** `.px-4`, `.px-2\.5`: a rule for exactly one class */
@@ -142,16 +180,8 @@ const readProbe = (probe: HTMLElement, property: string): number => {
  * loaded stylesheet, a CSS-in-JS insert), the scale is read again.
  */
 export const styleSignature = (): string => {
-  const sheets = [...Array.from(document.styleSheets), ...document.adoptedStyleSheets];
-  let rules = 0;
-  for (const sheet of sheets) {
-    try {
-      rules += sheet.cssRules.length;
-    } catch {
-      // Cross-origin: unreadable either way
-    }
-  }
-  return `${sheets.length}:${rules}`;
+  const sheets = allSheets();
+  return `${sheets.length}:${sheets.reduce((n, sheet) => n + rulesOf(sheet).length, 0)}`;
 };
 
 /** The page's scale. Probes values with a hidden element, so `calc(var(--spacing) * 4)` resolves too */
@@ -162,18 +192,21 @@ export const harvestScale = (): { scale: Scale; source: ScaleSource } => {
   probe.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none';
   document.body.appendChild(probe);
   try {
+    const root = getComputedStyle(document.documentElement);
+    const lookup = (name: string) => root.getPropertyValue(name);
     const classes = rules.flatMap(rule => {
       const name = rule.selectorText.match(SINGLE_CLASS)?.[1]?.replace(/\\(.)/g, '$1');
       const utility = name ? parseUtility(name, Array.from(rule.style)) : null;
       if (!name || !utility) return [];
+      // `leading-7` (28px) is a fixed height, not a ratio; it would read as one through the probe's font size
+      if (utility.family === 'line-height' && !unitlessLeading(rule.style.getPropertyValue('line-height'), lookup)) return [];
       probe.className = name;
       return [{ family: utility.family, value: readProbe(probe, utility.readAs), ref: { suffix: utility.suffix } }];
     });
     probe.className = '';
-    // Tailwind's `-0` steps exist even when the project uses none
-    if (classes.length) return { scale: buildScale([{ family: 'spacing', value: 0, ref: { suffix: '0' } }, ...classes]), source: 'classes' };
+    if (classes.length) return { scale: classScale(classes), source: 'classes' };
 
-    const variables = rules.filter(rule => /^(:root|html)$/.test(rule.selectorText)).flatMap(rule =>
+    const variables = rules.filter(rule => isRootSelector(rule.selectorText)).flatMap(rule =>
       Array.from(rule.style).flatMap(name => {
         const family = name.startsWith('--') ? variableFamily(name) : null;
         if (!family || !LENGTH.test(rule.style.getPropertyValue(name).trim())) return [];

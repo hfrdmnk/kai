@@ -31,6 +31,9 @@ const createEditList = (edits: StyleEdit[], onRemove: (property: string) => void
   const list = document.createElement('ul');
   list.className = 'kai-popover-edits';
   list.setAttribute('aria-label', 'Changes');
+  // Focus lands here after a pointer removal, rather than on the next row's button
+  list.tabIndex = -1;
+  list.addEventListener('pointermove', () => list.removeAttribute('data-settling'));
   for (const edit of edits) {
     const { property, from, to, snap } = describeEdit(edit);
     const row = document.createElement('li');
@@ -53,16 +56,29 @@ const createEditList = (edits: StyleEdit[], onRemove: (property: string) => void
     remove.className = 'kai-popover-edit-remove';
     remove.setAttribute('aria-label', `Remove ${property} change`);
     remove.appendChild(createIcon(iconClose));
-    remove.addEventListener('click', () => {
-      // Keep the keyboard in the list: the next row's button, else the previous one's
+    remove.addEventListener('click', (e) => {
+      // Enter, Space or Delete (a click with no pointer detail) keeps the keyboard in the list
+      const byKeyboard = e.detail === 0;
       const next = (row.nextElementSibling ?? row.previousElementSibling)?.querySelector('button');
       row.remove();
       onRemove(property);
-      if (next instanceof HTMLElement) next.focus();
       if (!list.children.length) {
         list.remove();
         onEmpty();
+      } else if (byKeyboard && next) {
+        next.focus();
+      } else {
+        // The next row has moved under the pointer: its button waits for the pointer to move, so a
+        // double click removes one change, not two
+        list.setAttribute('data-settling', '');
+        list.focus({ preventScroll: true });
       }
+    });
+    // Delete / Backspace on a focused remove button remove that change, like a click
+    remove.addEventListener('keydown', (e) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      e.preventDefault();
+      remove.click();
     });
     row.append(text, remove);
     list.appendChild(row);
@@ -283,5 +299,12 @@ export const createPopover = (
     if (previousFocus instanceof HTMLElement) previousFocus.focus();
   };
 
-  return { destroy, handleEscape };
+  return {
+    destroy,
+    handleEscape,
+    /** The note as typed, saved or not */
+    draft: () => textarea.value.trim(),
+    /** Whether focus is in the popover (its note, a remove button, a footer button) */
+    hasFocus: () => popover.contains(shadowRoot.activeElement),
+  };
 };

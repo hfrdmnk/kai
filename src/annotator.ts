@@ -1,6 +1,6 @@
 import type { AccentId, Annotation, FabCorner, Theme } from './types.ts';
 import { styles } from './styles.ts';
-import { generateSelector, generateLocator, generatePath, resolveAnnotation, composedParent, composedChildren, composedContains } from './core/selector.ts';
+import { generateSelector, generateLocator, generatePath, resolveAnnotation, ownAnnotationOf, composedParent, composedChildren, composedContains } from './core/selector.ts';
 import { getComputedStyles } from './core/styles.ts';
 import { getNearbyText } from './core/text.ts';
 import { INTERACTION_KEY, SHORTCUTS, isMac, type ShortcutAction } from './core/platform.ts';
@@ -282,7 +282,8 @@ class UIAnnotator extends HTMLElement {
         return;
       }
 
-      const existing = this.annotations.find(a => resolveAnnotation(a) === target);
+      // The element's own annotation: the last one resolving to it, whose edits are painted
+      const existing = ownAnnotationOf(this.annotations, target, resolveAnnotation);
 
       if (existing) {
         const markerRect = this.markers.getMarkerRect(existing.id);
@@ -368,6 +369,12 @@ class UIAnnotator extends HTMLElement {
         e.stopImmediatePropagation();
         this.hideFocusRing();
         this.stepHistory(historyAction);
+        return;
+      }
+      // Focus in the popover (a remove button, a footer button): the keys are its, not kai's shortcuts.
+      // Escape and Tab keep their handling below
+      if (own && this.activePopover?.hasFocus() && e.key !== 'Escape' && e.key !== 'Tab') {
+        this.forwardKeyEvent(e);
         return;
       }
       // An armed property's keys come first: they change meaning while armed
@@ -1053,8 +1060,11 @@ class UIAnnotator extends HTMLElement {
         const current = this.annotations.find(a => a.id === annotation.id);
         if (!current) return;
         const edits = withoutEdit(current.edits, property);
-        const updated: Annotation = { ...current, edits: edits.length ? edits : undefined };
-        // The last change of an annotation without a note takes the annotation with it
+        // The last change of an annotation without a note takes the annotation with it, unless a note
+        // is being typed: that draft becomes the note in the same step
+        const draft = this.activePopover?.draft() ?? '';
+        const comment = !current.comment.trim() && !edits.length && draft ? draft : current.comment;
+        const updated: Annotation = { ...current, comment, edits: edits.length ? edits : undefined };
         const gone = !updated.comment.trim() && !updated.edits;
         this.commit(gone ? this.annotations.filter(a => a.id !== current.id) : this.annotations.map(a => a.id === current.id ? updated : a), property);
         if (gone) this.closePopover();

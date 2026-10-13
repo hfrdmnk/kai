@@ -27,7 +27,7 @@ export type Annotation = {
   url: string;
   ariaAttributes: Record<string, string>;
   dataAttributes: Record<string, string>;
-  /** Drag-to-adjust changes; each has a line in `comment` and is applied to the page while the annotation exists */
+  /** Drag-to-adjust changes, apart from the note in `comment`; applied to the page (and the element's identical siblings) while the annotation exists */
   edits?: StyleEdit[];
 };
 

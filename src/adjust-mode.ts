@@ -7,7 +7,7 @@ import {
 import type { StylePreview } from './core/edit-styles.ts';
 import type { HeldKeys } from './core/held-keys.ts';
 import { hasSteps, harvestScale, stepOnScale, styleSignature, STEP_TRAVEL, type Scale } from './core/scale.ts';
-import { composedParent, generateSelector, resolveAnnotation, resolveAnnotationMatches } from './core/selector.ts';
+import { composedParent, generateSelector, ownAnnotationOf, resolveAnnotation, resolveAnnotationMatches } from './core/selector.ts';
 import type { StyleEdit } from './types.ts';
 import { getComputedStyles } from './core/styles.ts';
 import { armedHud, createAdjustLayer, dragHud } from './ui/adjust.ts';
@@ -107,7 +107,8 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
   const canSnap = (prop: AdjustProperty) => hasSteps(scaleOf(), prop);
   const snapping = (prop: AdjustProperty) => snapOn && canSnap(prop);
 
-  const annotationFor = (el: Element) => deps.annotations().find(a => resolveAnnotation(a) === el);
+  /** The element's own annotation, the last one resolving to it: the same rule edit-styles paints by */
+  const annotationFor = (el: Element) => ownAnnotationOf(deps.annotations(), el, resolveAnnotation);
 
   /** What the agent's fix changes: the target and its look-alikes */
   const matchesOf = (target: Element): Element[] => {
@@ -157,15 +158,17 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
   };
 
   /** Annotations of the target's siblings whose fix covers the target too (it's one of their matches) */
-  const siblingAnnotations = (target: Element) =>
-    deps.annotations().filter(a => resolveAnnotation(a) !== target && resolveAnnotationMatches(a).includes(target));
+  const siblingAnnotations = (target: Element) => {
+    const own = annotationFor(target);
+    return deps.annotations().filter(a => a !== own && resolveAnnotationMatches(a).includes(target));
+  };
 
   /**
    * Writes changes into annotations and saves, one edit per sibling group per longhand (see
    * `routeChanges`): a longhand a sibling's annotation already edits updates that edit, the rest go to
    * the target's own annotation, created when there's none. Returns the 1-based number of the
    * annotation the change went to and whether it's new; null when the edits come out the same (a
-   * look-alike dragged back to its own value): no change and no undo step.
+   * drag out and back to where it started): no change and no undo step.
    */
   const save = (target: Element, prop: AdjustProperty, changes: Record<string, Change>, styles: Record<string, string>) => {
     const list = deps.annotations();
@@ -376,7 +379,6 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
     update();
   };
 
-  /** Backspace while armed: the property's edits and their lines come off the element's annotation */
   /**
    * Backspace while armed: the property comes off what the element shows, its own annotation's edits
    * and the edits of sibling annotations that cover it (one edit per group: the whole group goes back)

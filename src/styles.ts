@@ -559,6 +559,8 @@ export const styles = `
   color: var(--text-secondary);
   cursor: pointer;
   opacity: 0;
+  /* Hidden buttons can't be clicked (or tapped at the row's end on touch) */
+  pointer-events: none;
   transition: opacity 140ms var(--ease-out);
 }
 
@@ -579,6 +581,19 @@ export const styles = `
 .kai-popover-edit:focus-within .kai-popover-edit-remove {
   opacity: 1;
 }
+
+.kai-popover-edit:hover .kai-popover-edit-remove,
+.kai-popover-edit-remove:focus-visible {
+  pointer-events: auto;
+}
+
+/* After a pointer removal, until the pointer moves: the row now under it doesn't offer its button yet */
+.kai-popover-edits[data-settling] .kai-popover-edit-remove {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.kai-popover-edits:focus { outline: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .kai-popover-edit-remove { transition: none; }

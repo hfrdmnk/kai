@@ -587,13 +587,13 @@ export const styles = `
   pointer-events: auto;
 }
 
-/* After a pointer removal, until the pointer moves: the row now under it doesn't offer its button yet */
-.kai-popover-edits[data-settling] .kai-popover-edit-remove {
-  opacity: 0;
-  pointer-events: none;
+/* No hover on touch: the remove buttons are always there */
+@media (hover: none) {
+  .kai-popover-edit-remove {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
-
-.kai-popover-edits:focus { outline: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .kai-popover-edit-remove { transition: none; }

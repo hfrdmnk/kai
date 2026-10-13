@@ -614,6 +614,7 @@ export const createFab = (
   let clearTimer: ReturnType<typeof setTimeout> | null = null;
   const resetClear = () => {
     clearArmed = false;
+    clearBtn.removeAttribute('data-armed');
     animateStateSwap(clearBtn, iconTrash);
     clearTimer = null;
   };
@@ -625,6 +626,8 @@ export const createFab = (
       opts.onClearAll();
     } else {
       clearArmed = true;
+      // Armed: a second press within 3 s clears all
+      clearBtn.setAttribute('data-armed', '');
       animateStateSwap(clearBtn, iconHelp, 'var(--color-danger)');
       clearTimer = setTimeout(resetClear, 3000);
     }

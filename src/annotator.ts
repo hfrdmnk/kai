@@ -340,7 +340,9 @@ class UIAnnotator extends HTMLElement {
         return;
       }
       const editable = e.composedPath().some(isEditable) || isEditable(this.shadow.activeElement);
-      if (!e.repeat && !e.metaKey && !e.ctrlKey && !editable
+      // In the popover, I and ? belong to it like every other key (I would close it and lose a typed note)
+      const inPopover = this.isOwnElement(e) && !!this.activePopover?.hasFocus();
+      if (!e.repeat && !e.metaKey && !e.ctrlKey && !editable && !inPopover
         // Mid-drag, I would let the release through to the page as a click
         && (e.key === '?' || (!e.altKey && e.key.toUpperCase() === INTERACTION_KEY && !this.adjustMode.isDragging()))) {
         e.preventDefault();

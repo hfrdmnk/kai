@@ -27,13 +27,14 @@ type PopoverOptions = {
  * The annotation's changes, one line per edit: `padding-right  24px → 32px  pr-8`. Hover or focus
  * shows a remove button at the row's end, over a fade.
  */
-const createEditList = (edits: StyleEdit[], onRemove: (property: string) => void, onEmpty: () => void): HTMLElement => {
+/** A second removal this soon after the last is a double click (or tap), not a second intent */
+const REMOVE_GUARD_MS = 400;
+
+const createEditList = (edits: StyleEdit[], onRemove: (property: string) => void, focusNote: () => void): HTMLElement => {
   const list = document.createElement('ul');
   list.className = 'kai-popover-edits';
   list.setAttribute('aria-label', 'Changes');
-  // Focus lands here after a pointer removal, rather than on the next row's button
-  list.tabIndex = -1;
-  list.addEventListener('pointermove', () => list.removeAttribute('data-settling'));
+  let lastRemoval = -Infinity;
   for (const edit of edits) {
     const { property, from, to, snap } = describeEdit(edit);
     const row = document.createElement('li');
@@ -57,22 +58,18 @@ const createEditList = (edits: StyleEdit[], onRemove: (property: string) => void
     remove.setAttribute('aria-label', `Remove ${property} change`);
     remove.appendChild(createIcon(iconClose));
     remove.addEventListener('click', (e) => {
-      // Enter, Space or Delete (a click with no pointer detail) keeps the keyboard in the list
+      // The next row slides under the pointer: a double click must not remove it too
+      if (e.timeStamp - lastRemoval < REMOVE_GUARD_MS) return;
+      lastRemoval = e.timeStamp;
+      // Enter, Space or Delete (a click with no pointer detail) keeps the keyboard in the list;
+      // after a pointer removal focus goes back to the note
       const byKeyboard = e.detail === 0;
       const next = (row.nextElementSibling ?? row.previousElementSibling)?.querySelector('button');
       row.remove();
       onRemove(property);
-      if (!list.children.length) {
-        list.remove();
-        onEmpty();
-      } else if (byKeyboard && next) {
-        next.focus();
-      } else {
-        // The next row has moved under the pointer: its button waits for the pointer to move, so a
-        // double click removes one change, not two
-        list.setAttribute('data-settling', '');
-        list.focus({ preventScroll: true });
-      }
+      if (!list.children.length) list.remove();
+      if (byKeyboard && next) next.focus();
+      else focusNote();
     });
     // Delete / Backspace on a focused remove button remove that change, like a click
     remove.addEventListener('keydown', (e) => {

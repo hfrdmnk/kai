@@ -20,6 +20,9 @@ const server = Bun.serve({
         <output id="escapes">0</output>
         <div id="box-parent" style="display:flex;gap:12px;padding:8px"><button id="box-child" style="margin:4px;padding:6px 10px">Box child</button><button>Two</button></div>
         <div id="rotated" style="width:40px;height:40px;padding:20px;margin:40px;transform:rotate(45deg);background:#ccc"></div>
+        <!-- No ids: the generated selector matches both twins, so an adjustment changes both -->
+        <section><div class="twin"><div class="row"><div class="body"><p class="t" style="margin:0;padding:4px">Twin A</p></div></div></div></section>
+        <section><div class="twin"><div class="row"><div class="body"><p class="t" style="margin:0;padding:4px">Twin B</p></div></div></div></section>
       </main>
       <script>
         let events = 0;
@@ -255,6 +258,116 @@ try {
   assert(await browser('eval', 'localStorage.getItem("ui-annotator:theme")') === '"light"'
     && await browser('eval', 'localStorage.getItem("ui-annotator:accent")') === '"yellow"'
     && keyboardHelp.includes('Close keyboard shortcuts'), 'Keyboard-only settings can change theme/accent and open help');
+
+  // ── Drag to adjust ──
+  const stored = async () => JSON.parse(await browser('eval', 'JSON.parse(localStorage.getItem(`ui-annotator:${location.origin}${location.pathname}`) ?? "[]")')) as
+    { selector: string; comment: string; edits?: { property: string; from: number; to: number }[] }[];
+  const twinPadding = async () => JSON.parse(await browser('eval', `[...document.querySelectorAll('.twin .t')].map(e => getComputedStyle(e).paddingRight)`)) as string[];
+  /** Arms a property on the first twin with the pointer just inside its right edge */
+  const armTwin = async (key: string) => {
+    await browser('hover', '.twin .t');
+    const [x, y] = JSON.parse(await browser('eval',
+      `(r => [Math.round(r.right - 3), Math.round(r.top + r.height / 2)])(document.querySelector('.twin .t').getBoundingClientRect())`)) as number[];
+    await browser('mouse', 'move', String(x), String(y));
+    await browser('eval', frames);
+    await browser('press', key);
+    await browser('eval', frames);
+    return [x, y];
+  };
+  /** Press, move right by `dx` in two steps, and leave the button down */
+  const dragRight = async ([x, y]: number[], dx: number) => {
+    await browser('mouse', 'down', 'left');
+    await browser('mouse', 'move', String(x + Math.round(dx / 2)), String(y));
+    await browser('mouse', 'move', String(x + dx), String(y));
+    await browser('eval', frames);
+  };
+
+  await reset();
+  // kai's HUD and hover tooltip are aria-hidden, so these checks read the page, not the readout
+  const twinSides = async () => JSON.parse(await browser('eval',
+    `[...document.querySelectorAll('.twin .t')].map(e => (cs => cs.paddingLeft + ' ' + cs.paddingRight)(getComputedStyle(e)))`)) as string[];
+  let at = await armTwin('p');
+  await browser('keydown', 'Alt');
+  await browser('eval', frames);
+  assert(!/\d+×\d+ px/.test(await overlayText()), 'Alt while armed does not enter inspect');
+  await dragRight(at, 20);
+  assert((await twinSides()).join() === '14px 14px,14px 14px', 'Alt drags a side and its opposite, previewed on every match of the selector');
+  await browser('keyup', 'Alt');
+  await browser('eval', frames);
+  assert((await twinSides()).join() === '4px 14px,4px 14px', 'Releasing Alt mid-drag goes back to the grabbed side alone');
+  await browser('press', 'Escape');
+  await browser('mouse', 'up', 'left');
+  await browser('eval', frames);
+  assert((await twinSides()).join() === '4px 4px,4px 4px' && !(await stored()).length
+    && (await browser('snapshot', '-i')).includes('"Toggle UI annotator" [expanded=true'), 'Escape mid-drag cancels, restores every match and keeps kai active');
+
+  at = await armTwin('p');
+  await dragRight(at, 20);
+  await browser('mouse', 'up', 'left');
+  await browser('eval', frames);
+  let saved = await stored();
+  assert(saved.length === 1 && saved[0].comment === 'padding-right: 4px → 14px (0.875rem)'
+    && saved[0].edits?.length === 1 && saved[0].edits[0].property === 'padding-right' && saved[0].edits[0].from === 4 && saved[0].edits[0].to === 14
+    && (await twinPadding()).join() === '14px,14px', 'Release creates an annotation with the edit and its comment line');
+  assert(!(await browser('snapshot', '-i')).includes('Annotation comment'), 'Releasing a drag does not open the annotation editor');
+
+  at = await armTwin('p');
+  await browser('mouse', 'down', 'left');
+  await browser('mouse', 'up', 'left');
+  await browser('eval', frames);
+  assert(!(await browser('snapshot', '-i')).includes('Annotation comment') && (await twinPadding()).join() === '14px,14px'
+    && (await stored())[0].comment === saved[0].comment, 'A press without movement changes nothing and opens no editor');
+
+  at = await armTwin('p');
+  await dragRight(at, 10);
+  await browser('mouse', 'up', 'left');
+  await browser('eval', frames);
+  saved = await stored();
+  assert(saved.length === 1 && saved[0].comment === 'padding-right: 4px → 19px (1.188rem)', 'A second drag extends the same annotation, keeping the original value');
+
+  await browser('reload');
+  await browser('wait', '300');
+  assert((await twinPadding()).join() === '19px,19px', 'Edits are re-applied on load');
+  await browser('find', 'role', 'button', 'click', '--name', 'Toggle UI annotator');
+  await browser('wait', '600');
+  await browser('click', '.twin .t');
+  await browser('find', 'role', 'button', 'click', '--name', 'Delete');
+  await browser('find', 'role', 'button', 'click', '--name', 'Sure?');
+  await browser('eval', frames);
+  assert((await twinPadding()).join() === '4px,4px' && !(await stored()).length, 'Deleting the annotation reverts its edits');
+
+  at = await armTwin('p');
+  await dragRight(at, 20);
+  await browser('mouse', 'up', 'left');
+  await browser('eval', frames);
+  await browser('click', '.twin .t');
+  await browser('snapshot', '-i');
+  await browser('press', 'Control+a');
+  await browser('keyboard', 'type', 'Just a note');
+  await browser('press', 'Control+Enter');
+  await browser('eval', frames);
+  saved = await stored();
+  assert(saved.length === 1 && saved[0].comment === 'Just a note' && !saved[0].edits && (await twinPadding()).join() === '4px,4px',
+    'Removing an edit\'s line from the comment drops the edit and its style');
+
+  await reset();
+  // G on a flex item adjusts its container's main-axis gap
+  await browser('hover', '#box-child');
+  await browser('eval', frames);
+  await browser('press', 'g');
+  const [gx, gy] = JSON.parse(await browser('eval',
+    `(r => [Math.round(r.left + 200), Math.round(r.top + r.height / 2)])(document.querySelector('#box-parent').getBoundingClientRect())`)) as number[];
+  await browser('mouse', 'move', String(gx), String(gy));
+  await dragRight([gx, gy], 16);
+  await browser('mouse', 'up', 'left');
+  await browser('eval', frames);
+  saved = await stored();
+  assert(saved.length === 1 && saved[0].selector === '#box-parent' && saved[0].comment === 'column-gap: 12px → 20px (1.25rem)',
+    'G adjusts the nearest flex container\'s main-axis gap');
+  await browser('press', 'Backspace');
+  await browser('press', 'Backspace');
+  await browser('eval', frames);
+  assert(await browser('eval', `getComputedStyle(document.querySelector('#box-parent')).columnGap`) === '"12px"', 'Clear all reverts every edit');
 
   await reset();
   await browser('focus', '#input');

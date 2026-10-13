@@ -153,27 +153,27 @@ export const resolveAnnotation = (a: Pick<Annotation, 'selector' | 'locator' | '
 };
 
 /**
- * Which annotations own their element: for each target, the last annotation resolving to it, the one
- * whose edits are painted on top. Indexes into `targets` (one per annotation, null when unresolved).
+ * Which annotations own their element: for each target, the last annotation resolving to it that has
+ * edits (the one painted on top), else the last one. Indexes into `annotations`, whose targets come in
+ * `targets` (null when unresolved).
  */
-export const ownerIndexes = <T>(targets: (T | null)[]): Set<number> => {
-  const seen = new Set<T>();
-  const owners = new Set<number>();
-  for (let i = targets.length - 1; i >= 0; i--) {
+export const ownerIndexes = <T>(annotations: { edits?: unknown[] }[], targets: (T | null)[]): Set<number> => {
+  const owner = new Map<T, number>();
+  annotations.forEach((a, i) => {
     const target = targets[i];
-    if (target === null || seen.has(target)) continue;
-    seen.add(target);
-    owners.add(i);
-  }
-  return owners;
+    if (target === null || target === undefined) return;
+    const previous = owner.get(target);
+    // A later annotation takes over unless it has no edits and the current owner has
+    if (previous === undefined || a.edits?.length || !annotations[previous].edits?.length) owner.set(target, i);
+  });
+  return new Set(owner.values());
 };
 
-/** The element's own annotation: the last one resolving to it (see `ownerIndexes`) */
-export const ownAnnotationOf = <A>(annotations: A[], el: Element, resolve: (a: A) => Element | null): A | undefined => {
-  for (let i = annotations.length - 1; i >= 0; i--) {
-    if (resolve(annotations[i]) === el) return annotations[i];
-  }
-  return undefined;
+/** The element's own annotation, by the same rule as `ownerIndexes`: what's painted is what opens */
+export const ownAnnotationOf = <A extends { edits?: unknown[] }>(annotations: A[], el: Element, resolve: (a: A) => Element | null): A | undefined => {
+  const targets = annotations.map(resolve);
+  const owners = ownerIndexes(annotations, targets);
+  return annotations.find((_, i) => owners.has(i) && targets[i] === el);
 };
 
 /** Classes kai didn't add */

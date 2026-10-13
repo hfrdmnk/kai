@@ -70,9 +70,10 @@ export const createEditStyles = () => {
     const add = (to: Map<Styled, Record<string, string>>, el: Element, declarations: Record<string, string>) => {
       if ('style' in el) to.set(el as Styled, { ...to.get(el as Styled), ...declarations });
     };
-    const matches = annotations.map(a => a.edits?.length ? resolveAnnotationMatches(a) : []);
-    // Owner: the last annotation resolving to an element. An earlier one on the same element only fills in, like a sibling's
-    const owners = ownerIndexes(annotations.map((a, i) => a.edits?.length ? matches[i][0] ?? null : null));
+    const matches = annotations.map(a => resolveAnnotationMatches(a));
+    // Owner: the last annotation with edits resolving to an element (as `ownAnnotationOf`). Another one
+    // on the same element only fills in, like a sibling's
+    const owners = ownerIndexes(annotations, matches.map(m => m[0] ?? null));
     annotations.forEach((a, i) => {
       if (!a.edits?.length) return;
       const declarations = editDeclarations(a.edits);

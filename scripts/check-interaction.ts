@@ -334,11 +334,15 @@ try {
   const editText = (a?: { edits?: { property: string; from: number; to: number; className?: string }[] }) =>
     (a?.edits ?? []).map(e => `${e.property}:${e.from}→${e.to}${e.className ? `:${e.className}` : ''}`).join();
   const twinPadding = async () => JSON.parse(await browser('eval', `[...document.querySelectorAll('.twin .t')].map(e => getComputedStyle(e).paddingRight)`)) as string[];
-  /** Arms a property on the first twin with the pointer just inside its right edge */
+  /**
+   * Arms a property on the first twin with the pointer just inside its right edge, near the bottom:
+   * the twin's marker covers its top-right corner 14px down, and whether mid-height lands on it
+   * depends on the fonts. Over the marker nothing is hovered, so the key arms nothing and the press clicks the marker
+   */
   const armTwin = async (key: string) => {
     await browser('hover', '.twin .t');
     const [x, y] = JSON.parse(await browser('eval',
-      `(r => [Math.round(r.right - 3), Math.round(r.top + r.height / 2)])(document.querySelector('.twin .t').getBoundingClientRect())`)) as number[];
+      `(r => [Math.round(r.right - 3), Math.round(r.bottom - 6)])(document.querySelector('.twin .t').getBoundingClientRect())`)) as number[];
     await browser('mouse', 'move', String(x), String(y));
     await browser('eval', frames);
     await browser('press', key);

@@ -97,7 +97,8 @@ export const createPopover = (
 
   const submit = () => {
     const comment = textarea.value.trim();
-    if (!comment) return;
+    // Saving an emptied comment deletes an existing annotation
+    if (!comment && !isEdit) return;
     opts.onSubmit(comment);
   };
 

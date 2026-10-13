@@ -1,6 +1,6 @@
 import type { AccentId, Annotation, FabCorner, Theme } from './types.ts';
 import { styles } from './styles.ts';
-import { generateSelector, generateLocator, generatePath, resolveAnnotation, composedParent, composedChildren, composedContains } from './core/selector.ts';
+import { generateSelector, generateLocator, generatePath, resolveAnnotation, resolveAnnotationMatches, composedParent, composedChildren, composedContains } from './core/selector.ts';
 import { getComputedStyles } from './core/styles.ts';
 import { getNearbyText } from './core/text.ts';
 import { INTERACTION_KEY, SHORTCUTS, type ShortcutAction } from './core/platform.ts';
@@ -8,17 +8,26 @@ import { loadSession, saveSession, clearSession, loadFabCorner, saveFabCorner, l
 import { applyAccent } from './core/accents.ts';
 import { computeCrosshair, computeTextInspectData, findLargestEnclosedElement, type TextInspectData } from './core/measure.ts';
 import { computeBoxModel, type BoxModelData } from './core/box-model.ts';
+import {
+  adjustPropertyFor, adjustValue, cursorFor, dragAxisOf, dragTravel, editDeclarations, editsInComment, flexAxisOf,
+  gapContainer, kindOf, longhandOf, mergeEdits, partsOf, pickParts, readValues, shortestEdits, syncEditLines,
+  type AdjustProperty, type Change, type Part, type Values,
+} from './core/adjust.ts';
+import { createEditStyles, type StylePreview } from './core/edit-styles.ts';
 import { toMarkdown } from './export/markdown.ts';
 import { createOverlay } from './ui/highlight.ts';
 import { createFab } from './ui/fab.ts';
 import { createPopover } from './ui/popover.ts';
 import { createMarkerManager } from './ui/markers.ts';
 import { createInspector } from './ui/inspector.ts';
-import { createGuideBar, type KeyId } from './ui/guide-bar.ts';
+import { createGuideBar, type GuideMode, type KeyId } from './ui/guide-bar.ts';
+import { armedHud, createAdjustLayer, dragHud } from './ui/adjust.ts';
 
 const DRAG_THRESHOLD = 5;
 /** Pointer travel after a mode switch that counts as moving on rather than hand jitter */
 const MODE_SWITCH_SLOP = 4;
+/** How long the HUD confirms a saved adjustment */
+const SAVED_MS = 1200;
 const BLOCKED_POINTER_EVENTS = [
   'dblclick', 'auxclick', 'contextmenu', 'dragstart',
   'pointerdown', 'pointerup', 'pointermove', 'pointerover', 'pointerout',
@@ -36,6 +45,30 @@ const snapToSvgRoot = (el: Element): Element => {
 
 const isEditable = (t: EventTarget | null): boolean =>
   t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+
+/** A press-drag-release in progress: where it started and the property's values then and now */
+type AdjustDrag = {
+  origin: { x: number; y: number };
+  /** The target's border box at press time; the nearest side or corner is picked against it */
+  rect: DOMRect;
+  start: Values;
+  cur: Values;
+  /** A grid gap's axis, decided by the first few px of travel */
+  axis: 'x' | 'y' | null;
+  /** Computed styles before the drag, for an annotation it creates */
+  styles: Record<string, string>;
+};
+
+/** Drag to adjust: a property armed on the selection; `parts` are what a drag would change right now */
+type AdjustState = {
+  prop: AdjustProperty;
+  target: Element;
+  /** Everything the annotation's selector matches; the preview and the fix change them all */
+  matches: Element[];
+  parts: Part[];
+  anchor: Part | null;
+  drag: AdjustDrag | null;
+};
 
 let instance: UIAnnotator | null = null;
 
@@ -62,12 +95,25 @@ class UIAnnotator extends HTMLElement {
   private highlightLocked = false;
   /** Box model of the last target; reading a flex container's children every frame is costly */
   private boxCache: { el: Element; rect: DOMRect; data: BoxModelData | null } | null = null;
+  private adjust: AdjustState | null = null;
+  /**
+   * Alt and Shift while a property is armed, set by their key events. Mouse events can set them but
+   * never clear them: synthetic input (and some platforms) send mouse events without modifier flags.
+   */
+  private adjustAlt = false;
+  private adjustShift = false;
+  /** The click that follows an adjustment's press and release is not an annotation click */
+  private suppressClick = false;
+  private adjustRafId: number | null = null;
+  private savedTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly editStyles = createEditStyles();
 
   private fab!: ReturnType<typeof createFab>;
   private overlay!: ReturnType<typeof createOverlay>;
   private inspector!: ReturnType<typeof createInspector>;
   private markers!: ReturnType<typeof createMarkerManager>;
   private guideBar!: ReturnType<typeof createGuideBar>;
+  private adjustLayer!: ReturnType<typeof createAdjustLayer>;
   private activePopover: ReturnType<typeof createPopover> | null = null;
   private activePopoverAnnotationId: string | null = null;
 
@@ -135,7 +181,9 @@ class UIAnnotator extends HTMLElement {
         });
       },
       onClearAll: () => {
+        this.disarm();
         this.annotations = [];
+        this.applyEdits();
         clearSession();
         this.markers.update([]);
         this.fab.updateBadge(0);
@@ -143,6 +191,7 @@ class UIAnnotator extends HTMLElement {
         this.closePopover();
       },
       onPickToggle: (armed) => {
+        this.disarm();
         this.pickMode = armed;
         if (this.passThrough) this.exitPassThrough();
         if (armed) this.closePopover();
@@ -150,6 +199,7 @@ class UIAnnotator extends HTMLElement {
       },
       onInteractionToggle: () => this.toggleInteraction(),
       onHelpToggle: () => {
+        this.disarm();
         this.fab.closeSettings();
         this.clearHover();
         this.inspector.hide();
@@ -162,6 +212,7 @@ class UIAnnotator extends HTMLElement {
       onSettingsToggle: (open) => {
         this.settingsOpen = open;
         if (open) {
+          this.disarm();
           this.clearHover();
           this.guideBar.hide();
         } else if (this.active) {
@@ -189,6 +240,7 @@ class UIAnnotator extends HTMLElement {
     this.overlay = createOverlay(this.shadow);
     this.inspector = createInspector(this.shadow);
     this.guideBar = createGuideBar(this.shadow);
+    this.adjustLayer = createAdjustLayer(this.shadow);
     this.markers = createMarkerManager(
       this.shadow,
       (annotation, markerRect) => {
@@ -205,6 +257,8 @@ class UIAnnotator extends HTMLElement {
     if (this.annotations.length) {
       this.markers.update(this.annotations);
       this.fab.updateBadge(this.annotations.length);
+      // Saved adjustments are part of the session
+      this.applyEdits();
     }
     this.fab.updateActionStates(this.annotations.length);
 
@@ -212,7 +266,8 @@ class UIAnnotator extends HTMLElement {
     this.handleMouseLeave = (e: MouseEvent) => {
       if (e.relatedTarget) return;
       this.hasPointer = false;
-      this.clearHover();
+      // An armed property keeps its target while the pointer is outside the window
+      if (!this.adjust) this.clearHover();
       this.guideBar.updatePointer(-1, -1);
     };
 
@@ -223,6 +278,7 @@ class UIAnnotator extends HTMLElement {
       this.boxCache = null;
       this.scheduleHoverUpdate();
       if (this.altHeld) this.scheduleMeasureUpdate();
+      if (this.adjust) this.scheduleAdjustUpdate();
     };
 
     this.handleClick = (e: MouseEvent) => {
@@ -230,6 +286,11 @@ class UIAnnotator extends HTMLElement {
       if (this.passThrough) return;
       e.preventDefault();
       e.stopImmediatePropagation();
+      // A press while armed adjusts (or changes nothing); it never opens the annotation popover
+      if (this.suppressClick || this.adjust) {
+        this.suppressClick = false;
+        return;
+      }
       if (this.fab.closeSettings()) return;
       if (this.altHeld) return;
 
@@ -288,7 +349,9 @@ class UIAnnotator extends HTMLElement {
       if (e.key === 'Escape' && this.active && !this.activePopover) {
         if (this.fab.closeSettings()) return;
         if (this.passThrough) return;
-        if (this.pickMode) {
+        if (this.adjust) {
+          this.disarm();
+        } else if (this.pickMode) {
           this.disarmPick();
         } else {
           this.deactivate();
@@ -309,6 +372,7 @@ class UIAnnotator extends HTMLElement {
         e.stopImmediatePropagation();
         this.hideFocusRing();
         if (e.key === '?') {
+          this.disarm();
           this.fab.closeSettings();
           this.clearHover();
           this.inspector.hide();
@@ -329,6 +393,14 @@ class UIAnnotator extends HTMLElement {
         this.hideFocusRing();
         if (action !== 'settings') this.fab.closeSettings();
         this.fab.pressAction(action);
+        return;
+      }
+      const adjustProp = this.adjustKeyFor(e);
+      if (adjustProp) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        this.hideFocusRing();
+        this.arm(adjustProp);
         return;
       }
       if (e.key === 'Escape') {
@@ -355,7 +427,9 @@ class UIAnnotator extends HTMLElement {
         return;
       }
       this.syncModifiers(e);
-      if (e.key === 'Alt' && !this.altHeld) {
+      if (e.key === 'Alt' || e.key === 'Shift') this.setAdjustModifier(e.key, true);
+      // While a property is armed, Alt picks the opposite side instead of inspecting
+      if (e.key === 'Alt' && !this.altHeld && !this.adjust) {
         this.altHeld = true;
         this.markModeSwitch();
         // The selection carries over; inspect mode draws it its own way
@@ -377,6 +451,7 @@ class UIAnnotator extends HTMLElement {
     };
 
     this.handleKeyup = (e: KeyboardEvent) => {
+      if (e.key === 'Alt' || e.key === 'Shift') this.setAdjustModifier(e.key, false);
       if (e.key === 'Alt' && this.altHeld) {
         this.exitMeasureMode();
       }
@@ -392,8 +467,11 @@ class UIAnnotator extends HTMLElement {
       if (this.altHeld) {
         this.exitMeasureMode();
       }
+      this.disarm();
       this.shiftHeld = false;
       this.ctrlHeld = false;
+      this.adjustAlt = false;
+      this.adjustShift = false;
     };
 
     this.handleMouseMove = (e: MouseEvent) => {
@@ -404,8 +482,16 @@ class UIAnnotator extends HTMLElement {
         this.hoverDirty = true;
       }
       this.hasPointer = true;
-      this.guideBar.updatePointer(e.clientX, e.clientY);
+      // The drag readout stays readable when the pointer passes under the HUD
+      if (this.adjust?.drag) this.guideBar.updatePointer(-1, -1);
+      else this.guideBar.updatePointer(e.clientX, e.clientY);
       if (!this.isOwnElement(e) && !this.passThrough) e.stopImmediatePropagation();
+
+      if (this.adjust) {
+        this.catchAdjustModifiers(e);
+        this.scheduleAdjustUpdate();
+        return;
+      }
 
       if (!this.altHeld) {
         this.scheduleHoverUpdate();
@@ -436,6 +522,12 @@ class UIAnnotator extends HTMLElement {
       if (this.passThrough) return;
       e.preventDefault();
       e.stopImmediatePropagation();
+      // Reset here too: a release outside the window fires no click to consume it
+      this.suppressClick = !!this.adjust;
+      if (this.adjust) {
+        if (e.button === 0 && !this.adjust.drag) this.beginDrag(e);
+        return;
+      }
       if (!this.altHeld) return;
       if (e.button !== 0) return;
       this.dragStart = { x: e.clientX, y: e.clientY };
@@ -444,6 +536,13 @@ class UIAnnotator extends HTMLElement {
     };
 
     this.handleMouseUp = (e: MouseEvent) => {
+      // A drag ends wherever it's released, over kai's own controls too
+      if (this.adjust?.drag && e.button === 0) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        this.commitDrag();
+        return;
+      }
       if (this.isOwnElement(e)) return;
       if (this.passThrough) return;
       e.preventDefault();
@@ -501,7 +600,8 @@ class UIAnnotator extends HTMLElement {
   }
 
   private updateHover() {
-    if (!this.active || this.altHeld || this.passThrough || this.settingsOpen || this.guideBar.isHelpOpen() || !this.hasPointer) return;
+    // An armed property locks the selection; ↑ / ↓ still walk it
+    if (!this.active || this.altHeld || this.adjust || this.passThrough || this.settingsOpen || this.guideBar.isHelpOpen() || !this.hasPointer) return;
 
     const dirty = this.hoverDirty;
     this.hoverDirty = false;
@@ -553,7 +653,7 @@ class UIAnnotator extends HTMLElement {
   }
 
   private walkAncestors(e: KeyboardEvent) {
-    if (this.activePopover || this.passThrough) return;
+    if (this.activePopover || this.passThrough || this.adjust?.drag) return;
     if (!this.selectedElement || !this.hoverTarget || isEditable(e.target)) return;
 
     // A box is showing, so the arrows belong to us even at the ends of the chain
@@ -575,6 +675,7 @@ class UIAnnotator extends HTMLElement {
       this.walkedUp = child !== hover;
     }
     if (this.altHeld) this.scheduleMeasureUpdate();
+    else if (this.adjust) this.retargetAdjust(this.selectedElement);
     else this.overlay.show(this.selectedElement);
   }
 
@@ -589,6 +690,7 @@ class UIAnnotator extends HTMLElement {
 
   private enterPassThrough() {
     if (this.altHeld) this.exitMeasureMode();
+    this.disarm();
     this.closePopover();
     this.passThrough = true;
     this.fab.setInteractionActive(true);
@@ -761,6 +863,7 @@ class UIAnnotator extends HTMLElement {
     this.overlay.destroy();
     this.inspector.destroy();
     this.guideBar.destroy();
+    this.adjustLayer.destroy();
     this.fab.destroy();
   }
 
@@ -774,6 +877,8 @@ class UIAnnotator extends HTMLElement {
 
   private activate() {
     this.active = true;
+    // Elements may have appeared since the session loaded
+    this.applyEdits();
     this.fab.setActive(true);
     this.markers.setActive(true);
     this.guideBar.show('annotate');
@@ -807,6 +912,8 @@ class UIAnnotator extends HTMLElement {
     if (this.altHeld) {
       this.exitMeasureMode();
     }
+    this.disarm();
+    this.clearSaved();
     this.passThrough = false;
     this.fab.setInteractionActive(false);
     this.disarmPick();
@@ -844,6 +951,208 @@ class UIAnnotator extends HTMLElement {
     }
   }
 
+  // ── Drag to adjust ──
+
+  /** Property keys arm in plain annotation mode, outside text fields and kai's panels */
+  private adjustKeyFor(e: KeyboardEvent): AdjustProperty | null {
+    if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return null;
+    if (this.altHeld || this.pickMode || this.activePopover || this.settingsOpen || this.guideBar.isHelpOpen()) return null;
+    if (e.composedPath().some(isEditable) || isEditable(this.shadow.activeElement)) return null;
+    return adjustPropertyFor(e.key);
+  }
+
+  /** Arms a property on the selection; its key again disarms, another property key switches */
+  private arm(prop: AdjustProperty) {
+    if (this.adjust?.drag) return;
+    if (this.adjust?.prop === prop) {
+      this.disarm();
+      return;
+    }
+    const selected = this.selectedElement ?? this.adjust?.target;
+    if (!selected?.isConnected) return;
+    const target = prop === 'gap' ? gapContainer(selected, composedParent) : selected;
+    if (!target) return;
+    this.clearSaved();
+    this.adjust = { prop, target, matches: this.matchesOf(target), parts: [], anchor: null, drag: null };
+    this.updateAdjust();
+  }
+
+  /** ↑ / ↓ while armed move the target with the selection; G keeps to flex and grid containers */
+  private retargetAdjust(selected: Element) {
+    const adjust = this.adjust!;
+    adjust.target = adjust.prop === 'gap' ? gapContainer(selected, composedParent) ?? adjust.target : selected;
+    adjust.matches = this.matchesOf(adjust.target);
+    this.updateAdjust();
+  }
+
+  /** Back to hovering; a drag in progress is cancelled and its preview taken off the page */
+  private disarm(showHud = true) {
+    if (!this.adjust) return;
+    const dragging = !!this.adjust.drag;
+    this.adjust = null;
+    if (this.adjustRafId !== null) {
+      cancelAnimationFrame(this.adjustRafId);
+      this.adjustRafId = null;
+    }
+    if (dragging) this.applyEdits();
+    this.adjustLayer.hide();
+    this.setCursor('');
+    if (this.selectedElement) this.overlay.show(this.selectedElement);
+    else this.overlay.hide();
+    this.hoverDirty = true;
+    if (!this.active) return;
+    if (showHud) this.guideBar.show(this.baseMode());
+    this.scheduleHoverUpdate();
+  }
+
+  /** Alt and Shift from a mouse event can turn a modifier on, never off (see `adjustAlt`) */
+  private catchAdjustModifiers(e: MouseEvent) {
+    if (e.altKey) this.setAdjustModifier('Alt', true);
+    if (e.shiftKey) this.setAdjustModifier('Shift', true);
+  }
+
+  private setAdjustModifier(key: 'Alt' | 'Shift', down: boolean) {
+    if ((key === 'Alt' ? this.adjustAlt : this.adjustShift) === down) return;
+    if (key === 'Alt') this.adjustAlt = down;
+    else this.adjustShift = down;
+    // Modifiers apply live, mid-drag too
+    if (this.adjust) this.scheduleAdjustUpdate();
+  }
+
+  private annotationFor(el: Element): Annotation | undefined {
+    return this.annotations.find(a => resolveAnnotation(a) === el);
+  }
+
+  /** What the agent's fix changes: everything the target's annotation selector matches */
+  private matchesOf(target: Element): Element[] {
+    const matches = resolveAnnotationMatches(this.annotationFor(target) ?? { selector: generateSelector(target), element: target.tagName.toLowerCase() });
+    return matches.includes(target) ? matches : [target, ...matches];
+  }
+
+  private beginDrag(e: MouseEvent) {
+    const adjust = this.adjust!;
+    const start = readValues(adjust.target, adjust.prop);
+    this.lastMousePos = { x: e.clientX, y: e.clientY };
+    adjust.matches = this.matchesOf(adjust.target);
+    adjust.drag = {
+      origin: { x: e.clientX, y: e.clientY },
+      rect: adjust.target.getBoundingClientRect(),
+      start,
+      cur: { ...start },
+      axis: null,
+      styles: getComputedStyles(adjust.target),
+    };
+    this.updateAdjust();
+  }
+
+  /** Longhands the drag has changed so far, from their values at press time */
+  private dragChanges(): Record<string, Change> {
+    const { prop, drag } = this.adjust!;
+    const changes: Record<string, Change> = {};
+    for (const part of partsOf(prop)) {
+      const from = drag!.start[part] ?? 0;
+      const to = drag!.cur[part] ?? 0;
+      if (from !== to) changes[longhandOf(prop, part)] = { from, to };
+    }
+    return changes;
+  }
+
+  private scheduleAdjustUpdate() {
+    if (this.adjustRafId !== null) return;
+    this.adjustRafId = requestAnimationFrame(() => {
+      this.adjustRafId = null;
+      this.updateAdjust();
+    });
+  }
+
+  /** Picks what the pointer and modifiers would change; mid-drag, previews the new values on every match */
+  private updateAdjust() {
+    const adjust = this.adjust;
+    if (!adjust) return;
+    const { prop, target, drag } = adjust;
+    if (!target.isConnected) {
+      this.disarm();
+      return;
+    }
+    const held = { alt: this.adjustAlt, shift: this.adjustShift };
+    const flexAxis = flexAxisOf(target);
+    const { x, y } = this.lastMousePos;
+    if (drag) {
+      const dx = x - drag.origin.x;
+      const dy = y - drag.origin.y;
+      if (kindOf(prop) === 'gap' && !drag.axis) drag.axis = dragAxisOf(dx, dy);
+      // The side or corner is the one nearest the press, not the pointer now
+      Object.assign(adjust, pickParts(prop, { rect: drag.rect, x: drag.origin.x, y: drag.origin.y, ...held, flexAxis, dragAxis: drag.axis }));
+      const travel = dragTravel(prop, adjust.parts, adjust.anchor, dx, dy);
+      drag.cur = { ...drag.start };
+      for (const part of adjust.parts) drag.cur[part] = adjustValue(prop, drag.start[part] ?? 0, travel);
+      this.applyEdits({ elements: adjust.matches, declarations: editDeclarations(shortestEdits(prop, this.dragChanges())) });
+      this.guideBar.showAdjust(dragHud(prop, adjust.parts, adjust.anchor, drag.start, drag.cur));
+    } else {
+      Object.assign(adjust, pickParts(prop, { rect: target.getBoundingClientRect(), x, y, ...held, flexAxis }));
+      this.guideBar.showAdjust(armedHud(prop, readValues(target, prop), adjust.parts, held));
+    }
+    this.setCursor(cursorFor(prop, adjust.parts, !!drag));
+    this.overlay.show(target, { matches: adjust.matches.length, exact: true });
+    this.adjustLayer.show({ prop, target, hot: adjust.parts, others: adjust.matches.filter(m => m !== target) });
+  }
+
+  /** Release: the drag's changes go into the target's annotation, which it creates when there's none */
+  private commitDrag() {
+    const { prop, target, drag } = this.adjust!;
+    const changes = this.dragChanges();
+    this.disarm(false);
+    if (!Object.keys(changes).length) {
+      this.guideBar.show(this.baseMode());
+      return;
+    }
+    let annotation = this.annotationFor(target);
+    const created = !annotation;
+    if (!annotation) {
+      annotation = this.createAnnotation(target, '', drag!.styles);
+      this.annotations.push(annotation);
+    }
+    const before = annotation.edits ?? [];
+    const edits = mergeEdits(before, prop, changes);
+    if (edits.length) annotation.edits = edits;
+    else delete annotation.edits;
+    annotation.comment = syncEditLines(annotation.comment, before, edits);
+    // Dragged back to where it started, with nothing else said
+    if (!annotation.comment.trim()) this.annotations = this.annotations.filter(a => a !== annotation);
+    this.persist();
+    const index = this.annotations.indexOf(annotation);
+    if (index === -1) this.guideBar.show(this.baseMode());
+    else this.showSaved(created ? `Annotation ${index + 1}` : `Added to annotation ${index + 1}`);
+  }
+
+  /** `✓ Annotation 3` for a moment; display only, hover and keys work right away */
+  private showSaved(text: string) {
+    this.clearSaved();
+    this.guideBar.showAdjust({ kind: 'saved', text });
+    this.savedTimer = setTimeout(() => {
+      this.savedTimer = null;
+      if (this.active && !this.adjust && this.guideBar.mode() === 'adjust') this.guideBar.show(this.baseMode());
+    }, SAVED_MS);
+  }
+
+  private clearSaved() {
+    if (this.savedTimer) clearTimeout(this.savedTimer);
+    this.savedTimer = null;
+  }
+
+  private applyEdits(preview?: StylePreview) {
+    this.editStyles.apply(this.annotations, preview);
+  }
+
+  /** Inspect sets the cursor the same way; every write is a mutation the annotator observes */
+  private setCursor(cursor: string) {
+    if (document.body.style.cursor !== cursor) document.body.style.cursor = cursor;
+  }
+
+  private baseMode(): GuideMode {
+    return this.passThrough ? 'interact' : this.pickMode ? 'pick' : 'annotate';
+  }
+
   /** Runs in the capture phase so the host page's own single-key shortcuts never see the keystroke. */
   private shortcutFor(e: KeyboardEvent): ShortcutAction | null {
     if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return null;
@@ -875,13 +1184,12 @@ class UIAnnotator extends HTMLElement {
   }
 
   private openPopover(element: Element, anchorRect?: DOMRect) {
+    this.disarm();
     this.closePopover();
 
     const selector = generateSelector(element);
-    const locator = generateLocator(element);
     const path = generatePath(element);
     const computedStyles = getComputedStyles(element);
-    const rect = element.getBoundingClientRect();
 
     this.activePopover = createPopover(this.shadow, {
       element,
@@ -890,33 +1198,7 @@ class UIAnnotator extends HTMLElement {
       styles: computedStyles,
       anchorRect,
       onSubmit: (comment) => {
-        const ariaAttrs: Record<string, string> = {};
-        const dataAttrs: Record<string, string> = {};
-        for (const attr of Array.from(element.attributes)) {
-          if (attr.name === 'role' || attr.name.startsWith('aria-')) {
-            ariaAttrs[attr.name] = attr.value;
-          } else if (attr.name.startsWith('data-')) {
-            dataAttrs[attr.name] = attr.value;
-          }
-        }
-
-        const annotation: Annotation = {
-          id: crypto.randomUUID(),
-          selector,
-          locator,
-          path,
-          comment,
-          styles: computedStyles,
-          rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height },
-          createdAt: new Date().toISOString(),
-          element: element.tagName.toLowerCase(),
-          classes: Array.from(element.classList).filter(c => !c.startsWith('kai-')),
-          nearbyText: getNearbyText(element),
-          url: location.href,
-          ariaAttributes: ariaAttrs,
-          dataAttributes: dataAttrs,
-        };
-        this.annotations.push(annotation);
+        this.annotations.push(this.createAnnotation(element, comment, computedStyles));
         this.markers.clearPreview();
         this.persist();
         this.closePopover();
@@ -928,7 +1210,38 @@ class UIAnnotator extends HTMLElement {
     });
   }
 
+  private createAnnotation(element: Element, comment: string, styles: Record<string, string>): Annotation {
+    const ariaAttrs: Record<string, string> = {};
+    const dataAttrs: Record<string, string> = {};
+    for (const attr of Array.from(element.attributes)) {
+      if (attr.name === 'role' || attr.name.startsWith('aria-')) {
+        ariaAttrs[attr.name] = attr.value;
+      } else if (attr.name.startsWith('data-')) {
+        dataAttrs[attr.name] = attr.value;
+      }
+    }
+    const rect = element.getBoundingClientRect();
+
+    return {
+      id: crypto.randomUUID(),
+      selector: generateSelector(element),
+      locator: generateLocator(element),
+      path: generatePath(element),
+      comment,
+      styles,
+      rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height },
+      createdAt: new Date().toISOString(),
+      element: element.tagName.toLowerCase(),
+      classes: Array.from(element.classList).filter(c => !c.startsWith('kai-')),
+      nearbyText: getNearbyText(element),
+      url: location.href,
+      ariaAttributes: ariaAttrs,
+      dataAttributes: dataAttrs,
+    };
+  }
+
   private openEditPopover(annotation: Annotation, markerRect?: DOMRect) {
+    this.disarm();
     this.closePopover();
     this.activePopoverAnnotationId = annotation.id;
     this.markers.showBox(annotation.id);
@@ -947,7 +1260,17 @@ class UIAnnotator extends HTMLElement {
       existingComment: annotation.comment,
       anchorRect: markerRect,
       onSubmit: (comment) => {
-        annotation.comment = comment;
+        if (!comment) {
+          // An emptied comment deletes the annotation, its edits included
+          this.annotations = this.annotations.filter(a => a.id !== annotation.id);
+        } else {
+          annotation.comment = comment;
+          // Deleting an edit's line takes the edit off the page
+          if (annotation.edits) {
+            annotation.edits = editsInComment(annotation.edits, comment);
+            if (!annotation.edits.length) delete annotation.edits;
+          }
+        }
         this.persist();
         this.closePopover();
       },
@@ -969,7 +1292,9 @@ class UIAnnotator extends HTMLElement {
     this.activePopover = null;
   }
 
+  /** Saves the session and re-derives kai's styles on the page from the annotations' edits */
   private persist() {
+    this.applyEdits();
     saveSession(this.annotations);
     this.markers.update(this.annotations);
     this.fab.updateBadge(this.annotations.length);

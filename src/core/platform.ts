@@ -9,7 +9,7 @@ export const INTERACTION_KEY = 'I';
  */
 export const SHORTCUTS = {
   pick: { keys: ['S'], label: 'S' },
-  copy: { keys: ['M'], label: 'M' },
+  copy: { keys: ['C'], label: 'C' },
   clear: { keys: ['Backspace', 'Delete'], label: isMac ? '⌫' : 'Del' },
   settings: { keys: [','], label: ',' },
 } as const;

@@ -77,6 +77,10 @@ No React, no Svelte, no Vue. Pure vanilla TypeScript compiled to a single IIFE b
 - The HUD stays one 32px line. Armed: a side or corner glyph (changing ones in accent), the property and its current value as CSS shorthand, and the modifier chips, lit while held (`⌥ axis · ⇧ all`; B `⌥ side · ⇧ all`; G `⇧ both`). Dragging: the declaration, its new value and the signed delta (`padding-right  35px  +11px`) in fixed-width tabular cells; several declarations at once show as one row named after the shorthand (`padding`, `gap`, `border-radius (right)`), valued at the grabbed side or corner. The pill only grows during a drag. After release, `✓ Annotation 3` or `✓ Added to annotation 3` shows for 1.2 s, display only
 - Release writes the change into the element's annotation (the one `resolveAnnotation` finds), creating one with an empty comment if needed. Each edit is stored in its shortest form (all four sides equal → `padding`, left and right → `padding-inline`, top and bottom → `padding-block`, else single sides; likewise `gap` and `border-radius`) and has a comment line, e.g. `padding-right: 24px → 34px (2.125rem)` or `line-height: 1.55 → 1.6`. Editing an adjusted property again keeps the original value and replaces its line; back at the original value, the edit and its line go
 - kai's styles on the page are derived from the edits (`createEditStyles` in `src/core/edit-styles.ts`): every annotation's edits are applied to its matches and every other longhand kai touched goes back to the element's own inline value, captured the first time kai touched it. This runs on load, activation, release, comment save, delete and clear all
+- `T` while armed toggles snapping to the project's scale; it stays on across armings until toggled off, and is offered (with a `T snap` chip in the armed HUD, accent while on) only when the page has a scale for the armed property. The scale (`harvestScale` in `src/core/scale.ts`, read on the first arming after activation) is the project's own utility classes from same-origin stylesheets: single-class rules for spacing (`p`, `px`… `m`… `gap`, `gap-x`, `gap-y`), `text-*` that set a font size, `leading-*` and `rounded-*`, values probed on a hidden element; look-alikes such as `text-red-500` or `rounded-t-lg` are skipped. Without utility classes it falls back to `:root` custom properties with length values named like a scale (`--space-*`, `--text-*`, `--leading-*`, `--radius-*`). While snapping, a drag moves one scale value per 12px of travel; an off-scale start goes to the next value in that direction, margin continues into negatives. The edit records the class named after the declaration's own prefix and the step (`pr-8`, `px-4`, `-mt-2`, `rounded-tl-lg`) or the variable, and its line reads `padding-right: 24px → 32px (2rem, pr-8)` or `gap: 16px → 24px (var(--space-6))`. The drag HUD shows the class or token in a muted cell while snapping is on
+- `←` / `→` while armed nudge the side (or corner, gap, value) under the pointer one step: 1px, 0.05 of line height, or one scale value while snapping; `→` is more. Each nudge is saved right away, like a release. The HUD shows the drag row with the delta since this arming's first nudge, and goes back to the hints 1.5 s after the last one
+- `Backspace` (or `Delete`) while armed resets the property on the element: its edits and their lines come off the annotation (the annotation goes when nothing else is left in it), the page goes back through the derived styles, and kai disarms with a short `Reset padding` notice. Unarmed, they still clear all
+- Keys that mean something while armed (Esc, Backspace / Delete, T, ← / →, the property keys, Alt, Shift) are handled before kai's single-key shortcuts. The adjust state machine lives in `src/adjust-mode.ts`; the annotator routes key and pointer events to it. Held modifiers are one record for every mode (`nextHeld` in `src/core/held-keys.ts`): a modifier's own key event decides it, other events report flags, and while armed mouse events can only add a modifier, since synthetic input sends none
 
 ### Annotation Authoring
 - Textarea for writing feedback
@@ -125,8 +129,8 @@ type StyleEdit = {
   property: string;   // As written: padding | padding-inline | padding-block | padding-top… | margin… | gap | row-gap | column-gap | font-size | line-height | border-radius | border-top-left-radius…
   from: number;       // px; unitless for line-height
   to: number;
-  className?: string; // Project utility class when snapped (not yet used)
-  token?: string;     // var(--x) when snapped to a CSS variable (not yet used)
+  className?: string; // Project utility class when snapped with T, named for this declaration (pr-8, px-4)
+  token?: string;     // var(--x) when snapped to a CSS variable
 };
 
 type ExportPayload = {
@@ -184,7 +188,10 @@ All kai UI layers sit at the top of the stacking context, above any host page co
 | Drag | Property armed | Adjust the nearest side or corner (gap: main axis or drag axis); release adds it to the annotation |
 | `Alt`, held | Property armed | Also the opposite side (border-radius: both corners on the nearest side) |
 | `Shift`, held | Property armed | All sides, all corners or both gaps |
-| `Backspace` / `Delete` | Annotator active, no text field focused | Clear all (second press within 3 s confirms) |
+| `T` | Property armed, page has a scale | Toggle snapping to the project's utility classes or scale variables (stays on) |
+| `←` / `→` | Property armed | Nudge the side under the pointer one step (1px, 0.05 or one scale value), saved right away |
+| `Backspace` / `Delete` | Property armed | Reset the property on the element (its edits and lines) |
+| `Backspace` / `Delete` | Annotator active, no property armed, no text field focused | Clear all (second press within 3 s confirms) |
 | `,` | Annotator active, no text field focused | Toggle settings |
 | `I` | Annotator active, no text field focused | Toggle interaction / annotation mode |
 | `?` | Annotator active, no text field focused | Toggle shortcut reference for all modes |

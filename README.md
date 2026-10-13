@@ -83,6 +83,12 @@ classes (all the cards in a grid, say), and the HUD shows the new value and the 
 `padding-right: 24px → 34px (2.125rem)` to the element's annotation. <kbd>Esc</kbd> cancels.
 Deleting the annotation, or its line, puts the page back.
 
+While a property is armed, <kbd>←</kbd> / <kbd>→</kbd> nudge the side under the pointer by one step
+and save it right away, and <kbd>Backspace</kbd> resets the property on the element. If the page has
+its own scale (Tailwind-style utility classes, or `:root` variables like `--space-4`), <kbd>T</kbd>
+snaps drags and nudges to it and the line names the class: `padding-right: 24px → 32px (2rem, pr-8)`.
+Snapping stays on until you press <kbd>T</kbd> again.
+
 ### Interaction mode
 
 While kai is in annotation mode, page clicks and keyboard input are blocked. Press <kbd>I</kbd> to
@@ -120,7 +126,10 @@ interaction mode outside text fields.
 | <kbd>P</kbd> / <kbd>M</kbd> / <kbd>G</kbd> / <kbd>F</kbd> / <kbd>L</kbd> / <kbd>B</kbd> | Annotation mode, element hovered | Arm padding / margin / gap / font size / line height / border radius; the same key or <kbd>Esc</kbd> disarms |
 | Drag | Property armed | Adjust the nearest side or corner; release adds it to the annotation |
 | <kbd>Alt</kbd> / <kbd>Shift</kbd> (hold) | Dragging | That side and its opposite / all sides, corners or gaps |
-| <kbd>⌫</kbd> / <kbd>Del</kbd> | Active, has annotations | Clear all: first press arms, second press within 3 s confirms |
+| <kbd>T</kbd> | Property armed, page has a scale | Snap to the project's utility classes or scale variables (stays on) |
+| <kbd>←</kbd> / <kbd>→</kbd> | Property armed | Nudge the side under the pointer one step, saved right away |
+| <kbd>⌫</kbd> / <kbd>Del</kbd> | Property armed | Reset the property on the element |
+| <kbd>⌫</kbd> / <kbd>Del</kbd> | Active, has annotations, nothing armed | Clear all: first press arms, second press within 3 s confirms |
 | <kbd>,</kbd> | Active | Toggle settings |
 | <kbd>I</kbd> | Active, outside text fields | Toggle interaction / annotation mode (also a button beside kai) |
 | <kbd>?</kbd> | Active, outside text fields | Toggle shortcut reference for all modes |

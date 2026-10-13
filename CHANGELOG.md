@@ -6,6 +6,8 @@
 
 - Drag to adjust: hover an element, press P (padding), M (margin), G (gap), F (font size), L (line height) or B (border radius), then drag anywhere. The nearest side or corner changes; Alt adds its opposite, Shift takes all. The page previews the change on every element with the same tag and classes, with bands, gutters, line stripes or corner arcs showing what will change and a one-line HUD showing the value
 - Release writes the change into the element's annotation as a line like `padding-right: 24px → 34px (2.125rem)` and stores it as `edits`. Adjustments persist with the session; deleting the annotation, clearing all or removing the line puts the page back
+- T snaps drags and nudges to the project's own scale: its Tailwind-style utility classes, or `:root` variables like `--space-4` when there are none. The line names the class or variable, e.g. `padding-right: 24px → 32px (2rem, pr-8)`
+- ←/→ while a property is armed nudge the side under the pointer by one step and save right away; Backspace resets the property on the element
 
 ### Changed
 

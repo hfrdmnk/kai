@@ -1093,7 +1093,7 @@ class UIAnnotator extends HTMLElement {
       this.guideBar.showAdjust(armedHud(prop, readValues(target, prop), adjust.parts, held));
     }
     this.setCursor(cursorFor(prop, adjust.parts, !!drag));
-    this.overlay.show(target, { matches: adjust.matches.length, exact: true });
+    this.overlay.show(target, { matches: adjust.matches.length, exact: true, tooltip: !drag });
     this.adjustLayer.show({ prop, target, hot: adjust.parts, others: adjust.matches.filter(m => m !== target) });
   }
 

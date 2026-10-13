@@ -8,6 +8,8 @@ type ShowOptions = {
   matches?: number;
   /** Hug the element with a thin outline and its own radius, leaving the space around it to drag-to-adjust drawings */
   exact?: boolean;
+  /** Leave the tooltip out, e.g. mid-drag, when the HUD already says what's changing */
+  tooltip?: boolean;
 };
 
 export const createOverlay = (shadowRoot: ShadowRoot) => {
@@ -53,7 +55,7 @@ export const createOverlay = (shadowRoot: ShadowRoot) => {
   const show = (el: Element, options: ShowOptions = {}) => {
     current = el;
     currentOptions = options;
-    const { matches = 1, exact = false } = options;
+    const { matches = 1, exact = false, tooltip: withTooltip = true } = options;
     const bounding = el.getBoundingClientRect();
 
     // Inline elements wrapping across lines get one box per line fragment
@@ -69,6 +71,11 @@ export const createOverlay = (shadowRoot: ShadowRoot) => {
     });
     for (let i = rects.length; i < boxes.length; i++) {
       boxes[i].style.display = 'none';
+    }
+
+    if (!withTooltip) {
+      tooltip.style.display = 'none';
+      return;
     }
 
     tooltip.textContent = describeElement(el);

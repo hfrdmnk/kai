@@ -20,9 +20,8 @@ const server = Bun.serve({
         <output id="escapes">0</output>
         <div id="box-parent" style="display:flex;gap:12px;padding:8px"><button id="box-child" style="margin:4px;padding:6px 10px">Box child</button><button>Two</button></div>
         <div id="rotated" style="width:40px;height:40px;padding:20px;margin:40px;transform:rotate(45deg);background:#ccc"></div>
-        <!-- No ids: the generated selector matches both twins, so an adjustment changes both -->
-        <section><div class="twin"><div class="row"><div class="body"><p class="t" style="margin:0;padding:4px">Twin A</p></div></div></div></section>
-        <section><div class="twin"><div class="row"><div class="body"><p class="t" style="margin:0;padding:4px">Twin B</p></div></div></div></section>
+        <!-- Siblings with the same tag and classes: the selector pins one (:nth-of-type), an adjustment previews on both -->
+        <section class="twin"><p class="t" style="margin:0;padding:4px">Twin A</p><p class="t" style="margin:0;padding:4px">Twin B</p><p style="margin:0;padding:4px">Plain</p></section>
       </main>
       <script>
         let events = 0;

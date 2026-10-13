@@ -136,18 +136,6 @@ export const resolveSelector = (selector: string): Element | null => {
   return el;
 };
 
-/** Every element a selector matches, following each `>>>` hop into every matching host's open shadow root. */
-export const resolveSelectorAll = (selector: string): Element[] => {
-  const parts = selector.split(SHADOW_SEP);
-  let scopes: (Document | ShadowRoot)[] = [document];
-  let found: Element[] = [];
-  parts.forEach((part, i) => {
-    found = scopes.flatMap(scope => Array.from(scope.querySelectorAll(part)));
-    if (i < parts.length - 1) scopes = found.flatMap(el => el.shadowRoot ?? []);
-  });
-  return found;
-};
-
 /**
  * The locator wins while it still lands on the same kind of element; a shifted
  * tree falls back to the readable selector, which may hit an earlier sibling.
@@ -165,18 +153,20 @@ export const resolveAnnotation = (a: Pick<Annotation, 'selector' | 'locator' | '
 };
 
 /**
- * Everything an annotation's fix would change: all matches of its readable selector, plus the
- * annotated element itself when a shifted tree no longer matches it.
+ * Everything an annotation's fix would change. The readable selector is unique on purpose
+ * (`:nth-of-type`), so siblings are found by the class list instead: every element in the same
+ * document or shadow root with the annotated element's tag and all of its classes. An element
+ * without classes only matches itself.
  */
 export const resolveAnnotationMatches = (a: Pick<Annotation, 'selector' | 'locator' | 'element'>): Element[] => {
   const target = resolveAnnotation(a);
-  let matches: Element[] = [];
-  try {
-    matches = resolveSelectorAll(a.selector);
-  } catch {
-    // An unparsable selector matches nothing
-  }
-  return target && !matches.includes(target) ? [target, ...matches] : matches;
+  if (!target) return [];
+  const classes = Array.from(target.classList).filter(c => !c.startsWith('kai-'));
+  if (!classes.length) return [target];
+  const root = target.getRootNode() as Document | ShadowRoot;
+  const selector = CSS.escape(target.localName) + classes.map(c => '.' + CSS.escape(c)).join('');
+  const matches = Array.from(root.querySelectorAll(selector));
+  return matches.includes(target) ? matches : [target, ...matches];
 };
 
 export const generatePath = (el: Element): string => {

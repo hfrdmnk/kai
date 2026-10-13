@@ -332,6 +332,13 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
       show('adjust');
       return;
     }
+    if (hud.kind === 'drag' && (swapping || widthAnim)) {
+      // A drag right after arming: end the hints' crossfade now, or its frozen width becomes the drag's minimum
+      contentAnim?.cancel();
+      widthAnim?.cancel();
+      widthAnim = null;
+      swapping = false;
+    }
     if (swapping) return;
     content.replaceChildren(renderAdjust(hud));
     if (hud.kind !== 'drag') {

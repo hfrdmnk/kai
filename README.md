@@ -78,8 +78,8 @@ Hover an element and press a property key: <kbd>P</kbd> padding, <kbd>M</kbd> ma
 (of the element or its nearest flex/grid container), <kbd>F</kbd> font size, <kbd>L</kbd> line height,
 <kbd>B</kbd> border radius. Then press, drag and release anywhere on the page. The side or corner
 nearest the pointer changes; hold <kbd>Alt</kbd> for it and its opposite side (or both corners on that
-side) and <kbd>Shift</kbd> for all of them. The page updates live on every element the annotation's
-selector matches, and the HUD shows the new value and the change. Release adds a line like
+side) and <kbd>Shift</kbd> for all of them. The page updates live on every element with the same tag and
+classes (all the cards in a grid, say), and the HUD shows the new value and the change. Release adds a line like
 `padding-right: 24px → 34px (2.125rem)` to the element's annotation. <kbd>Esc</kbd> cancels.
 Deleting the annotation, or its line, puts the page back.
 

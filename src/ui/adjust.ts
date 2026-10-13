@@ -1,6 +1,6 @@
 import {
   ADJUST, CORNERS, SIDES, dragReadout, kindOf, nameWidth, shorthandValue,
-  type AdjustProperty, type Part, type Side, type Values,
+  type AdjustProperty, type Part, type ScaleRef, type Side, type Values,
 } from '../core/adjust.ts';
 import { computeBoxModel, inset, outset, type Box, type Edges } from '../core/box-model.ts';
 import type { AdjustHud, KeyId } from './guide-bar.ts';
@@ -21,8 +21,14 @@ const MODIFIER_HINTS: Record<string, [KeyId, string][]> = {
   value: [],
 };
 
-/** Armed HUD: `[glyph] Padding 24px · ⌥ axis · ⇧ all`, the glyph and chips following the pointer and modifiers */
-export const armedHud = (prop: AdjustProperty, values: Values, parts: Part[], held: { alt: boolean; shift: boolean }): AdjustHud => {
+/**
+ * Armed HUD: `[glyph] Padding 24px · ⌥ axis · ⇧ all · T snap`, the glyph and chips following the pointer
+ * and modifiers. The T chip is there only when the project has a scale for the property; lit while on.
+ */
+export const armedHud = (
+  prop: AdjustProperty, values: Values, parts: Part[], held: { alt: boolean; shift: boolean },
+  snap: { available: boolean; on: boolean },
+): AdjustHud => {
   const kind = kindOf(prop);
   const on = (all: Part[]) => all.map(p => parts.includes(p));
   return {
@@ -30,13 +36,18 @@ export const armedHud = (prop: AdjustProperty, values: Values, parts: Part[], he
     title: ADJUST[prop].title,
     value: shorthandValue(prop, values),
     glyph: kind === 'sides' ? { corners: false, on: on(SIDES) } : kind === 'corners' ? { corners: true, on: on(CORNERS) } : null,
-    modifiers: MODIFIER_HINTS[kind].map(([key, hint]) => ({ key, hint, pressed: key === 'alt' ? held.alt : held.shift })),
+    modifiers: [
+      ...MODIFIER_HINTS[kind].map(([key, hint]) => ({ key, hint, pressed: key === 'alt' ? held.alt : held.shift })),
+      ...(snap.available ? [{ key: 't' as const, hint: 'snap', pressed: snap.on }] : []),
+    ],
   };
 };
 
-/** Drag HUD: `padding-right  35px  +11px` */
-export const dragHud = (prop: AdjustProperty, parts: Part[], anchor: Part | null, start: Values, cur: Values): AdjustHud =>
-  ({ kind: 'drag', ...dragReadout(prop, parts, anchor, start, cur), nameWidth: nameWidth(prop) });
+/** Drag and nudge HUD: `padding-right  35px  +11px`, plus the class or token (`pr-8`) while snapping */
+export const dragHud = (
+  prop: AdjustProperty, parts: Part[], anchor: Part | null, start: Values, cur: Values,
+  refs: Partial<Record<Part, ScaleRef>>, snap: boolean,
+): AdjustHud => ({ kind: 'drag', ...dragReadout(prop, parts, anchor, start, cur, refs), nameWidth: nameWidth(prop), snap });
 
 export type AdjustLayerState = {
   prop: AdjustProperty;

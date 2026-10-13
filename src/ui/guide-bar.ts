@@ -1,7 +1,7 @@
 import { SPRING, GLIDE } from '../core/easing.ts';
 import { isMac, INTERACTION_KEY, SHORTCUTS } from '../core/platform.ts';
 
-export type KeyId = 'alt' | 'shift' | 'ctrl' | 'esc';
+export type KeyId = 'alt' | 'shift' | 'ctrl' | 'esc' | 't';
 export type GuideMode = 'annotate' | 'measure' | 'interact' | 'pick' | 'adjust';
 
 /** Drag to adjust: armed hints, the drag readout, or the confirmation after release; all one 32px line */
@@ -15,14 +15,26 @@ export type AdjustHud =
     glyph: { corners: boolean; on: boolean[] } | null;
     modifiers: { key: KeyId; hint: string; pressed: boolean }[];
   }
-  | { kind: 'drag'; name: string; value: string; delta: string; /** Name cell width in ch */ nameWidth: number }
-  | { kind: 'saved'; text: string };
+  | {
+    kind: 'drag';
+    name: string;
+    value: string;
+    delta: string;
+    /** Name cell width in ch */
+    nameWidth: number;
+    /** Snapping is on: a cell for the snapped class or token (`note`, empty when off the scale) */
+    snap: boolean;
+    note: string;
+  }
+  /** A moment's confirmation: `✓ Annotation 3`, `Reset padding` */
+  | { kind: 'notice'; text: string; check: boolean };
 
 const KEY_LABELS: Record<KeyId, string> = {
   alt: isMac ? '⌥' : 'Alt',
   shift: isMac ? '⇧' : 'Shift',
   ctrl: isMac ? '⌃' : 'Ctrl',
   esc: 'Esc',
+  t: 'T',
 };
 
 type Hint = { keys: KeyId[]; hint: string };
@@ -78,14 +90,16 @@ const renderContent = (mode: Exclude<GuideMode, 'adjust'>, pressedKeys: KeyId[])
 
 const renderAdjust = (hud: AdjustHud): DocumentFragment => {
   const frag = document.createDocumentFragment();
-  if (hud.kind === 'saved') {
-    frag.append(span('kai-guide-bar-check', '✓'), span('', hud.text));
+  if (hud.kind === 'notice') {
+    if (hud.check) frag.appendChild(span('kai-guide-bar-check', '✓'));
+    frag.appendChild(span('', hud.text));
     return frag;
   }
   if (hud.kind === 'drag') {
     const name = span('kai-guide-bar-name', hud.name);
     name.style.minWidth = `${hud.nameWidth}ch`;
     frag.append(name, span('kai-guide-bar-num', hud.value), span('kai-guide-bar-num kai-guide-bar-delta', hud.delta));
+    if (hud.snap) frag.appendChild(span('kai-guide-bar-note', hud.note));
     return frag;
   }
   if (hud.glyph) {
@@ -171,6 +185,9 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
       ['Drag', 'Nearest side or corner; release adds it to the annotation'],
       ['Alt + drag', 'That side and its opposite, or both corners on that side'],
       ['Shift + drag', 'All sides, all corners or both gaps'],
+      ['T', 'Snap to the project’s scale (stays on; offered when the page has one)'],
+      ['← / →', 'Nudge the side under the pointer one step, saved right away'],
+      ['Backspace', 'Reset the property on the element'],
       ['Esc', 'Cancel the drag or disarm'],
     ]],
     ['Annotation editor & settings', [
@@ -228,8 +245,14 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
 
   let pressedKeys: KeyId[] = [];
 
+  /** A crossfade's fade-out fills forwards under its fade-in; ending a crossfade must cancel both */
+  const stopContentAnims = () => {
+    for (const anim of content.getAnimations()) anim.cancel();
+    contentAnim = null;
+  };
+
   const render = (mode: GuideMode) =>
-    mode === 'adjust' ? renderAdjust(adjustHud ?? { kind: 'saved', text: '' }) : renderContent(mode, pressedKeys);
+    mode === 'adjust' ? renderAdjust(adjustHud ?? { kind: 'notice', text: '', check: false }) : renderContent(mode, pressedKeys);
 
   const resetDragWidth = () => {
     dragWidth = 0;
@@ -259,7 +282,7 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
     }
 
     barAnim?.cancel();
-    contentAnim?.cancel();
+    stopContentAnims();
     widthAnim?.cancel();
     swapping = false;
 
@@ -333,8 +356,9 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
       return;
     }
     if (hud.kind === 'drag' && (swapping || widthAnim)) {
-      // A drag right after arming: end the hints' crossfade now, or its frozen width becomes the drag's minimum
-      contentAnim?.cancel();
+      // A drag right after arming: end the hints' crossfade now, or its frozen width becomes the drag's minimum.
+      // Both halves go: cancelling only the fade-in would bring back the finished fade-out's opacity 0
+      stopContentAnims();
       widthAnim?.cancel();
       widthAnim = null;
       swapping = false;
@@ -358,7 +382,7 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
     currentMode = null;
 
     barAnim?.cancel();
-    contentAnim?.cancel();
+    stopContentAnims();
     widthAnim?.cancel();
     swapping = false;
 

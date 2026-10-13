@@ -1,19 +1,24 @@
 import type { Annotation } from './types.ts';
 import {
-  adjustPropertyFor, adjustValue, cursorFor, dragAxisOf, dragTravel, editDeclarations, flexAxisOf, gapContainer,
-  kindOf, longhandOf, partsOf, pickParts, readValues, shortestEdits, withChanges,
-  type AdjustProperty, type Change, type Part, type Values,
+  ADJUST, adjustPropertyFor, adjustValue, cursorFor, dragAxisOf, dragTravel, editDeclarations, flexAxisOf, gapContainer,
+  kindOf, longhandOf, nudgeValue, partsOf, pickParts, propertyOfDeclaration, readValues, shortestEdits, withChanges,
+  withoutProperty, type AdjustProperty, type Change, type Part, type ScaleRef, type Values,
 } from './core/adjust.ts';
 import type { StylePreview } from './core/edit-styles.ts';
 import type { HeldKeys } from './core/held-keys.ts';
+import { hasSteps, harvestScale, stepOnScale, STEP_TRAVEL, type Scale } from './core/scale.ts';
 import { composedParent, generateSelector, resolveAnnotation, resolveAnnotationMatches } from './core/selector.ts';
 import { getComputedStyles } from './core/styles.ts';
 import { armedHud, createAdjustLayer, dragHud } from './ui/adjust.ts';
 import type { createGuideBar, GuideMode } from './ui/guide-bar.ts';
 import type { createOverlay } from './ui/highlight.ts';
 
-/** How long the HUD confirms a saved adjustment */
-const SAVED_MS = 1200;
+/** How long the HUD shows a confirmation (`✓ Annotation 3`, `Reset padding`) */
+const NOTICE_MS = 1200;
+/** How long the HUD shows a nudge's readout after the last ←/→ before going back to the hints */
+const NUDGE_MS = 1500;
+
+type Refs = Partial<Record<Part, ScaleRef>>;
 
 /** A press-drag-release in progress: where it started and the property's values then and now */
 type Drag = {
@@ -22,10 +27,19 @@ type Drag = {
   rect: DOMRect;
   start: Values;
   cur: Values;
+  /** The scale steps `cur` landed on while snapping */
+  refs: Refs;
   /** A grid gap's axis, decided by the first few px of travel */
   axis: 'x' | 'y' | null;
   /** Computed styles before the drag, for an annotation it creates */
   styles: Record<string, string>;
+};
+
+/** ←/→ nudges of this arming: the values before the first, and what the HUD's readout shows until it times out */
+type Nudges = {
+  from: Values;
+  shown: { parts: Part[]; anchor: Part | null; refs: Refs } | null;
+  timer: ReturnType<typeof setTimeout> | null;
 };
 
 /** A property armed on the selection; `parts` are what a drag would change right now */
@@ -37,6 +51,7 @@ type Armed = {
   parts: Part[];
   anchor: Part | null;
   drag: Drag | null;
+  nudges: Nudges | null;
 };
 
 export type AdjustModeDeps = {
@@ -61,17 +76,26 @@ export type AdjustModeDeps = {
 
 /**
  * Drag to adjust: a property key arms on the selection, then a press, drag and release anywhere on
- * the page writes the change into the element's annotation. The annotator routes keys and pointer
- * events here and owns everything else (selection, annotations, persistence).
+ * the page writes the change into the element's annotation. ←/→ nudge, Backspace resets, T snaps to
+ * the project's scale. The annotator routes keys and pointer events here and owns everything else
+ * (selection, annotations, persistence).
  */
 export const createAdjustMode = (deps: AdjustModeDeps) => {
   const { guideBar, overlay } = deps;
   const layer = createAdjustLayer(deps.shadowRoot);
   let armed: Armed | null = null;
+  /** T: snap drags and nudges to the project's scale. Sticky until toggled off */
+  let snapOn = false;
+  /** Read on the first arming after activation; the page's styles may have loaded since */
+  let scale: Scale | null = null;
   /** The click that follows an adjustment's press and release is not an annotation click */
   let suppressClick = false;
   let rafId: number | null = null;
-  let savedTimer: ReturnType<typeof setTimeout> | null = null;
+  let noticeTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const scaleOf = () => scale ??= harvestScale().scale;
+  const canSnap = (prop: AdjustProperty) => hasSteps(scaleOf(), prop);
+  const snapping = (prop: AdjustProperty) => snapOn && canSnap(prop);
 
   const annotationFor = (el: Element) => deps.annotations().find(a => resolveAnnotation(a) === el);
 
@@ -86,19 +110,19 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
     if (document.body.style.cursor !== cursor) document.body.style.cursor = cursor;
   };
 
-  const clearSaved = () => {
-    if (savedTimer) clearTimeout(savedTimer);
-    savedTimer = null;
+  const clearNotice = () => {
+    if (noticeTimer) clearTimeout(noticeTimer);
+    noticeTimer = null;
   };
 
-  /** `✓ Annotation 3` for a moment; display only, hover and keys work right away */
-  const showSaved = (text: string) => {
-    clearSaved();
-    guideBar.showAdjust({ kind: 'saved', text });
-    savedTimer = setTimeout(() => {
-      savedTimer = null;
+  /** A confirmation for a moment; display only, hover and keys work right away */
+  const showNotice = (text: string, check = false) => {
+    clearNotice();
+    guideBar.showAdjust({ kind: 'notice', text, check });
+    noticeTimer = setTimeout(() => {
+      noticeTimer = null;
       if (deps.isActive() && !armed && guideBar.mode() === 'adjust') guideBar.show(deps.baseMode());
-    }, SAVED_MS);
+    }, NOTICE_MS);
   };
 
   const schedule = () => {
@@ -109,22 +133,37 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
     });
   };
 
-  /** Longhands the drag has changed so far, from their values at press time */
-  const dragChanges = (): Record<string, Change> => {
-    const { prop, drag } = armed!;
+  /** Longhands that differ between two sets of values, with the scale step each landed on */
+  const changesBetween = (prop: AdjustProperty, start: Values, cur: Values, refs: Refs): Record<string, Change> => {
     const changes: Record<string, Change> = {};
     for (const part of partsOf(prop)) {
-      const from = drag!.start[part] ?? 0;
-      const to = drag!.cur[part] ?? 0;
-      if (from !== to) changes[longhandOf(prop, part)] = { from, to };
+      const from = start[part] ?? 0;
+      const to = cur[part] ?? 0;
+      if (from !== to) changes[longhandOf(prop, part)] = refs[part] ? { from, to, ref: refs[part] } : { from, to };
     }
     return changes;
+  };
+
+  /**
+   * Writes changes into the target's annotation, creating it when there's none, and saves.
+   * Returns the annotation's 1-based number and whether it's new; 0 when it went away
+   * (back at the original values with nothing else said).
+   */
+  const save = (target: Element, prop: AdjustProperty, changes: Record<string, Change>, styles: Record<string, string>) => {
+    const list = deps.annotations();
+    const existing = annotationFor(target);
+    const base = existing ?? deps.createAnnotation(target, styles);
+    const updated: Annotation = { ...base, ...withChanges(base, prop, changes) };
+    let next = existing ? list.map(a => a === existing ? updated : a) : [...list, updated];
+    if (!updated.comment.trim()) next = next.filter(a => a !== updated);
+    deps.saveAnnotations(next);
+    return { number: next.indexOf(updated) + 1, created: !existing };
   };
 
   /** Picks what the pointer and modifiers would change; mid-drag, previews the new values on every match */
   const update = () => {
     if (!armed) return;
-    const { prop, target, drag } = armed;
+    const { prop, target, drag, nudges } = armed;
     if (!target.isConnected) {
       disarm();
       return;
@@ -140,17 +179,37 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
       // The side or corner is the one nearest the press, not the pointer now
       Object.assign(armed, pickParts(prop, { rect: drag.rect, x: drag.origin.x, y: drag.origin.y, ...held, flexAxis, dragAxis: drag.axis }));
       const travel = dragTravel(prop, armed.parts, armed.anchor, dx, dy);
+      const snap = snapping(prop);
       drag.cur = { ...drag.start };
-      for (const part of armed.parts) drag.cur[part] = adjustValue(prop, drag.start[part] ?? 0, travel);
-      deps.applyEdits({ elements: armed.matches, declarations: editDeclarations(shortestEdits(prop, dragChanges())) });
-      guideBar.showAdjust(dragHud(prop, armed.parts, armed.anchor, drag.start, drag.cur));
+      drag.refs = {};
+      for (const part of armed.parts) {
+        const start = drag.start[part] ?? 0;
+        if (!snap) {
+          drag.cur[part] = adjustValue(prop, start, travel);
+          continue;
+        }
+        const step = stepOnScale(scaleOf(), prop, start, Math.trunc(travel / STEP_TRAVEL));
+        drag.cur[part] = step.value;
+        if (step.ref) drag.refs[part] = step.ref;
+      }
+      const changes = changesBetween(prop, drag.start, drag.cur, drag.refs);
+      deps.applyEdits({ elements: armed.matches, declarations: editDeclarations(shortestEdits(prop, changes)) });
+      guideBar.showAdjust(dragHud(prop, armed.parts, armed.anchor, drag.start, drag.cur, drag.refs, snap));
     } else {
       Object.assign(armed, pickParts(prop, { rect: target.getBoundingClientRect(), x, y, ...held, flexAxis }));
-      guideBar.showAdjust(armedHud(prop, readValues(target, prop), armed.parts, held));
+      const values = readValues(target, prop);
+      guideBar.showAdjust(nudges?.shown
+        ? dragHud(prop, nudges.shown.parts, nudges.shown.anchor, nudges.from, values, nudges.shown.refs, snapping(prop))
+        : armedHud(prop, values, armed.parts, held, { available: canSnap(prop), on: snapOn }));
     }
     setCursor(cursorFor(prop, armed.parts, !!drag));
     overlay.show(target, { matches: armed.matches.length, exact: true, tooltip: !drag });
     layer.show({ prop, target, hot: armed.parts, others: armed.matches.filter(m => m !== target) });
+  };
+
+  const endNudges = () => {
+    if (armed?.nudges?.timer) clearTimeout(armed.nudges.timer);
+    if (armed) armed.nudges = null;
   };
 
   /** Arms a property on the selection; its key again disarms, another property key switches */
@@ -164,8 +223,9 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
     if (!selected?.isConnected) return;
     const target = prop === 'gap' ? gapContainer(selected, composedParent) : selected;
     if (!target) return;
-    clearSaved();
-    armed = { prop, target, matches: matchesOf(target), parts: [], anchor: null, drag: null };
+    clearNotice();
+    endNudges();
+    armed = { prop, target, matches: matchesOf(target), parts: [], anchor: null, drag: null, nudges: null };
     update();
   };
 
@@ -173,6 +233,7 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
   const disarm = (showHud = true) => {
     if (!armed) return;
     const dragging = !!armed.drag;
+    endNudges();
     armed = null;
     if (rafId !== null) {
       cancelAnimationFrame(rafId);
@@ -191,6 +252,7 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
   /** ↑ / ↓ while armed move the target with the selection; G keeps to flex and grid containers */
   const retarget = (selected: Element) => {
     if (!armed || armed.drag) return;
+    endNudges();
     armed.target = armed.prop === 'gap' ? gapContainer(selected, composedParent) ?? armed.target : selected;
     armed.matches = matchesOf(armed.target);
     update();
@@ -198,6 +260,7 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
 
   const beginDrag = (e: MouseEvent) => {
     const a = armed!;
+    endNudges();
     const start = readValues(a.target, a.prop);
     a.matches = matchesOf(a.target);
     a.drag = {
@@ -205,6 +268,7 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
       rect: a.target.getBoundingClientRect(),
       start,
       cur: { ...start },
+      refs: {},
       axis: null,
       styles: getComputedStyles(a.target),
     };
@@ -214,34 +278,109 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
   /** Release: the drag's changes go into the target's annotation, which it creates when there's none */
   const commitDrag = () => {
     const { prop, target, drag } = armed!;
-    const changes = dragChanges();
+    const changes = changesBetween(prop, drag!.start, drag!.cur, drag!.refs);
     disarm(false);
     if (!Object.keys(changes).length) {
       guideBar.show(deps.baseMode());
       return;
     }
-    const list = deps.annotations();
+    const { number, created } = save(target, prop, changes, drag!.styles);
+    if (!number) guideBar.show(deps.baseMode());
+    else showNotice(created ? `Annotation ${number}` : `Added to annotation ${number}`, true);
+  };
+
+  /**
+   * ←/→: one step (1px, 0.05, or one scale step while snapping) on the sides under the pointer, saved
+   * right away. The HUD shows the drag readout, its delta counted from before this arming's first
+   * nudge, and goes back to the hints after the last one.
+   */
+  const nudge = (dir: 1 | -1) => {
+    const a = armed!;
+    const { prop, target } = a;
+    const start = readValues(target, prop);
+    const { x, y } = deps.pointer();
+    const { alt, shift } = deps.held();
+    // A grid gap has no drag to pick its axis: ←/→ means the column gap
+    const { parts, anchor } = pickParts(prop, { rect: target.getBoundingClientRect(), x, y, alt, shift, flexAxis: flexAxisOf(target), dragAxis: 'x' });
+    const snap = snapping(prop);
+    const cur = { ...start };
+    const refs: Refs = {};
+    for (const part of parts) {
+      if (!snap) {
+        cur[part] = nudgeValue(prop, start[part] ?? 0, dir);
+        continue;
+      }
+      const step = stepOnScale(scaleOf(), prop, start[part] ?? 0, dir);
+      cur[part] = step.value;
+      if (step.ref) refs[part] = step.ref;
+    }
+    const changes = changesBetween(prop, start, cur, refs);
+    if (!Object.keys(changes).length) return;
+    save(target, prop, changes, getComputedStyles(target));
+    // The save replaced the annotations; the target and its matches are the same elements
+    if (a.nudges?.timer) clearTimeout(a.nudges.timer);
+    a.nudges = {
+      from: a.nudges?.from ?? start,
+      shown: { parts, anchor, refs },
+      timer: setTimeout(() => {
+        if (armed !== a || !a.nudges) return;
+        a.nudges.shown = null;
+        a.nudges.timer = null;
+        update();
+      }, NUDGE_MS),
+    };
+    update();
+  };
+
+  /** Backspace while armed: the property's edits and their lines come off the element's annotation */
+  const resetProperty = () => {
+    const { prop, target } = armed!;
+    const name = ADJUST[prop].title.toLowerCase();
     const existing = annotationFor(target);
-    const base = existing ?? deps.createAnnotation(target, drag!.styles);
-    const updated: Annotation = { ...base, ...withChanges(base, prop, changes) };
-    let next = existing ? list.map(a => a === existing ? updated : a) : [...list, updated];
-    // Dragged back to where it started, with nothing else said
-    if (!updated.comment.trim()) next = next.filter(a => a !== updated);
-    deps.saveAnnotations(next);
-    const index = next.indexOf(updated);
-    if (index === -1) guideBar.show(deps.baseMode());
-    else showSaved(existing ? `Added to annotation ${index + 1}` : `Annotation ${index + 1}`);
+    disarm(false);
+    if (!existing?.edits?.some(e => propertyOfDeclaration(e.property) === prop)) {
+      showNotice(`No ${name} changes to reset`);
+      return;
+    }
+    const updated: Annotation = { ...existing, ...withoutProperty(existing, prop) };
+    const list = deps.annotations();
+    deps.saveAnnotations(updated.comment.trim() ? list.map(a => a === existing ? updated : a) : list.filter(a => a !== existing));
+    showNotice(`Reset ${name}`);
+  };
+
+  const toggleSnap = () => {
+    if (!armed || !canSnap(armed.prop)) return false;
+    snapOn = !snapOn;
+    // Back to the hints, which show the chip; later nudges still count from this arming's first
+    if (armed.nudges?.timer) clearTimeout(armed.nudges.timer);
+    if (armed.nudges) armed.nudges = { ...armed.nudges, shown: null, timer: null };
+    update();
+    return true;
   };
 
   /**
    * Keys that mean something here, routed before kai's single-key shortcuts. Property keys arm when
-   * `canArm` (plain annotation mode, no text field or panel focused); Escape disarms.
-   * Returns whether the key was used.
+   * `canArm` (plain annotation mode, no text field or panel focused). While armed: Escape disarms (a
+   * drag is cancelled), Backspace / Delete reset, ←/→ nudge, T toggles snapping. Returns whether the
+   * key was used.
    */
   const handleKeydown = (e: KeyboardEvent, canArm: boolean): boolean => {
-    if (e.key === 'Escape' && armed) {
-      disarm();
-      return true;
+    if (armed) {
+      if (e.key === 'Escape') {
+        disarm();
+        return true;
+      }
+      if (!e.metaKey && !e.ctrlKey) {
+        if (e.key === 'Backspace' || e.key === 'Delete') {
+          if (!e.repeat && !armed.drag) resetProperty();
+          return true;
+        }
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          if (!armed.drag) nudge(e.key === 'ArrowRight' ? 1 : -1);
+          return true;
+        }
+        if (!e.altKey && !e.repeat && e.key.toUpperCase() === 'T' && toggleSnap()) return true;
+      }
     }
     if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return false;
     const prop = adjustPropertyFor(e.key);
@@ -273,9 +412,16 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
     return consumed;
   };
 
+  /** kai turned off: disarm, drop any confirmation and read the scale afresh next time */
+  const deactivate = () => {
+    disarm();
+    clearNotice();
+    scale = null;
+  };
+
   const destroy = () => {
+    deactivate();
     if (rafId !== null) cancelAnimationFrame(rafId);
-    clearSaved();
     layer.destroy();
   };
 
@@ -292,7 +438,7 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
     },
     retarget,
     disarm,
-    clearSaved,
+    deactivate,
     destroy,
   };
 };

@@ -882,8 +882,7 @@ class UIAnnotator extends HTMLElement {
     if (this.inspecting) {
       this.exitMeasureMode();
     }
-    this.adjustMode.disarm();
-    this.adjustMode.clearSaved();
+    this.adjustMode.deactivate();
     this.passThrough = false;
     this.fab.setInteractionActive(false);
     this.disarmPick();

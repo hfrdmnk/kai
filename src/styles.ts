@@ -1058,6 +1058,14 @@ export const styles = `
   color: var(--color-accent);
 }
 
+/* The class or token a snapped value lands on, while T is on */
+.kai-guide-bar-note {
+  min-width: 9ch;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--inv-text-muted);
+}
+
 .kai-guide-bar-check {
   color: var(--color-success);
 }

@@ -30,7 +30,7 @@ type PopoverOptions = {
 /** A second removal this soon after the last is a double click (or tap), not a second intent */
 const REMOVE_GUARD_MS = 400;
 
-const createEditList = (edits: StyleEdit[], onRemove: (property: string) => void, focusNote: () => void): HTMLElement => {
+const createEditList = (edits: StyleEdit[], onRemove: (property: string) => void, focusNote: () => void, focusButton: () => void): HTMLElement => {
   const list = document.createElement('ul');
   list.className = 'kai-popover-edits';
   list.setAttribute('aria-label', 'Changes');
@@ -74,7 +74,11 @@ const createEditList = (edits: StyleEdit[], onRemove: (property: string) => void
       onRemove(property);
       if (!list.children.length) list.remove();
       if (byKeyboard && next) next.focus();
-      else if (!byTouch) focusNote();
+      else if (byTouch) {
+        // Focus stays in the popover, on a button, which opens no on-screen keyboard
+        if (next) next.focus({ preventScroll: true });
+        else focusButton();
+      } else focusNote();
     });
     // Delete / Backspace on a focused remove button remove that change, like a click
     remove.addEventListener('keydown', (e) => {
@@ -162,7 +166,8 @@ export const createPopover = (
   body.appendChild(pathEl);
   body.appendChild(textarea);
   if (opts.edits?.length && opts.onRemoveEdit) {
-    body.appendChild(createEditList(opts.edits, opts.onRemoveEdit, () => textarea.focus()));
+    body.appendChild(createEditList(opts.edits, opts.onRemoveEdit, () => textarea.focus(),
+      () => popover.querySelector<HTMLElement>('.kai-popover-footer .kai-btn--primary')?.focus({ preventScroll: true })));
   }
   body.appendChild(descEl);
 

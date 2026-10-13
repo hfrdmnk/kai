@@ -970,9 +970,10 @@ try {
   // Touch screens (hover: none): the popover's remove buttons are always shown and tappable
   await touchBrowser('open', `http://127.0.0.1:${server.port}/?open`);
   const injected = [{
-    id: 'touch', selector: '#card-a', path: '', comment: '', styles: {}, rect: { x: 0, y: 0, w: 0, h: 0 }, createdAt: '',
+    id: 'touch', selector: '#card-a', path: '', comment: 'Touch note', styles: {}, rect: { x: 0, y: 0, w: 0, h: 0 }, createdAt: '',
     element: 'article', classes: ['card', 'px-2'], nearbyText: '', url: '', ariaAttributes: {}, dataAttributes: {},
-    edits: [{ property: 'padding-right', from: 8, to: 18 }],
+    // With a note, removing a change keeps the popover open
+    edits: [{ property: 'padding-right', from: 8, to: 18 }, { property: 'padding-top', from: 0, to: 10 }],
   }];
   await touchBrowser('eval', `localStorage.setItem(\`ui-annotator:\${location.origin}\${location.pathname}\`, ${JSON.stringify(JSON.stringify(injected))})`);
   await touchBrowser('reload');
@@ -982,6 +983,19 @@ try {
   await touchBrowser('snapshot', '-i');
   const touchButton = JSON.parse(await touchBrowser('eval', `(b => [matchMedia('(hover: none)').matches, getComputedStyle(b).opacity, getComputedStyle(b).pointerEvents])(document.querySelector('ui-annotator').shadowRoot.querySelector('.kai-popover-edit-remove'))`));
   assert(touchButton[0] === true && touchButton[1] === '1' && touchButton[2] === 'auto', 'Without hover (touch), remove buttons are always shown and tappable');
+  // A tap removal keeps focus on a popover button (no on-screen keyboard, keys still go to the popover)
+  const afterTap = JSON.parse(await touchBrowser('eval', `new Promise(done => {
+    const root = document.querySelector('ui-annotator').shadowRoot;
+    // A real tap focuses the button first (Android Chrome); removing it must not drop focus to the page
+    const button = root.querySelector('.kai-popover-edit-remove');
+    button.focus();
+    button.dispatchEvent(new PointerEvent('click', { pointerType: 'touch', detail: 1, bubbles: true, cancelable: true }));
+    requestAnimationFrame(() => {
+      const focused = root.activeElement;
+      done([focused?.localName ?? '', !!focused?.closest('.kai-popover'), root.querySelectorAll('.kai-popover-edit').length]);
+    });
+  })`)) as [string, boolean, number];
+  assert(afterTap[0] === 'button' && afterTap[1] && afterTap[2] === 1, 'A tap removal keeps focus on a popover button, not the note or the page');
   if (failures) throw new Error(`${failures} browser regression checks failed`);
 } finally {
   // Each session closes on its own; one failing must not leave the other open

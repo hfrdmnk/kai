@@ -313,6 +313,8 @@ export const createMarkerManager = (
     };
   };
 
+  let passive = false;
+
   const ensureStackElement = (key: string, count: number): HTMLElement => {
     const existing = stackElements.get(key);
     if (existing) {
@@ -323,6 +325,7 @@ export const createMarkerManager = (
 
     const el = document.createElement('div');
     el.className = 'kai-marker-stack kai-marker-stack--has-badge';
+    el.toggleAttribute('data-passive', passive);
     el.appendChild(createMarkerIcon());
 
     const badge = document.createElement('span');
@@ -517,6 +520,7 @@ export const createMarkerManager = (
       if (!marker) {
         marker = document.createElement('div');
         marker.className = 'kai-marker';
+        marker.toggleAttribute('data-passive', passive);
         marker.setAttribute('role', 'button');
         marker.setAttribute('tabindex', '0');
         marker.addEventListener('click', (e) => {
@@ -604,6 +608,16 @@ export const createMarkerManager = (
 
   rafId = requestAnimationFrame(reposition);
 
+  /**
+   * While a property is armed, markers let the pointer through to the page, so the annotated
+   * element's corner under its marker can be grabbed again
+   */
+  const setPassive = (on: boolean) => {
+    passive = on;
+    if (on) closeStackMenu();
+    for (const el of [...markerMap.values(), ...stackElements.values()]) el.toggleAttribute('data-passive', on);
+  };
+
   const setActive = (active: boolean) => {
     isActive = active;
     pendingEntrance = active;
@@ -619,5 +633,5 @@ export const createMarkerManager = (
     return markerMap.get(id)?.getBoundingClientRect();
   };
 
-  return { update, showPreview, clearPreview, showBox, hideBox, setActive, destroy, getMarkerRect };
+  return { update, showPreview, clearPreview, showBox, hideBox, setActive, setPassive, destroy, getMarkerRect };
 };

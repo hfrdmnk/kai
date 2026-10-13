@@ -614,6 +614,12 @@ export const styles = `
   border: none;
 }
 
+/* Drag to adjust: the pointer reaches the annotated element under its marker */
+.kai-marker[data-passive],
+.kai-marker-stack[data-passive] {
+  pointer-events: none;
+}
+
 .kai-marker {
   border-radius: 9999px 9999px 9999px var(--radius-sm);
 }

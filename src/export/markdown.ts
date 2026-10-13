@@ -10,9 +10,14 @@ export const formatSiblings = (count: number, key: string, parent: string): stri
 const siblingsLine = (a: Annotation): string | null => {
   const matches = resolveAnnotationMatches(a);
   const target = resolveAnnotation(a);
-  if (matches.length < 2 || !target?.parentElement) return null;
+  // The parent as matching sees it: parentNode, so siblings at the top of a shadow root count too
+  const parent = target?.parentNode;
+  if (matches.length < 2 || !target || !parent) return null;
   const classes = Array.from(target.classList).filter(c => !c.startsWith('kai-'));
-  return formatSiblings(matches.length, [target.localName, ...classes].join('.'), generateSelector(target.parentElement));
+  // Escaped, so the key is a valid selector (div.md\:px-4)
+  const key = [target.localName, ...classes].map(name => CSS.escape(name)).join('.');
+  const where = parent instanceof ShadowRoot ? `${generateSelector(parent.host)} >>> :host` : generateSelector(parent as Element);
+  return formatSiblings(matches.length, key, where);
 };
 
 /** `- \`padding-right: 24px → 32px\` (2rem, \`pr-8\`)`: the change in code, then its rem and class or token */

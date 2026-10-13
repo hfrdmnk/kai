@@ -16,6 +16,7 @@ The name 回 (kai) is Japanese for "turn," as in a turn in a cycle. Annotate wha
 - Smart element selection with hover highlight, breadcrumb paths, and computed styles (px→rem)
 - CSS variable autocomplete — type `--` to browse the page's custom properties
 - Measurement mode (<kbd>Alt</kbd>): crosshair with dimensions, text metrics, box model (padding, margin, flex/grid gaps), selection rectangle
+- Drag to adjust (<kbd>P</kbd> <kbd>M</kbd> <kbd>G</kbd> <kbd>F</kbd> <kbd>L</kbd> <kbd>B</kbd>): drag padding, margin, gap, font size, line height or border radius live on the page; the change lands in the element's annotation
 - Interaction mode (<kbd>I</kbd>): interact with the page without leaving the annotator
 - Shortcut reference (<kbd>?</kbd>): see shortcuts for every mode in one panel
 - Copy any element's selector with the cursor action bubble
@@ -71,6 +72,17 @@ To run the browser regression check, install `agent-browser` and its Chromium br
 
 Hold <kbd>Alt</kbd> to enter measurement mode. A crosshair follows your cursor showing element dimensions. Hold <kbd>Shift</kbd> additionally to see text metrics. Tap <kbd>Ctrl</kbd> while holding Alt to toggle the box model: padding in the accent color, margin and flex/grid gaps hatched, with values in px and rem. It stays on until you release Alt. Shift and the box model combine. <kbd>↑</kbd> / <kbd>↓</kbd> move whatever you're measuring to the parent or child, and the selection carries across annotating, measuring and the box model as long as you keep the mouse still. The first mouse move after switching goes back to the innermost element. Click and drag to measure arbitrary distances.
 
+### Drag to adjust
+
+Hover an element and press a property key: <kbd>P</kbd> padding, <kbd>M</kbd> margin, <kbd>G</kbd> gap
+(of the element or its nearest flex/grid container), <kbd>F</kbd> font size, <kbd>L</kbd> line height,
+<kbd>B</kbd> border radius. Then press, drag and release anywhere on the page. The side or corner
+nearest the pointer changes; hold <kbd>Alt</kbd> for it and its opposite side (or both corners on that
+side) and <kbd>Shift</kbd> for all of them. The page updates live on every element the annotation's
+selector matches, and the HUD shows the new value and the change. Release adds a line like
+`padding-right: 24px → 34px (2.125rem)` to the element's annotation. <kbd>Esc</kbd> cancels.
+Deleting the annotation, or its line, puts the page back.
+
 ### Interaction mode
 
 While kai is in annotation mode, page clicks and keyboard input are blocked. Press <kbd>I</kbd> to
@@ -101,10 +113,13 @@ interaction mode outside text fields.
 | Shortcut | Context | Action |
 |---|---|---|
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> | Any tab | Toggle kai on / off (extension shortcut, change it at `chrome://extensions/shortcuts`) |
-| <kbd>Esc</kbd> | Annotation mode | Close help / panel / settings → cancel pick mode → deactivate, whichever applies first |
+| <kbd>Esc</kbd> | Annotation mode | Close help / panel / settings → cancel a drag or disarm → cancel pick mode → deactivate, whichever applies first |
 | <kbd>Esc</kbd> | Interaction mode | Dismiss the page's topmost overlay |
 | <kbd>S</kbd> | Active | Toggle copy-selector pick mode |
-| <kbd>M</kbd> | Active, has annotations | Copy all annotations as Markdown |
+| <kbd>C</kbd> | Active, has annotations | Copy all annotations as Markdown |
+| <kbd>P</kbd> / <kbd>M</kbd> / <kbd>G</kbd> / <kbd>F</kbd> / <kbd>L</kbd> / <kbd>B</kbd> | Annotation mode, element hovered | Arm padding / margin / gap / font size / line height / border radius; the same key or <kbd>Esc</kbd> disarms |
+| Drag | Property armed | Adjust the nearest side or corner; release adds it to the annotation |
+| <kbd>Alt</kbd> / <kbd>Shift</kbd> (hold) | Dragging | That side and its opposite / all sides, corners or gaps |
 | <kbd>⌫</kbd> / <kbd>Del</kbd> | Active, has annotations | Clear all: first press arms, second press within 3 s confirms |
 | <kbd>,</kbd> | Active | Toggle settings |
 | <kbd>I</kbd> | Active, outside text fields | Toggle interaction / annotation mode (also a button beside kai) |

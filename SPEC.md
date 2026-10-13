@@ -67,6 +67,17 @@ No React, no Svelte, no Vue. Pure vanilla TypeScript compiled to a single IIFE b
 - The model is computed once per target and recomputed on scroll, resize or DOM changes
 - Dragging to measure hides the layer. `Ctrl+wheel` (browser zoom) is blocked while inspecting
 
+### Drag to Adjust
+- In plain annotation mode (not interaction or pick mode, not while inspecting, not while a text field, the popover, settings or the shortcut panel has focus), a property key arms that property on the selection: `P` padding, `M` margin, `G` gap of the selection or its closest flex/grid ancestor, `F` font-size, `L` line-height (unitless), `B` border-radius. The same key again or `Esc` disarms; another property key switches. While armed the selection is locked to hover; `↑` / `↓` still walk it and move the armed target
+- Press, drag and release anywhere is one adjustment; afterwards kai is disarmed. A press without movement changes nothing and doesn't open the popover
+- Sides (P, M): the side nearest the pointer at press time; pulling it outward is more. `Alt` adds the opposite side, `Shift` takes all four. Corners (B): the nearest corner by quadrant; `Alt` both corners on the nearest side, `Shift` all four; toward the element's middle is more. Gap (G): a flex container's main-axis gap (`column-gap` for rows, `row-gap` for columns); for grid the first 6px of travel pick `column-gap` (↔) or `row-gap` (↕); `Shift` both. F, L: → or ↑ is more, no modifiers. Modifiers apply live mid-drag. While armed, `Alt` is this modifier and doesn't enter inspect
+- 2px of travel per px of spacing, radius and gap, 4px per px of font size, 2px per 0.01 of line height. Values are whole px, line height steps of 0.05; travel under 3px is ignored. Padding, gap and radius stop at 0; margin goes negative
+- The change previews live as inline `!important` longhands on every element matching the annotation's selector (`resolveSelectorAll`, shadow hops included), since the fix will change them all. Other matches get a dashed accent outline and the tooltip shows `×N`. The hover box hugs the element with a thin outline
+- While armed and dragging, kai draws what will change like the box model: padding bands, hatched margin bands and gap gutters, stripes on alternate lines for line height, and for each changing corner a second rounded border 4px outside its curve. Changing sides and gutters get a 2px accent outline; an empty one still gets a 4px sliver. The cursor is `ew-resize` / `ns-resize` / `move` along the changing sides or gaps, `crosshair` otherwise
+- The HUD stays one 32px line. Armed: a side or corner glyph (changing ones in accent), the property and its current value as CSS shorthand, and the modifier chips, lit while held (`⌥ axis · ⇧ all`; B `⌥ side · ⇧ all`; G `⇧ both`). Dragging: the declaration, its new value and the signed delta (`padding-right  35px  +11px`) in fixed-width tabular cells; several declarations at once show as one row named after the shorthand (`padding`, `gap`, `border-radius (right)`), valued at the grabbed side or corner. The pill only grows during a drag. After release, `✓ Annotation 3` or `✓ Added to annotation 3` shows for 1.2 s, display only
+- Release writes the change into the element's annotation (the one `resolveAnnotation` finds), creating one with an empty comment if needed. Each edit is stored in its shortest form (all four sides equal → `padding`, left and right → `padding-inline`, top and bottom → `padding-block`, else single sides; likewise `gap` and `border-radius`) and has a comment line, e.g. `padding-right: 24px → 34px (2.125rem)` or `line-height: 1.55 → 1.6`. Editing an adjusted property again keeps the original value and replaces its line; back at the original value, the edit and its line go
+- kai's styles on the page are derived from the edits (`createEditStyles` in `src/core/edit-styles.ts`): every annotation's edits are applied to its matches and every other longhand kai touched goes back to the element's own inline value, captured the first time kai touched it. This runs on load, activation, release, comment save, delete and clear all
+
 ### Annotation Authoring
 - Textarea for writing feedback
 - **CSS variable autocomplete**: When the user types `--`, harvest all CSS custom properties from the page's stylesheets available for the selected element. Show a dropdown with variable names, resolved values, and color swatches for color values. Navigate with arrow keys, accept with Tab/Enter.
@@ -77,18 +88,18 @@ No React, no Svelte, no Vue. Pure vanilla TypeScript compiled to a single IIFE b
 - Numbered markers appear on annotated elements (repositioned on scroll/resize)
 - Drawer lists all annotations with selector and comment preview
 - Click an annotation in the drawer to scroll the page to that element
-- Remove individual annotations or clear all
+- Remove individual annotations or clear all; their adjustments come off the page with them. Saving an emptied comment deletes the annotation; saving it without an adjustment's line drops that adjustment
 - Keyboard navigation: Tab between items, Enter to scroll, Delete/Backspace to remove
 
 ### Export
-- **JSON**: Structured object with url, viewport dimensions, timestamp, and annotation array (each with selector, path, intent, styles, rect, comment)
+- **JSON**: Structured object with url, viewport dimensions, timestamp, and annotation array (each with selector, path, intent, styles, rect, comment, edits)
 - **Markdown**: Formatted for pasting into AI coding agents — headings per annotation with selector as code, styles listed, feedback quoted
 - Copy to clipboard with inline button feedback (icon swap + color change, auto-reset)
 - **Copy selector**: cursor action bubble arms a one-shot pick mode; clicking an element copies its selector and the bubble shows the same check confirmation
 
 ### Session Persistence
 - Annotations saved to `localStorage` under key `ui-annotator:{origin}{pathname}`
-- Sessions load automatically when the tool initializes on a page with prior data
+- Sessions load automatically when the tool initializes on a page with prior data, adjustments re-applied to the page
 - Clear session button in the drawer
 
 </section>
@@ -107,6 +118,15 @@ type Annotation = {
   styles: Record<string, string>;      // Relevant computed styles
   rect: { x: number; y: number; w: number; h: number };
   createdAt: string;                   // ISO timestamp
+  edits?: StyleEdit[];                 // Drag-to-adjust changes; each has a line in comment
+};
+
+type StyleEdit = {
+  property: string;   // As written: padding | padding-inline | padding-block | padding-top… | margin… | gap | row-gap | column-gap | font-size | line-height | border-radius | border-top-left-radius…
+  from: number;       // px; unitless for line-height
+  to: number;
+  className?: string; // Project utility class when snapped (not yet used)
+  token?: string;     // var(--x) when snapped to a CSS variable (not yet used)
 };
 
 type ExportPayload = {
@@ -155,10 +175,15 @@ All kai UI layers sit at the top of the stacking context, above any host page co
 | `Escape` | Settings open | Close settings |
 | `Escape` | Shortcut reference open | Close shortcut reference |
 | `Escape` | Pick mode armed | Cancel pick mode |
+| `Escape` | Property armed or dragging | Disarm; mid-drag, cancel and put the page back |
 | `Escape` | Annotation mode, no panel | Deactivate annotator |
 | `Escape` | Interaction mode | Pass to the page (e.g. dismiss its dialog) |
 | `S` | Annotator active, no text field focused | Toggle copy-selector pick mode |
-| `M` | Annotator active, no text field focused | Copy all annotations as Markdown |
+| `C` | Annotator active, no text field focused | Copy all annotations as Markdown |
+| `P` / `M` / `G` / `F` / `L` / `B` | Annotation mode, no text field focused | Arm padding / margin / gap / font-size / line-height / border-radius on the selection (same key again disarms) |
+| Drag | Property armed | Adjust the nearest side or corner (gap: main axis or drag axis); release adds it to the annotation |
+| `Alt`, held | Property armed | Also the opposite side (border-radius: both corners on the nearest side) |
+| `Shift`, held | Property armed | All sides, all corners or both gaps |
 | `Backspace` / `Delete` | Annotator active, no text field focused | Clear all (second press within 3 s confirms) |
 | `,` | Annotator active, no text field focused | Toggle settings |
 | `I` | Annotator active, no text field focused | Toggle interaction / annotation mode |
@@ -166,7 +191,7 @@ All kai UI layers sit at the top of the stacking context, above any host page co
 | `Alt`, held | Annotation mode | Inspect / drag to measure |
 | `Alt+Shift`, held | Annotation mode | Inspect text metrics |
 | `Alt+Ctrl`, held | Annotation mode | Inspect the box model (padding, margin, flex/grid gaps); combines with `Shift` |
-| `↑` / `↓` | Element hovered, annotation or inspect mode | Move the selection (highlight, measurement or box model) to the parent / back toward the hovered element |
+| `↑` / `↓` | Element hovered, annotation or inspect mode | Move the selection (highlight, measurement or box model) to the parent / back toward the hovered element; while a property is armed, its target moves along |
 | `Cmd/Ctrl+Enter` | Panel textarea focused | Submit annotation |
 | `Tab` | Autocomplete visible | Accept selected suggestion |
 | `Tab` | Rem suggestion visible | Accept px→rem replacement |

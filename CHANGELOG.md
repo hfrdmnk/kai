@@ -2,8 +2,16 @@
 
 ## Unreleased
 
+### Added
+
+- Drag to adjust: hover an element, press P (padding), M (margin), G (gap), F (font size), L (line height) or B (border radius), then drag anywhere. The nearest side or corner changes; Alt adds its opposite, Shift takes all. The page previews the change on every element the selector matches, with bands, gutters, line stripes or corner arcs showing what will change and a one-line HUD showing the value
+- Release writes the change into the element's annotation as a line like `padding-right: 24px → 34px (2.125rem)` and stores it as `edits`. Adjustments persist with the session; deleting the annotation, clearing all or removing the line puts the page back
+
 ### Changed
 
+- Copy as Markdown moves from M to C; M now arms margin
+- Saving an emptied comment deletes the annotation
+- The HUD is always one 32px line
 - The box model shows only while Ctrl is held with Alt, like Shift for text metrics, instead of toggling on a Ctrl tap
 
 ## 1.1.0 — 2026-10-10

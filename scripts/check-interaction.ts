@@ -789,6 +789,81 @@ try {
   await browser('eval', frames);
   const markdown = JSON.parse(await browser('eval', 'window.__copied ?? ""')) as string;
   assert(markdown.includes('**Changes:**\n- `padding-top: 0px → 10px` (0.625rem)\n- `padding-right: 8px → 18px` (1.125rem)'), 'Markdown lists the changes');
+  assert(markdown.includes('Applies to all 3 identical siblings (`article.card.px-2` under `#cards`)'), 'Markdown says a shared change applies to all siblings');
+
+  // ── Popover keys and pointer ──
+  /** card-a with two changes: padding-right and padding-top */
+  const twoChanges = async () => {
+    await resetOpen();
+    await dragRight(await armEl('#card-a'), 20);
+    await release();
+    await browser('wait', '1300');
+    await browser('hover', '#card-a');
+    await browser('eval', frames);
+    await browser('press', 'p');
+    const [x, y] = JSON.parse(await browser('eval',
+      `(r => [Math.round(r.left + r.width / 2), Math.round(r.top + 2)])(document.querySelector('#card-a').getBoundingClientRect())`)) as number[];
+    await browser('mouse', 'move', String(x), String(y));
+    await browser('eval', frames);
+    await browser('mouse', 'down', 'left');
+    await browser('mouse', 'move', String(x), String(y - 10));
+    await browser('mouse', 'move', String(x), String(y - 20));
+    await release();
+    await browser('wait', '1300');
+    await browser('click', '#card-a');
+    await browser('snapshot', '-i');
+  };
+  const rowCount = () => inShadow(`root.querySelectorAll('.kai-popover-edit').length`);
+
+  // Two quick clicks on a row's remove button remove one change: the next row doesn't take the second
+  await twoChanges();
+  const [qx, qy] = await inShadow(`(r => [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)])(root.querySelectorAll('.kai-popover-edit')[0].getBoundingClientRect())`) as number[];
+  await browser('mouse', 'move', String(qx), String(qy));
+  await browser('wait', '250');
+  const [cx, cy] = await inShadow(`(r => [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)])(root.querySelectorAll('.kai-popover-edit-remove')[0].getBoundingClientRect())`) as number[];
+  await browser('mouse', 'move', String(cx), String(cy));
+  for (let i = 0; i < 2; i++) {
+    await browser('mouse', 'down', 'left');
+    await browser('mouse', 'up', 'left');
+  }
+  await browser('eval', frames);
+  assert(editText((await stored())[0]) === 'padding-right:8→18' && await rowCount() === 1, 'A double click on a remove button removes one change');
+  await browser('press', 'Escape');
+
+  // Backspace on a focused remove button removes that change; kai's Clear all isn't armed
+  await twoChanges();
+  await inShadow(`(root.querySelector('.kai-popover-edit-remove').focus(), true)`);
+  await browser('press', 'Backspace');
+  await browser('eval', frames);
+  const focusedAfter = await inShadow(`root.activeElement?.getAttribute('aria-label') ?? ''`);
+  assert(editText((await stored())[0]) === 'padding-right:8→18' && focusedAfter === 'Remove padding-right change',
+    'Backspace on a focused remove button removes that change and moves focus to the next row\'s button');
+  // C on the focused Save button: the popover's, not kai's copy
+  await browser('eval', `(() => { window.__copied = undefined; navigator.clipboard.writeText = text => { window.__copied = text; return Promise.resolve(); }; return true; })()`);
+  await inShadow(`(root.querySelector('.kai-popover .kai-btn--primary').focus(), true)`);
+  await browser('press', 'c');
+  await browser('eval', frames);
+  assert(await browser('eval', 'window.__copied === undefined') === 'true', 'C with focus on Save does not copy');
+  await browser('press', 'Escape');
+  // Had the Backspace above armed Clear all, this press would confirm it
+  await browser('press', 'Backspace');
+  await browser('eval', frames);
+  assert((await stored()).length === 1, 'Backspace on a remove button did not arm Clear all');
+
+  // Removing the last change while a note is being typed keeps the annotation with that note
+  await resetOpen();
+  await dragRight(await armEl('#card-a'), 20);
+  await release();
+  await browser('wait', '1300');
+  await browser('click', '#card-a');
+  await browser('snapshot', '-i');
+  await browser('keyboard', 'type', 'Draft note');
+  await inShadow(`(root.querySelector('.kai-popover-edit-remove').click(), true)`);
+  await browser('eval', frames);
+  saved = await stored();
+  assert(saved.length === 1 && saved[0].comment === 'Draft note' && !saved[0].edits && await px('#card-a') === '8px'
+    && await inShadow(`!!root.querySelector('.kai-popover')`) === true, 'Removing the last change keeps an annotation whose note is being typed');
+  await browser('press', 'Escape');
 
   // The target leaves the page right before release: the release stays kai's, nothing throws
   await resetOpen();

@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.2.0 — 2026-10-13
+
+Drag to adjust spacing, type and radius straight on the page, snapped to the project's own scale, with changes saved apart from your note and previewed on identical siblings. Every change to the annotations can now be undone and redone.
 
 ### Added
 

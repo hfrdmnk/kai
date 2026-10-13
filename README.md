@@ -86,7 +86,8 @@ remove button on hover, and the Markdown export adds them as a **Changes** list.
 <kbd>Esc</kbd> cancels. Deleting the annotation, or one of its changes, puts the page back.
 
 While a property is armed, <kbd>←</kbd> / <kbd>→</kbd> nudge the side under the pointer by one step
-and save it right away, and <kbd>Backspace</kbd> resets the property on the element. If the page has
+and save it right away, and <kbd>Backspace</kbd> resets the property on the element and its identical siblings
+(an annotation left with neither a note nor changes goes). If the page has
 its own scale (Tailwind-style utility classes, or `:root` variables like `--space-4`), <kbd>T</kbd>
 snaps drags and nudges to it and the change names the class: `padding-right  24px → 32px  pr-8`.
 Snapping stays on until you press <kbd>T</kbd> again.

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   adjustPropertyFor, adjustValue, cursorFor, dragAxisOf, dragReadout, dragTravel, editDeclarations, editsInComment,
   formatEditLine, longhandsOfDeclaration, mergeEdits, nameWidth, nearestCorner, nearestSide, pickParts,
-  nudgeValue, shorthandValue, shortestEdits, syncEditLines, withChanges, withoutProperty,
+  changeLabel, nudgeValue, shorthandValue, shortestEdits, syncEditLines, withChanges, withoutProperty,
 } from '../src/core/adjust.ts';
 import type { StyleEdit } from '../src/types.ts';
 
@@ -441,5 +441,15 @@ describe('snapped readout', () => {
     expect(dragReadout('gap', ['row', 'column'], null, { row: 8, column: 8 }, { row: 24, column: 24 }, { row: { token: 'var(--space-6)' }, column: { token: 'var(--space-6)' } }))
       .toEqual({ name: 'gap', value: '24px', delta: '+16px', note: 'var(--space-6)' });
     expect(dragReadout('padding', ['right'], 'right', { right: 24 }, { right: 25 }).note).toBe('');
+  });
+});
+
+describe('undo labels', () => {
+  test('name the declarations a change wrote', () => {
+    expect(changeLabel('padding', { 'padding-right': { from: 24, to: 34 } })).toBe('padding-right');
+    expect(changeLabel('padding', {
+      'padding-top': { from: 8, to: 12 }, 'padding-bottom': { from: 8, to: 12 }, 'padding-left': { from: 8, to: 10 },
+    })).toBe('padding-block, padding-left');
+    expect(changeLabel('gap', { 'row-gap': { from: 8, to: 12 }, 'column-gap': { from: 8, to: 12 } })).toBe('gap');
   });
 });

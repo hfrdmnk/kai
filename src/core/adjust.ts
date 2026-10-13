@@ -323,6 +323,10 @@ export const withChanges = (a: { comment: string; edits?: StyleEdit[] }, prop: A
   return { comment: syncEditLines(a.comment, before, edits), edits: edits.length ? edits : undefined };
 };
 
+/** What undo calls a drag or nudge: the declarations it wrote, `padding-right` or `padding-block, padding-left` */
+export const changeLabel = (prop: AdjustProperty, changes: Record<string, Change>): string =>
+  shortestEdits(prop, changes).map(e => e.property).join(', ');
+
 /** An annotation's comment and edits without a property's edits and their lines (Backspace while armed) */
 export const withoutProperty = (a: { comment: string; edits?: StyleEdit[] }, prop: AdjustProperty) => {
   const before = a.edits ?? [];

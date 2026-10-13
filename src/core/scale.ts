@@ -137,6 +137,23 @@ const readProbe = (probe: HTMLElement, property: string): number => {
   return parseFloat(cs.getPropertyValue(property));
 };
 
+/**
+ * A cheap fingerprint of the page's styles: sheet count and rule count. When it changes (a lazily
+ * loaded stylesheet, a CSS-in-JS insert), the scale is read again.
+ */
+export const styleSignature = (): string => {
+  const sheets = [...Array.from(document.styleSheets), ...document.adoptedStyleSheets];
+  let rules = 0;
+  for (const sheet of sheets) {
+    try {
+      rules += sheet.cssRules.length;
+    } catch {
+      // Cross-origin: unreadable either way
+    }
+  }
+  return `${sheets.length}:${rules}`;
+};
+
 /** The page's scale. Probes values with a hidden element, so `calc(var(--spacing) * 4)` resolves too */
 export const harvestScale = (): { scale: Scale; source: ScaleSource } => {
   const rules = styleRules();

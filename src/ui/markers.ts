@@ -213,7 +213,7 @@ export const createMarkerManager = (
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         closeStackMenu(true);
-        onMarkerClick(ann, stackEl.getBoundingClientRect());
+        onMarkerClick(currentAnnotations.find(a => a.id === ann.id) ?? ann, stackEl.getBoundingClientRect());
       });
 
       btn.addEventListener('mouseenter', () => {
@@ -526,7 +526,9 @@ export const createMarkerManager = (
         marker.addEventListener('click', (e) => {
           e.stopPropagation();
           const el = e.currentTarget as HTMLElement;
-          onMarkerClick(annotation, el.getBoundingClientRect());
+          // Annotations are replaced on every change: open the current one, not the one this marker was made for
+          const current = currentAnnotations.find(a => a.id === annotation.id);
+          if (current) onMarkerClick(current, el.getBoundingClientRect());
         });
         marker.addEventListener('mouseenter', () => onMarkerEnter?.(annotation.id));
         marker.addEventListener('mouseleave', () => onMarkerLeave?.(annotation.id));

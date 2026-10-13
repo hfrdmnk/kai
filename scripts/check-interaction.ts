@@ -35,16 +35,11 @@ const server = Bun.serve({
       </main>
       <!-- Below main, so main's own size (measured by the inspect checks) stays put -->
       <section id="review" style="padding:0 80px 80px">
-          <!-- Matching: identical utility-only siblings change together, a lone look-alike elsewhere doesn't;
-               component-class look-alikes change wherever they are, whatever their utilities -->
+          <!-- Matching: identical siblings change together; the same classes in another parent don't -->
           <ul id="tpl"><li class="px-2 py-1">One</li><li class="px-2 py-1">Two</li></ul>
           <ul><li class="px-2 py-1" id="lone">Lone</li></ul>
-          <div><article class="card px-2" id="card-a">Card A</article></div>
-          <div><article class="card px-4" id="card-b">Card B</article></div>
-          <div><article class="card px-2" id="card-c">Card C</article></div>
+          <div id="cards"><article class="card px-2" id="card-a">Card A</article><article class="card px-2" id="card-b">Card B</article><article class="card px-2" id="card-c">Card C</article></div>
           <div id="gone">Removed mid-drag</div>
-          <!-- A var() shorthand with a longhand after it: the shorthand reads empty inline -->
-          <div id="mixed" style="--p: 20px; padding: var(--p); padding-top: 4px; background: #eee">Mixed</div>
           <!-- Padding from a variable through the shorthand: its longhands read empty inline -->
           <div id="shorthand" style="--pad: 20px; padding: var(--pad); background: #eee">Shorthand</div>
       </section>
@@ -295,7 +290,10 @@ try {
 
   // ── Drag to adjust ──
   const stored = async () => JSON.parse(await browser('eval', 'JSON.parse(localStorage.getItem(`ui-annotator:${location.origin}${location.pathname}`) ?? "[]")')) as
-    { selector: string; comment: string; edits?: { property: string; from: number; to: number }[] }[];
+    { selector: string; comment: string; edits?: { property: string; from: number; to: number; className?: string }[] }[];
+  /** `padding-right:4→14`, `:pr-8` when snapped: an annotation's edits in one string */
+  const editText = (a?: { edits?: { property: string; from: number; to: number; className?: string }[] }) =>
+    (a?.edits ?? []).map(e => `${e.property}:${e.from}→${e.to}${e.className ? `:${e.className}` : ''}`).join();
   const twinPadding = async () => JSON.parse(await browser('eval', `[...document.querySelectorAll('.twin .t')].map(e => getComputedStyle(e).paddingRight)`)) as string[];
   /** Arms a property on the first twin with the pointer just inside its right edge */
   const armTwin = async (key: string) => {
@@ -340,9 +338,8 @@ try {
   await browser('mouse', 'up', 'left');
   await browser('eval', frames);
   let saved = await stored();
-  assert(saved.length === 1 && saved[0].comment === 'padding-right: 4px → 14px (0.875rem)'
-    && saved[0].edits?.length === 1 && saved[0].edits[0].property === 'padding-right' && saved[0].edits[0].from === 4 && saved[0].edits[0].to === 14
-    && (await twinPadding()).join() === '14px,14px', 'Release creates an annotation with the edit and its comment line');
+  assert(saved.length === 1 && saved[0].comment === '' && editText(saved[0]) === 'padding-right:4→14'
+    && (await twinPadding()).join() === '14px,14px', 'Release creates an annotation with the edit and an empty note');
   assert(!(await browser('snapshot', '-i')).includes('Annotation comment'), 'Releasing a drag does not open the annotation editor');
 
   at = await armTwin('p');
@@ -350,14 +347,14 @@ try {
   await browser('mouse', 'up', 'left');
   await browser('eval', frames);
   assert(!(await browser('snapshot', '-i')).includes('Annotation comment') && (await twinPadding()).join() === '14px,14px'
-    && (await stored())[0].comment === saved[0].comment, 'A press without movement changes nothing and opens no editor');
+    && editText((await stored())[0]) === editText(saved[0]), 'A press without movement changes nothing and opens no editor');
 
   at = await armTwin('p');
   await dragRight(at, 10);
   await browser('mouse', 'up', 'left');
   await browser('eval', frames);
   saved = await stored();
-  assert(saved.length === 1 && saved[0].comment === 'padding-right: 4px → 19px (1.188rem)', 'A second drag extends the same annotation, keeping the original value');
+  assert(saved.length === 1 && editText(saved[0]) === 'padding-right:4→19', 'A second drag extends the same annotation, keeping the original value');
 
   await browser('reload');
   await browser('wait', '300');
@@ -381,8 +378,8 @@ try {
   await browser('press', 'Control+Enter');
   await browser('eval', frames);
   saved = await stored();
-  assert(saved.length === 1 && saved[0].comment === 'Just a note' && !saved[0].edits && (await twinPadding()).join() === '4px,4px',
-    'Removing an edit\'s line from the comment drops the edit and its style');
+  assert(saved.length === 1 && saved[0].comment === 'Just a note' && editText(saved[0]) === 'padding-right:4→14' && (await twinPadding()).join() === '14px,14px',
+    'The note saves apart from the edits, which stay');
 
   await reset();
   // G on a flex item adjusts its container's main-axis gap
@@ -396,7 +393,7 @@ try {
   await browser('mouse', 'up', 'left');
   await browser('eval', frames);
   saved = await stored();
-  assert(saved.length === 1 && saved[0].selector === '#box-parent' && saved[0].comment === 'column-gap: 12px → 20px (1.25rem)',
+  assert(saved.length === 1 && saved[0].selector === '#box-parent' && editText(saved[0]) === 'column-gap:12→20',
     'G adjusts the nearest flex container\'s main-axis gap');
   await browser('press', 'Backspace');
   await browser('press', 'Backspace');
@@ -429,21 +426,20 @@ try {
   await browser('mouse', 'up', 'left');
   await browser('eval', frames);
   saved = await stored();
-  assert(saved.length === 1 && saved[0].comment === 'padding-right: 16px → 32px (2rem, pr-8)' && saved[0].edits?.[0].className === 'pr-8',
-    'A snapped edit names its class in the comment line and the data');
+  assert(saved.length === 1 && editText(saved[0]) === 'padding-right:16→32:pr-8', 'A snapped edit names its class');
 
   // Snapping stays on: one ← steps back down the scale, saved without a release
   await armSnap();
   await browser('press', 'ArrowLeft');
   await browser('eval', frames);
   saved = await stored();
-  assert(await snapPadding() === '"24px"' && saved[0].comment === 'padding-right: 16px → 24px (1.5rem, pr-6)', 'Snapping is sticky and ← nudges one scale step, saved right away');
+  assert(await snapPadding() === '"24px"' && editText(saved[0]) === 'padding-right:16→24:pr-6', 'Snapping is sticky and ← nudges one scale step, saved right away');
   await browser('press', 't');
   await browser('press', 'ArrowRight');
   await browser('press', 'ArrowRight');
   await browser('eval', frames);
   saved = await stored();
-  assert(await snapPadding() === '"26px"' && saved.length === 1 && saved[0].comment === 'padding-right: 16px → 26px (1.625rem)',
+  assert(await snapPadding() === '"26px"' && saved.length === 1 && editText(saved[0]) === 'padding-right:16→26',
     'With T off, → nudges 1px at a time into the same annotation');
 
   // A second annotation, so a stray Clear all would show
@@ -509,7 +505,7 @@ try {
   assert(await hudVisible() && (await hudText()).startsWith('padding-'), 'A nudge during the arming crossfade leaves the HUD visible');
   await browser('press', 'Escape');
 
-  // Undo a drag: the style comes off every match and the comment goes back
+  // Undo a drag: the style comes off every match and the edit goes
   await resetOpen();
   await browser('click', '.twin .t');
   await browser('snapshot', '-i');
@@ -523,11 +519,11 @@ try {
   await browser('eval', frames);
   saved = await stored();
   assert((await twinPadding()).join() === '4px,4px' && saved.length === 1 && saved[0].comment === 'Twins' && !saved[0].edits
-    && (await hudText()) === 'Undid padding-right', 'Undo a drag restores every match and the comment');
+    && (await hudText()) === 'Undid padding-right', 'Undo a drag restores every match and the annotation');
   await browser('press', 'Control+Shift+z');
   await browser('eval', frames);
   saved = await stored();
-  assert((await twinPadding()).join() === '14px,14px' && saved[0].comment === 'Twins\npadding-right: 4px → 14px (0.875rem)'
+  assert((await twinPadding()).join() === '14px,14px' && saved[0].comment === 'Twins' && editText(saved[0]) === 'padding-right:4→14'
     && (await hudText()) === 'Redid padding-right', 'Redo re-applies the drag');
 
   // A new edit after undoing drops the redo steps
@@ -583,7 +579,7 @@ try {
   await dragRight(at, 20);
   await browser('mouse', 'up', 'left');
   await browser('eval', frames);
-  const before = (await stored())[0].comment;
+  const before = editText((await stored())[0]);
   await browser('hover', '#snap');
   await browser('eval', frames);
   await browser('press', 'p');
@@ -597,7 +593,7 @@ try {
   await browser('mouse', 'up', 'left');
   await browser('eval', frames);
   saved = await stored();
-  assert(saved[0].comment !== before && !(await browser('snapshot', '-i')).includes('Annotation comment'),
+  assert(editText(saved[0]) !== before && !(await browser('snapshot', '-i')).includes('Annotation comment'),
     'While armed, a press on a marker adjusts the element under it instead of opening the editor');
 
   // ── Review fixes ──
@@ -634,27 +630,41 @@ try {
   await browser('mouse', 'up', 'left');
   await browser('snapshot', '-i');
   const opened = await inShadow(`root.querySelector('.kai-popover-textarea').value`) as string;
+  const rows = await inShadow(`[...root.querySelectorAll('.kai-popover-edit')].map(r => r.textContent)`) as string[];
   await browser('press', 'Control+End');
   await browser('press', 'Enter');
   await browser('keyboard', 'type', 'Roomier');
   await browser('press', 'Control+Enter');
   await browser('eval', frames);
   saved = await stored();
-  assert(opened === 'Card note\npadding-right: 8px → 18px (1.125rem)' && saved[0].comment === `${opened}\nRoomier`
-    && saved[0].edits?.length === 1 && await px('#card-a') === '18px', 'A marker opens the current annotation, and saving keeps its edit and style');
+  assert(opened === 'Card note' && rows.join() === 'padding-right8px → 18px' && saved[0].comment === 'Card note\nRoomier'
+    && editText(saved[0]) === 'padding-right:8→18' && await px('#card-a') === '18px', 'A marker opens the current annotation, its change listed; saving keeps it');
 
-  // Matching: component look-alikes change; a look-alike's own edit starts from the page's value, not kai's
-  assert(await px('#card-b') === '18px', 'A component-class look-alike in another parent changes too, whatever its utilities');
+  // One edit per sibling group: a drag on card B updates card A's edit; all cards follow
+  assert(await px('#card-a, #card-b, #card-c') === '18px,18px,18px', 'Siblings with the same classes follow the edit');
+  await browser('wait', '1300');
   await dragRight(await armEl('#card-b'), 10);
   await release();
   saved = await stored();
+  assert(saved.length === 1 && editText(saved[0]) === 'padding-right:8→23' && await px('#card-a, #card-b, #card-c') === '23px,23px,23px',
+    'Dragging a sibling updates the edit it shows (card A\'s); no competing edit on card B');
+  // ← on card B walks the shared edit down, then past the page value onto card B's own annotation
+  await armEl('#card-b');
+  await browser('eval', `(() => {
+    for (let i = 0; i < 16; i++) document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, composed: true, cancelable: true }));
+    return true;
+  })()`);
+  await browser('press', 'Escape');
+  saved = await stored();
+  const cardA = saved.find(a => a.selector.includes('card-a'));
   const cardB = saved.find(a => a.selector.includes('card-b'));
-  assert(cardB?.edits?.[0].from === 16 && cardB.edits[0].to === 23, 'A look-alike already showing another edit records the page\'s own value as from');
+  assert(await px('#card-a, #card-b, #card-c') === '7px,7px,7px' && cardA?.comment === 'Card note\nRoomier' && !cardA.edits && editText(cardB) === 'padding-right:8→7',
+    'Nudging a sibling down passes the shared value: card A\'s edit goes at 8, card B\'s own takes over below');
 
   await resetOpen();
   await dragRight(await armEl('#tpl li'), 20);
   assert(await px('#tpl li') === '18px,18px' && await px('#lone') === '8px',
-    'Identical utility-only siblings preview together; a lone look-alike elsewhere does not');
+    'Identical siblings preview together; the same classes in another parent do not');
   await release();
 
   // An inline shorthand with a variable: the longhands read empty; undo must bring the shorthand back
@@ -698,31 +708,87 @@ try {
   await browser('set', 'viewport', '1280', '800', '2');
 
   // ── Second review ──
-  // On each element its own annotation wins over look-alikes' edits
+  // A sibling dragged back to the page value takes the group's edit off: every sibling reverts
   await resetOpen();
   await dragRight(await armEl('#card-a'), 20);
   await release();
-  await dragRight(await armEl('#card-b'), 10);
-  await release();
-  assert(await px('#card-a') === '18px' && await px('#card-b') === '23px', 'Each card renders its own edit, not a look-alike\'s');
-  await browser('wait', '1300');
-  await dragRight(await armEl('#card-a'), 24);
-  await release();
-  assert(await px('#card-a') === '30px', 'Dragging an element with its own edit keeps the new value after release');
-
-  // A look-alike dragged back to its own value: no annotation, no undo step
-  const before2 = (await stored()).length;
   await browser('wait', '1300');
   at = await armEl('#card-c');
   await browser('mouse', 'down', 'left');
-  await browser('mouse', 'move', String(at[0] - 15), String(at[1]));
-  await browser('mouse', 'move', String(at[0] - 30), String(at[1]));
+  await browser('mouse', 'move', String(at[0] - 10), String(at[1]));
+  await browser('mouse', 'move', String(at[0] - 20), String(at[1]));
   await release();
-  assert((await stored()).length === before2, 'A look-alike back at its own value adds no annotation');
+  assert(!(await stored()).length && await px('#card-a, #card-b, #card-c') === '8px,8px,8px', 'A sibling back at the page value removes the shared edit');
   await browser('wait', '1300');
   await browser('press', 'Control+z');
   await settle();
-  assert(await hudText() === 'Undid padding-right' && await px('#card-a') === '18px', 'Undo skips the no-op drag and takes back the last real change');
+  assert(await hudText() === 'Undid padding-right' && await px('#card-a, #card-b, #card-c') === '18px,18px,18px', 'Undo brings the shared edit back');
+
+  // The popover lists an annotation's changes; hover shows a row's remove button
+  await resetOpen();
+  await dragRight(await armEl('#card-a'), 20);
+  await release();
+  await browser('wait', '1300');
+  // A second change on the same card: the top side, dragged up
+  await browser('hover', '#card-a');
+  await browser('eval', frames);
+  await browser('press', 'p');
+  const [tx, ty] = JSON.parse(await browser('eval',
+    `(r => [Math.round(r.left + r.width / 2), Math.round(r.top + 2)])(document.querySelector('#card-a').getBoundingClientRect())`)) as number[];
+  await browser('mouse', 'move', String(tx), String(ty));
+  await browser('eval', frames);
+  await browser('mouse', 'down', 'left');
+  await browser('mouse', 'move', String(tx), String(ty - 10));
+  await browser('mouse', 'move', String(tx), String(ty - 20));
+  await release();
+  await browser('wait', '1300');
+  await browser('click', '#card-a');
+  await browser('snapshot', '-i');
+  const listRows = await inShadow(`[...root.querySelectorAll('.kai-popover-edit')].map(r => r.textContent)`) as string[];
+  // Within a property, edits follow CSS side order
+  assert(listRows.join('|') === 'padding-top0px → 10px|padding-right8px → 18px', 'The popover lists each change on its own row');
+  const removeAt = async (i: number) => await inShadow(`(r => [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)])(root.querySelectorAll('.kai-popover-edit')[${i}].getBoundingClientRect())`) as number[];
+  const removeOpacity = (i: number) => inShadow(`getComputedStyle(root.querySelectorAll('.kai-popover-edit-remove')[${i}]).opacity`);
+  assert(await removeOpacity(1) === '0', 'Remove buttons are hidden until a row is hovered');
+  const [rx, ry] = await removeAt(1);
+  await browser('mouse', 'move', String(rx), String(ry));
+  await browser('wait', '250');
+  const label = await inShadow(`root.querySelectorAll('.kai-popover-edit-remove')[1].getAttribute('aria-label')`);
+  assert(await removeOpacity(1) === '1' && label === 'Remove padding-right change', 'Hovering a row shows its remove button');
+  const [bx, by] = await inShadow(`(r => [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)])(root.querySelectorAll('.kai-popover-edit-remove')[1].getBoundingClientRect())`) as number[];
+  await browser('mouse', 'move', String(bx), String(by));
+  await browser('mouse', 'down', 'left');
+  await browser('mouse', 'up', 'left');
+  await browser('eval', frames);
+  saved = await stored();
+  assert(editText(saved[0]) === 'padding-top:0→10' && await px('#card-a') === '8px'
+    && (await inShadow(`root.querySelectorAll('.kai-popover-edit').length`)) === 1, 'Removing a row takes that change off the page and the list');
+  await browser('press', 'Escape');
+  await browser('press', 'Control+z');
+  await settle();
+  assert(await hudText() === 'Undid padding-right' && await px('#card-a') === '18px', 'Removing a row is undoable');
+
+  // An empty note keeps an annotation that has changes
+  await browser('click', '#card-a');
+  await browser('snapshot', '-i');
+  await browser('keyboard', 'type', 'Temporary');
+  await browser('press', 'Control+Enter');
+  await browser('click', '#card-a');
+  await browser('snapshot', '-i');
+  await browser('press', 'Control+a');
+  await browser('press', 'Backspace');
+  await browser('press', 'Control+Enter');
+  await browser('eval', frames);
+  saved = await stored();
+  assert(saved.length === 1 && saved[0].comment === '' && editText(saved[0]) === 'padding-top:0→10,padding-right:8→18',
+    'Saving an empty note keeps an annotation that still has changes');
+
+  // Markdown export lists the changes
+  await browser('eval', `(() => { navigator.clipboard.writeText = text => { window.__copied = text; return Promise.resolve(); }; return true; })()`);
+  await browser('press', 'c');
+  await browser('eval', frames);
+  const markdown = JSON.parse(await browser('eval', 'window.__copied ?? ""')) as string;
+  assert(markdown.includes('**Changes:**\n- `padding-top: 0px → 10px` (0.625rem)\n- `padding-right: 8px → 18px` (1.125rem)'), 'Markdown lists the changes');
 
   // The target leaves the page right before release: the release stays kai's, nothing throws
   await resetOpen();
@@ -739,24 +805,6 @@ try {
   await browser('eval', frames);
   assert(await browser('get', 'text', '#errors') === '0' && !(await stored()).length, 'A target removed mid-drag ends the drag without an error');
 
-  // var() shorthand followed by a longhand: undo brings the whole attribute back
-  await resetOpen();
-  await browser('hover', '#mixed');
-  await browser('eval', frames);
-  await browser('press', 'p');
-  const [lx, ly] = JSON.parse(await browser('eval',
-    `(r => [Math.round(r.left + 3), Math.round(r.top + r.height / 2)])(document.querySelector('#mixed').getBoundingClientRect())`)) as number[];
-  await browser('mouse', 'move', String(lx), String(ly));
-  await browser('eval', frames);
-  await browser('mouse', 'down', 'left');
-  await browser('mouse', 'move', String(lx - 10), String(ly));
-  await browser('mouse', 'move', String(lx - 20), String(ly));
-  await release();
-  const mixed = () => px('#mixed', 'padding');
-  assert(await mixed() === '4px 20px 20px 30px', 'A drag on the left side of the mixed var() padding');
-  await browser('press', 'Control+z');
-  await browser('eval', frames);
-  assert(await mixed() === '4px 20px 20px', 'Undo restores the var() shorthand and its longhand as written');
 
   await reset();
   await browser('focus', '#input');

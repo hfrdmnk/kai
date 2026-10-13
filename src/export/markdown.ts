@@ -16,7 +16,7 @@ const siblingsLine = (a: Annotation): string | null => {
   const classes = Array.from(target.classList).filter(c => !c.startsWith('kai-'));
   // Escaped, so the key is a valid selector (div.md\:px-4)
   const key = [target.localName, ...classes].map(name => CSS.escape(name)).join('.');
-  const where = parent instanceof ShadowRoot ? `${generateSelector(parent.host)} >>> :host` : generateSelector(parent as Element);
+  const where = parent instanceof ShadowRoot ? `${generateSelector(parent.host)} >>> (shadow root)` : generateSelector(parent as Element);
   return formatSiblings(matches.length, key, where);
 };
 

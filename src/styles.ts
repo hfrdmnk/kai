@@ -587,8 +587,8 @@ export const styles = `
   pointer-events: auto;
 }
 
-/* No hover on touch: the remove buttons are always there */
-@media (hover: none) {
+/* No hover on touch, including touchscreen laptops that report a mouse: the remove buttons are always there */
+@media (hover: none), (any-pointer: coarse) {
   .kai-popover-edit-remove {
     opacity: 1;
     pointer-events: auto;

@@ -1,5 +1,5 @@
 import { $ } from 'bun';
-import { chmod, mkdtemp, readdir, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir, homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -77,11 +77,27 @@ const server = Bun.serve({
 // Headless Chromium reports no hover-capable pointer, (hover: none), like a touch screen. The main
 // session runs Chrome through a wrapper that reports a mouse, so hover-only UI behaves as on a desktop;
 // a second session keeps the default to check the touch behaviour.
-const chromeDir = join(homedir(), '.agent-browser', 'browsers');
-const chromeBuild = (await readdir(chromeDir)).filter(name => name.startsWith('chrome-')).sort().pop();
-if (!chromeBuild) throw new Error('No agent-browser Chrome found; run agent-browser install.');
-const wrapper = join(await mkdtemp(join(tmpdir(), 'kai-check-')), 'chrome-desktop-pointer.sh');
-await writeFile(wrapper, `#!/usr/bin/env bash\nexec "${join(chromeDir, chromeBuild, 'chrome')}" '--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4' "$@"\n`);
+// KAI_CHROME points at a Chrome binary; otherwise the newest agent-browser build (by version, not text) is used
+const findChrome = async (): Promise<string> => {
+  if (process.env.KAI_CHROME) return process.env.KAI_CHROME;
+  const chromeDir = join(homedir(), '.agent-browser', 'browsers');
+  const builds = await readdir(chromeDir).catch(() => [] as string[]);
+  const version = (name: string) => name.slice('chrome-'.length).split('.').map(Number);
+  const newestFirst = builds.filter(name => /^chrome-\d/.test(name)).sort((a, b) => {
+    const [va, vb] = [version(a), version(b)];
+    for (let i = 0; i < Math.max(va.length, vb.length); i++) if ((va[i] ?? 0) !== (vb[i] ?? 0)) return (vb[i] ?? 0) - (va[i] ?? 0);
+    return 0;
+  });
+  for (const build of newestFirst) {
+    const binary = join(chromeDir, build, 'chrome');
+    if (await Bun.file(binary).exists()) return binary;
+  }
+  throw new Error('No agent-browser Chrome found; run agent-browser install, or set KAI_CHROME.');
+};
+const chrome = await findChrome().catch(error => { server.stop(true); throw error; });
+const wrapperDir = await mkdtemp(join(tmpdir(), 'kai-check-'));
+const wrapper = join(wrapperDir, 'chrome-desktop-pointer.sh');
+await writeFile(wrapper, `#!/usr/bin/env bash\nexec "${chrome}" '--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4' "$@"\n`);
 await chmod(wrapper, 0o755);
 const session = `kai-check-${process.pid}`;
 const browser = async (...args: string[]) => {
@@ -848,6 +864,17 @@ try {
   assert(editText((await stored())[0]) === 'padding-right:8→18' && await rowCount() === 1, 'A double click on a remove button removes one change');
   await browser('press', 'Escape');
 
+  // Two quick Delete presses on focused remove buttons remove two changes: the double-click guard is for the pointer only
+  await twoChanges();
+  await inShadow(`(root.querySelector('.kai-popover-edit-remove').focus(), true)`);
+  await browser('eval', `new Promise(done => {
+    const press = () => document.querySelector('ui-annotator').shadowRoot.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true, cancelable: true }));
+    press();
+    setTimeout(() => { press(); requestAnimationFrame(() => requestAnimationFrame(() => done(true))); }, 100);
+  })`);
+  assert(!(await stored()).length, 'Two quick Delete presses on focused remove buttons remove both changes');
+  await browser('press', 'Escape');
+
   // Backspace on a focused remove button removes that change; kai's Clear all isn't armed
   await twoChanges();
   await inShadow(`(root.querySelector('.kai-popover-edit-remove').focus(), true)`);
@@ -961,4 +988,5 @@ try {
   await browser('close').catch(() => {});
   await touchBrowser('close').catch(() => {});
   server.stop(true);
+  await rm(wrapperDir, { recursive: true, force: true });
 }

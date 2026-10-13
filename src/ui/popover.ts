@@ -58,18 +58,23 @@ const createEditList = (edits: StyleEdit[], onRemove: (property: string) => void
     remove.setAttribute('aria-label', `Remove ${property} change`);
     remove.appendChild(createIcon(iconClose));
     remove.addEventListener('click', (e) => {
-      // The next row slides under the pointer: a double click must not remove it too
-      if (e.timeStamp - lastRemoval < REMOVE_GUARD_MS) return;
-      lastRemoval = e.timeStamp;
       // Enter, Space or Delete (a click with no pointer detail) keeps the keyboard in the list;
       // after a pointer removal focus goes back to the note
       const byKeyboard = e.detail === 0;
+      // The next row slides under the pointer: a double click must not remove it too. Quick
+      // keyboard removals are deliberate, so the guard is for the pointer only
+      if (!byKeyboard) {
+        if (e.timeStamp - lastRemoval < REMOVE_GUARD_MS) return;
+        lastRemoval = e.timeStamp;
+      }
+      // Focusing the note after a tap would pop up the on-screen keyboard
+      const byTouch = (e as PointerEvent).pointerType === 'touch';
       const next = (row.nextElementSibling ?? row.previousElementSibling)?.querySelector('button');
       row.remove();
       onRemove(property);
       if (!list.children.length) list.remove();
       if (byKeyboard && next) next.focus();
-      else focusNote();
+      else if (!byTouch) focusNote();
     });
     // Delete / Backspace on a focused remove button remove that change, like a click
     remove.addEventListener('keydown', (e) => {

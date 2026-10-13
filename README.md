@@ -70,7 +70,7 @@ To run the browser regression check, install `agent-browser` and its Chromium br
 
 ### Measurement mode
 
-Hold <kbd>Alt</kbd> to enter measurement mode. A crosshair follows your cursor showing element dimensions. Hold <kbd>Shift</kbd> additionally to see text metrics. Tap <kbd>Ctrl</kbd> while holding Alt to toggle the box model: padding in the accent color, margin and flex/grid gaps hatched, with values in px and rem. It stays on until you release Alt. Shift and the box model combine. <kbd>↑</kbd> / <kbd>↓</kbd> move whatever you're measuring to the parent or child, and the selection carries across annotating, measuring and the box model as long as you keep the mouse still. The first mouse move after switching goes back to the innermost element. Click and drag to measure arbitrary distances.
+Hold <kbd>Alt</kbd> to enter measurement mode. A crosshair follows your cursor showing element dimensions. Hold <kbd>Shift</kbd> additionally to see text metrics. Hold <kbd>Ctrl</kbd> as well to see the box model: padding in the accent color, margin and flex/grid gaps hatched, with values in px and rem. It shows while Ctrl is held. Shift and the box model combine. <kbd>↑</kbd> / <kbd>↓</kbd> move whatever you're measuring to the parent or child, and the selection carries across annotating, measuring and the box model as long as you keep the mouse still. The first mouse move after switching goes back to the innermost element. Click and drag to measure arbitrary distances.
 
 ### Drag to adjust
 
@@ -78,8 +78,9 @@ Hover an element and press a property key: <kbd>P</kbd> padding, <kbd>M</kbd> ma
 (of the element or its nearest flex/grid container), <kbd>F</kbd> font size, <kbd>L</kbd> line height,
 <kbd>B</kbd> border radius. Then press, drag and release anywhere on the page. The side or corner
 nearest the pointer changes; hold <kbd>Alt</kbd> for it and its opposite side (or both corners on that
-side) and <kbd>Shift</kbd> for all of them. The page updates live on every element with the same tag and
-classes (all the cards in a grid, say), and the HUD shows the new value and the change. Release adds a line like
+side) and <kbd>Shift</kbd> for all of them. The page updates live on its look-alikes too: identical
+siblings (the items of a list) and, for component classes like `card`, every element with them (all the cards
+on the page), and the HUD shows the new value and the change. Release adds a line like
 `padding-right: 24px → 34px (2.125rem)` to the element's annotation. <kbd>Esc</kbd> cancels.
 Deleting the annotation, or its line, puts the page back.
 
@@ -140,7 +141,7 @@ interaction mode outside text fields.
 | <kbd>?</kbd> | Active, outside text fields | Toggle shortcut reference for all modes |
 | <kbd>Alt</kbd> (hold) | Active | Measurement mode |
 | <kbd>Alt</kbd>+<kbd>Shift</kbd> (hold) | Active | Measurement mode with text metrics |
-| <kbd>Ctrl</kbd> (tap, holding <kbd>Alt</kbd>) | Measurement mode | Toggle the box model (combines with <kbd>Shift</kbd>) |
+| <kbd>Alt</kbd>+<kbd>Ctrl</kbd> (hold) | Active | Measurement mode with the box model (combines with <kbd>Shift</kbd>) |
 | <kbd>↑</kbd> / <kbd>↓</kbd> | Element hovered, annotating or measuring | Move highlight / measurement to parent / back down |
 | <kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>Enter</kbd> | Annotation popover | Save annotation |
 | <kbd>Esc</kbd> | Annotation popover | Close popover |

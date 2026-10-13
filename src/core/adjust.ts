@@ -297,8 +297,10 @@ export const formatEditLine = (e: StyleEdit): string => {
  * The property of a line kai wrote: `padding-right: 24px → 34px (2.125rem)`, `line-height: 1.5 → 1.6`.
  * Only lines in that format belong to an edit; `font-size: should match the heading` is the user's.
  */
-const EDIT_LINE = /^\s*([a-z-]+):\s*-?[\d.]+(?:px)?\s*→\s*-?[\d.]+(?:px)?(?:\s*\(.*\))?\s*$/;
+const EDIT_LINE = /^\s*([a-z-]+):\s*-?[\d.]+(?:px)?\s*→\s*-?[\d.]+(?:px)?(?:\s*\((?:[^()]|\([^()]*\))*\))?/;
 const lineProperty = (line: string): string | null => line.match(EDIT_LINE)?.[1] ?? null;
+/** What the user wrote after kai's part of a line (`… (1rem) check mobile`); kept when kai rewrites it */
+const lineNote = (line: string): string => line.slice(line.match(EDIT_LINE)?.[0].length ?? line.length);
 
 /**
  * Brings an annotation's comment in line with its edits: a changed edit replaces its line (matched by
@@ -315,7 +317,7 @@ export const syncEditLines = (comment: string, before: StyleEdit[], after: Style
     if (prev && same(prev, e) && prev.className === e.className && prev.token === e.token) continue;
     const i = lines.findIndex(line => lineProperty(line) === e.property);
     if (i === -1) lines.push(formatEditLine(e));
-    else lines[i] = formatEditLine(e);
+    else lines[i] = formatEditLine(e) + lineNote(lines[i]);
   }
   return lines.join('\n');
 };
@@ -333,9 +335,17 @@ export const withChanges = (a: { comment: string; edits?: StyleEdit[] }, prop: A
   return { comment: syncEditLines(a.comment, before, edits), edits: edits.length ? edits : undefined };
 };
 
-/** What undo calls a drag or nudge: the declarations it wrote, `padding-right` or `padding-block, padding-left` */
-export const changeLabel = (prop: AdjustProperty, changes: Record<string, Change>): string =>
-  shortestEdits(prop, changes).map(e => e.property).join(', ');
+/**
+ * The declarations whose edits differ between two lists (added, changed or removed), sorted: what
+ * an undo step is called. Empty when nothing changed, which is then no step at all.
+ */
+export const editsLabel = (before: StyleEdit[], after: StyleEdit[]): string => {
+  const key = (e: StyleEdit) => JSON.stringify([e.from, e.to, e.className ?? '', e.token ?? '']);
+  const was = new Map(before.map(e => [e.property, key(e)]));
+  const now = new Map(after.map(e => [e.property, key(e)]));
+  const names = new Set([...was.keys(), ...now.keys()].filter(name => was.get(name) !== now.get(name)));
+  return [...names].sort().join(', ');
+};
 
 /** An annotation's comment and edits without a property's edits and their lines (Backspace while armed) */
 export const withoutProperty = (a: { comment: string; edits?: StyleEdit[] }, prop: AdjustProperty) => {
@@ -410,12 +420,33 @@ export const cursorFor = (prop: AdjustProperty, parts: Part[], dragging = false)
 
 // ── Reading the page ──
 
-/** A computed corner radius in px as drawn: the horizontal component, `%` of the width, capped at half the shorter side */
-export const radiusPx = (value: string, width: number, height: number): number => {
-  const first = value.trim().split(/\s+/)[0] ?? '';
-  const radius = first.endsWith('%') ? parseFloat(first) / 100 * width : parseFloat(first) || 0;
-  return Math.min(radius, width / 2, height / 2);
+/**
+ * Corner radii in px as drawn, by the CSS rule: when the radii on a side add up to more than its
+ * length, all of them shrink by the same factor (the smallest side length / sum). Each value is
+ * `horizontal [vertical]`, `%` of the width or height; what's returned is the horizontal component,
+ * so an elliptical corner reads as its horizontal radius.
+ */
+export const cornerRadii = (values: Record<Corner, string>, width: number, height: number): Record<Corner, number> => {
+  const parse = (value: string) => {
+    const [h = '0', v = h] = value.trim().split(/\s+/);
+    const px = (part: string, size: number) => part.endsWith('%') ? parseFloat(part) / 100 * size : parseFloat(part) || 0;
+    return { h: px(h, width), v: px(v, height) };
+  };
+  const r = Object.fromEntries(CORNERS.map(c => [c, parse(values[c])])) as Record<Corner, { h: number; v: number }>;
+  const fit = (length: number, a: number, b: number) => a + b > length ? length / (a + b) : 1;
+  const f = Math.min(
+    fit(width, r['top-left'].h, r['top-right'].h),
+    fit(width, r['bottom-left'].h, r['bottom-right'].h),
+    fit(height, r['top-left'].v, r['bottom-left'].v),
+    fit(height, r['top-right'].v, r['bottom-right'].v),
+  );
+  return Object.fromEntries(CORNERS.map(c => [c, r[c].h * f])) as Record<Corner, number>;
 };
+
+/** An element's layout box (border box, untransformed); a transform would inflate its bounding rect */
+const layoutSize = (el: Element) => el instanceof HTMLElement
+  ? { width: el.offsetWidth, height: el.offsetHeight }
+  : el.getBoundingClientRect();
 
 /** A computed gap in px: `%` of the content box along its axis, `normal` is 0 */
 export const gapPx = (value: string, size: number): number =>
@@ -431,11 +462,11 @@ export const readValues = (el: Element, prop: AdjustProperty): Values => {
     return { value: Math.round(lineHeight / fontSize * 1000) / 1000 };
   }
   if (prop === 'border-radius') {
-    const { width, height } = el.getBoundingClientRect();
-    return Object.fromEntries(CORNERS.map(c => [c, radiusPx(cs.getPropertyValue(longhandOf(prop, c)), width, height)]));
+    const { width, height } = layoutSize(el);
+    return cornerRadii(Object.fromEntries(CORNERS.map(c => [c, cs.getPropertyValue(longhandOf(prop, c))])) as Record<Corner, string>, width, height);
   }
   if (prop === 'gap') {
-    const { width, height } = el.getBoundingClientRect();
+    const { width, height } = layoutSize(el);
     const content = {
       width: width - px('border-left-width') - px('border-right-width') - px('padding-left') - px('padding-right'),
       height: height - px('border-top-width') - px('border-bottom-width') - px('padding-top') - px('padding-bottom'),

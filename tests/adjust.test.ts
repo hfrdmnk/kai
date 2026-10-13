@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   adjustPropertyFor, adjustValue, cursorFor, dragAxisOf, dragReadout, dragTravel, editDeclarations, editsInComment,
   formatEditLine, longhandsOfDeclaration, mergeEdits, nameWidth, nearestCorner, nearestSide, pickParts,
-  changeLabel, gapPx, nudgeValue, radiusPx, shorthandValue, shortestEdits, syncEditLines, withChanges, withoutProperty,
+  cornerRadii, editsLabel, gapPx, nudgeValue, shorthandValue, shortestEdits, syncEditLines, withChanges, withoutProperty,
 } from '../src/core/adjust.ts';
 import type { StyleEdit } from '../src/types.ts';
 
@@ -444,16 +444,6 @@ describe('snapped readout', () => {
   });
 });
 
-describe('undo labels', () => {
-  test('name the declarations a change wrote', () => {
-    expect(changeLabel('padding', { 'padding-right': { from: 24, to: 34 } })).toBe('padding-right');
-    expect(changeLabel('padding', {
-      'padding-top': { from: 8, to: 12 }, 'padding-bottom': { from: 8, to: 12 }, 'padding-left': { from: 8, to: 10 },
-    })).toBe('padding-block, padding-left');
-    expect(changeLabel('gap', { 'row-gap': { from: 8, to: 12 }, 'column-gap': { from: 8, to: 12 } })).toBe('gap');
-  });
-});
-
 describe('review fixes', () => {
   test('nearest side measures to the edge segment, not its infinite line', () => {
     // Box 100–300 × 100–200; a press right of it, level with the top edge's line
@@ -492,18 +482,46 @@ describe('review fixes', () => {
     expect(editsInComment([edits[0]], 'line-height: 1.5 → 1.7')).toEqual([edits[0]]);
   });
 
-  test('radius values: first component, % of the width, capped at half the shorter side', () => {
-    expect(radiusPx('12px', 200, 100)).toBe(12);
-    expect(radiusPx('10px 20px', 200, 100)).toBe(10);
-    expect(radiusPx('9999px', 200, 100)).toBe(50);
-    expect(radiusPx('50%', 200, 100)).toBe(50);
-    expect(radiusPx('10%', 200, 100)).toBe(20);
-    expect(radiusPx('0px', 200, 100)).toBe(0);
+  test('radius values follow the CSS rule: all scaled down together only when a side is over-full', () => {
+    const all = (v: string) => ({ 'top-left': v, 'top-right': v, 'bottom-right': v, 'bottom-left': v });
+    // A 20px tall tab with 12px top corners: no side is over-full, so 12 stays 12 (not capped at 10)
+    expect(cornerRadii({ 'top-left': '12px', 'top-right': '12px', 'bottom-right': '0px', 'bottom-left': '0px' }, 100, 20))
+      .toEqual({ 'top-left': 12, 'top-right': 12, 'bottom-right': 0, 'bottom-left': 0 });
+    // rounded-full: 9999px everywhere, scaled by the shortest side
+    expect(cornerRadii(all('9999px'), 200, 100)['top-left']).toBeCloseTo(50);
+    // 50% is elliptical (100 × 50 on a 200 × 100 box) and fits: the horizontal component is read
+    expect(cornerRadii(all('50%'), 200, 100)['top-left']).toBe(100);
+    // An elliptical pair: horizontal component
+    expect(cornerRadii(all('10px 20px'), 200, 100)['top-left']).toBe(10);
+    expect(cornerRadii(all('0px'), 200, 100)['top-left']).toBe(0);
   });
 
   test('gap values: px, % of the content size, normal is 0', () => {
     expect(gapPx('12px', 400)).toBe(12);
     expect(gapPx('10%', 400)).toBe(40);
     expect(gapPx('normal', 400)).toBe(0);
+  });
+});
+
+describe('second review', () => {
+  test("kai's line can carry the user's note after it", () => {
+    const before = [{ property: 'padding-left', from: 8, to: 16 }];
+    const comment = 'padding-left: 8px → 16px (1rem) check mobile';
+    expect(editsInComment(before, comment)).toEqual(before);
+    expect(syncEditLines(comment, before, [{ property: 'padding-left', from: 8, to: 20 }])).toBe('padding-left: 8px → 20px (1.25rem) check mobile');
+    // Nested parentheses in a token stay kai's part
+    const token = [{ property: 'gap', from: 8, to: 24, token: 'var(--space-6)' }];
+    expect(syncEditLines('gap: 8px → 24px (var(--space-6)) wider?', token, [{ property: 'gap', from: 8, to: 16, token: 'var(--space-4)' }]))
+      .toBe('gap: 8px → 16px (var(--space-4)) wider?');
+    expect(syncEditLines(comment, before, [])).toBe('');
+  });
+
+  test('a change is labelled by the declarations whose edits differ', () => {
+    const a = { property: 'padding-right', from: 8, to: 18 };
+    expect(editsLabel([], [a])).toBe('padding-right');
+    expect(editsLabel([a], [{ ...a, to: 20 }])).toBe('padding-right');
+    expect(editsLabel([a], [])).toBe('padding-right');
+    expect(editsLabel([a], [a])).toBe('');
+    expect(editsLabel([a], [{ property: 'padding-inline', from: 8, to: 18 }])).toBe('padding-inline, padding-right');
   });
 });

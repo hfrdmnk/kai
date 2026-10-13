@@ -111,6 +111,9 @@ describe('review fixes', () => {
     expect(unitlessLeading('28px', lookup)).toBe(false);
     expect(unitlessLeading('var(--leading-px)', lookup)).toBe(false);
     expect(unitlessLeading('calc(var(--spacing) * 7)', lookup)).toBe(false);
+    // A calc of plain numbers is a ratio too (Tailwind v4's --text-lg--line-height)
+    expect(unitlessLeading('calc(1.75 / 1.125)', lookup)).toBe(true);
+    expect(unitlessLeading('calc(2rem / 1.125)', lookup)).toBe(false);
   });
 
   test('variables come from :root-like rules, Tailwind v4 theme layers included', () => {

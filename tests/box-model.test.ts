@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { flexGutters, formatEdges, gridAxis, parseTracks } from '../src/core/box-model.ts';
+import { flexGutters, formatEdges, gapValues, gridAxis, parseTracks } from '../src/core/box-model.ts';
 
 const edges = (top: number, right: number, bottom: number, left: number) => ({ top, right, bottom, left });
 const box = (left: number, top: number, width: number, height: number) => ({ left, top, width, height });
@@ -113,5 +113,12 @@ describe('empty gutters (drag to adjust)', () => {
   test('grid tracks without a gap', () => {
     expect(gridAxis([100, 100, 100], 0, 300, 'normal').gutters).toEqual([]);
     expect(gridAxis([100, 100, 100], 0, 300, 'normal', true).gutters).toEqual([100, 200]);
+  });
+});
+
+describe('gap values', () => {
+  test('percentages resolve against the content box: column-gap the width, row-gap the height', () => {
+    expect(gapValues({ rowGap: '10%', columnGap: '5%' }, { width: 400, height: 200 })).toEqual({ rowGap: 20, columnGap: 20 });
+    expect(gapValues({ rowGap: '12px', columnGap: 'normal' }, { width: 400, height: 200 })).toEqual({ rowGap: 12, columnGap: 0 });
   });
 });

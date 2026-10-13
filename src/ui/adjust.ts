@@ -1,6 +1,6 @@
 import {
-  ADJUST, CORNERS, SIDES, dragReadout, kindOf, nameWidth, shorthandValue,
-  type AdjustProperty, type Part, type ScaleRef, type Side, type Values,
+  ADJUST, CORNERS, SIDES, cornerRadii, dragReadout, kindOf, nameWidth, shorthandValue,
+  type AdjustProperty, type Corner, type Part, type ScaleRef, type Side, type Values,
 } from '../core/adjust.ts';
 import { computeBoxModel, inset, outset, type Box, type Edges } from '../core/box-model.ts';
 import type { AdjustHud, KeyId } from './guide-bar.ts';
@@ -91,13 +91,6 @@ const sliver = (band: Box, side: Side): Box => {
 
 const px = (cs: CSSStyleDeclaration, name: string) => parseFloat(cs.getPropertyValue(name)) || 0;
 
-/** A corner's radius in px, percentages resolved, capped like the browser's rendering */
-const cornerRadius = (cs: CSSStyleDeclaration, corner: string, rect: DOMRect) => {
-  const value = cs.getPropertyValue(`border-${corner}-radius`).split(' ')[0];
-  const radius = value.endsWith('%') ? parseFloat(value) / 100 * rect.width : parseFloat(value) || 0;
-  return Math.min(radius, rect.width / 2, rect.height / 2);
-};
-
 /**
  * What an armed property is about to change, drawn like the box model: padding bands, hatched margin
  * bands and gap gutters, line stripes for line-height, and a second rounded border outside each corner
@@ -187,9 +180,11 @@ export const createAdjustLayer = (shadowRoot: ShadowRoot) => {
   const drawArcs = (target: Element, hot: Set<Part>) => {
     const cs = getComputedStyle(target);
     const rect = target.getBoundingClientRect();
+    // Radii as drawn (the CSS rule scales them down together on over-full sides), at the drawn size
+    const radii = cornerRadii(Object.fromEntries(CORNERS.map(c => [c, cs.getPropertyValue(`border-${c}-radius`)])) as Record<Corner, string>, rect.width, rect.height);
     for (const corner of CORNERS) {
       if (!hot.has(corner)) continue;
-      const radius = cornerRadius(cs, corner, rect);
+      const radius = radii[corner];
       const size = radius + ARC_OFFSET + ARC_TAIL;
       const [vertical, horizontal] = corner.split('-');
       const el = next('kai-adjust-arc');

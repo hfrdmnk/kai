@@ -65,6 +65,12 @@ export const formatEdges = (e: Edges): string => {
   return values.every(v => v === 0) ? values.join(' ') : withRem(values);
 };
 
+/** Computed gaps in px: a percentage resolves against the content box, column-gap the width, row-gap the height */
+export const gapValues = (gaps: { rowGap: string; columnGap: string }, content: { width: number; height: number }) => {
+  const px = (value: string, size: number) => value.trim().endsWith('%') ? parseFloat(value) / 100 * size : parseFloat(value) || 0;
+  return { rowGap: px(gaps.rowGap, content.height), columnGap: px(gaps.columnGap, content.width) };
+};
+
 const formatGap = (row: number, column: number): string =>
   withRem(row === column ? [round(row)] : [round(row), round(column)]);
 
@@ -290,8 +296,12 @@ export const computeBoxModel = (el: Element, { emptyGutters = false } = {}): Box
   if (Object.values(borderWidth).some(v => v > 0)) rows.push(['Border', formatEdges(borderWidth)]);
   rows.push(['Padding', formatEdges(padding)]);
   const container = /flex|grid/.test(cs.display);
-  const rowGap = container ? parseFloat(cs.rowGap) || 0 : 0;
-  const columnGap = container ? parseFloat(cs.columnGap) || 0 : 0;
+  // Layout size, untransformed: percentages resolve against the content box
+  const layout = el instanceof HTMLElement ? { width: el.offsetWidth, height: el.offsetHeight } : bounds;
+  const { rowGap, columnGap } = container ? gapValues(cs, {
+    width: layout.width - borderWidth.left - borderWidth.right - padding.left - padding.right,
+    height: layout.height - borderWidth.top - borderWidth.bottom - padding.top - padding.bottom,
+  }) : { rowGap: 0, columnGap: 0 };
   if (rowGap > 0 || columnGap > 0) rows.push(['Gap', formatGap(rowGap, columnGap)]);
 
   // A wrapped inline box is drawn on its first line

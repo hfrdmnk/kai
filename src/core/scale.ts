@@ -98,7 +98,7 @@ export const unitlessLeading = (value: string, lookup: (name: string) => string)
     const resolved = lookup(ref[1]).trim();
     return resolved ? unitlessLeading(resolved, lookup) : !!ref[2] && unitlessLeading(ref[2], lookup);
   }
-  return /^\d*\.?\d+$/.test(v);
+  return /^\d*\.?\d+$/.test(v) || /^calc\([\d.\s*/+-]+\)$/.test(v);
 };
 
 /** Rules that define page-wide variables: `:root`, `html`, Tailwind v4's `:root, :host`, `:where(:root)` */
@@ -209,7 +209,10 @@ export const harvestScale = (): { scale: Scale; source: ScaleSource } => {
     const variables = rules.filter(rule => isRootSelector(rule.selectorText)).flatMap(rule =>
       Array.from(rule.style).flatMap(name => {
         const family = name.startsWith('--') ? variableFamily(name) : null;
-        if (!family || !LENGTH.test(rule.style.getPropertyValue(name).trim())) return [];
+        const raw = rule.style.getPropertyValue(name).trim();
+        if (!family || !LENGTH.test(raw)) return [];
+        // As for leading-* classes: a fixed height (`--leading-body: 28px`) isn't a ratio
+        if (family === 'line-height' && !unitlessLeading(raw, lookup)) return [];
         const property = family === 'spacing' ? 'padding-left' : family === 'border-radius' ? 'border-top-left-radius' : family;
         probe.style.setProperty(property, `var(${name})`);
         const value = readProbe(probe, property);

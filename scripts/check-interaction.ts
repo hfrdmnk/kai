@@ -1,4 +1,7 @@
 import { $ } from 'bun';
+import { chmod, mkdtemp, readdir, writeFile } from 'node:fs/promises';
+import { tmpdir, homedir } from 'node:os';
+import { join } from 'node:path';
 
 // Requires agent-browser + Chromium. Exercise the packaged bundle, not private UI state.
 const bundle = Bun.file(process.env.KAI_BUNDLE ?? new URL('../dist/extension/kai.js', import.meta.url));
@@ -71,9 +74,23 @@ const server = Bun.serve({
         }, true);
       </script><script src="${new URL(req.url).searchParams.has('open') ? '/kai-open.js' : '/kai.js'}"></script>`, { headers: { 'Content-Type': 'text/html' } }),
 });
+// Headless Chromium reports no hover-capable pointer, (hover: none), like a touch screen. The main
+// session runs Chrome through a wrapper that reports a mouse, so hover-only UI behaves as on a desktop;
+// a second session keeps the default to check the touch behaviour.
+const chromeDir = join(homedir(), '.agent-browser', 'browsers');
+const chromeBuild = (await readdir(chromeDir)).filter(name => name.startsWith('chrome-')).sort().pop();
+if (!chromeBuild) throw new Error('No agent-browser Chrome found; run agent-browser install.');
+const wrapper = join(await mkdtemp(join(tmpdir(), 'kai-check-')), 'chrome-desktop-pointer.sh');
+await writeFile(wrapper, `#!/usr/bin/env bash\nexec "${join(chromeDir, chromeBuild, 'chrome')}" '--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4' "$@"\n`);
+await chmod(wrapper, 0o755);
 const session = `kai-check-${process.pid}`;
 const browser = async (...args: string[]) => {
-  const result = await $`agent-browser --session ${session} ${args}`.quiet();
+  const result = await $`agent-browser --session ${session} --executable-path ${wrapper} ${args}`.quiet();
+  return result.text().trim();
+};
+const touchSession = `kai-touch-${process.pid}`;
+const touchBrowser = async (...args: string[]) => {
+  const result = await $`agent-browser --session ${touchSession} ${args}`.quiet();
   return result.text().trim();
 };
 let failures = 0;
@@ -93,6 +110,7 @@ const reset = async () => {
 try {
   await browser('open', `http://127.0.0.1:${server.port}`);
   await browser('set', 'viewport', '1280', '800', '2');
+  if (await browser('eval', `matchMedia('(hover: hover)').matches`) !== 'true') throw new Error('The desktop-pointer Chrome wrapper did not take effect.');
   await browser('find', 'role', 'button', 'click', '--name', 'Toggle UI annotator');
   await browser('wait', '600');
   await browser('click', '#action');
@@ -835,6 +853,8 @@ try {
   await inShadow(`(root.querySelector('.kai-popover-edit-remove').focus(), true)`);
   await browser('press', 'Backspace');
   await browser('eval', frames);
+  const clearArmed = () => inShadow(`root.querySelector('[aria-label="Clear all"]').hasAttribute('data-armed')`);
+  const armedAfterRemove = await clearArmed();
   const focusedAfter = await inShadow(`root.activeElement?.getAttribute('aria-label') ?? ''`);
   assert(editText((await stored())[0]) === 'padding-right:8→18' && focusedAfter === 'Remove padding-right change',
     'Backspace on a focused remove button removes that change and moves focus to the next row\'s button');
@@ -845,10 +865,41 @@ try {
   await browser('eval', frames);
   assert(await browser('eval', 'window.__copied === undefined') === 'true', 'C with focus on Save does not copy');
   await browser('press', 'Escape');
-  // Had the Backspace above armed Clear all, this press would confirm it
+  // The same key outside the popover does arm it: the state the check above reads is real
   await browser('press', 'Backspace');
   await browser('eval', frames);
-  assert((await stored()).length === 1, 'Backspace on a remove button did not arm Clear all');
+  assert(armedAfterRemove === false && await clearArmed() === true, 'Backspace on a remove button does not arm Clear all (outside the popover it does)');
+
+  // After a click removal: focus is in the note, Tab stays in the popover, a focused remove button shows
+  await twoChanges();
+  const [ox, oy] = await inShadow(`(r => [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)])(root.querySelectorAll('.kai-popover-edit')[0].getBoundingClientRect())`) as number[];
+  await browser('mouse', 'move', String(ox), String(oy));
+  await browser('wait', '250');
+  const [px1, py1] = await inShadow(`(r => [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)])(root.querySelectorAll('.kai-popover-edit-remove')[0].getBoundingClientRect())`) as number[];
+  await browser('mouse', 'move', String(px1), String(py1));
+  await browser('mouse', 'down', 'left');
+  await browser('mouse', 'up', 'left');
+  await browser('eval', frames);
+  const afterClick = await inShadow(`root.activeElement?.className ?? ''`);
+  // Off the row, so only keyboard focus can show the button
+  await browser('mouse', 'move', '5', '5');
+  await browser('press', 'Tab');
+  await browser('wait', '250');
+  const tabbed = await inShadow(`[!!root.activeElement?.closest('.kai-popover'), root.activeElement?.getAttribute('aria-label') ?? '', getComputedStyle(root.activeElement).opacity]`) as [boolean, string, string];
+  assert(afterClick === 'kai-popover-textarea' && tabbed[0] && tabbed[1] === 'Remove padding-right change' && tabbed[2] === '1',
+    'After a click removal focus is in the note; Tab lands on the next control in the popover, a visible remove button');
+  await browser('press', 'Escape');
+
+  // I with focus on Save belongs to the popover: it stays open, the typed note intact
+  await browser('click', '#card-a');
+  await browser('snapshot', '-i');
+  await browser('keyboard', 'type', 'Half typed');
+  await inShadow(`(root.querySelector('.kai-popover .kai-btn--primary').focus(), true)`);
+  await browser('press', 'i');
+  await browser('eval', frames);
+  assert(await inShadow(`root.querySelector('.kai-popover-textarea')?.value ?? null`) === 'Half typed' && !(await hudText()).includes('Interacting'),
+    'I with focus on a popover button leaves the popover open and the note intact');
+  await browser('press', 'Escape');
 
   // Removing the last change while a note is being typed keeps the annotation with that note
   await resetOpen();
@@ -889,8 +940,25 @@ try {
   await browser('press', 'End');
   await browser('keyboard', 'type', ' keyboard');
   assert(await browser('get', 'value', '#input') === 'Original keyboard', 'Tab from a frozen page input reaches the interaction control');
+  // Touch screens (hover: none): the popover's remove buttons are always shown and tappable
+  await touchBrowser('open', `http://127.0.0.1:${server.port}/?open`);
+  const injected = [{
+    id: 'touch', selector: '#card-a', path: '', comment: '', styles: {}, rect: { x: 0, y: 0, w: 0, h: 0 }, createdAt: '',
+    element: 'article', classes: ['card', 'px-2'], nearbyText: '', url: '', ariaAttributes: {}, dataAttributes: {},
+    edits: [{ property: 'padding-right', from: 8, to: 18 }],
+  }];
+  await touchBrowser('eval', `localStorage.setItem(\`ui-annotator:\${location.origin}\${location.pathname}\`, ${JSON.stringify(JSON.stringify(injected))})`);
+  await touchBrowser('reload');
+  await touchBrowser('find', 'role', 'button', 'click', '--name', 'Toggle UI annotator');
+  await touchBrowser('wait', '600');
+  await touchBrowser('click', '#card-a');
+  await touchBrowser('snapshot', '-i');
+  const touchButton = JSON.parse(await touchBrowser('eval', `(b => [matchMedia('(hover: none)').matches, getComputedStyle(b).opacity, getComputedStyle(b).pointerEvents])(document.querySelector('ui-annotator').shadowRoot.querySelector('.kai-popover-edit-remove'))`));
+  assert(touchButton[0] === true && touchButton[1] === '1' && touchButton[2] === 'auto', 'Without hover (touch), remove buttons are always shown and tappable');
   if (failures) throw new Error(`${failures} browser regression checks failed`);
 } finally {
-  await browser('close');
+  // Each session closes on its own; one failing must not leave the other open
+  await browser('close').catch(() => {});
+  await touchBrowser('close').catch(() => {});
   server.stop(true);
 }

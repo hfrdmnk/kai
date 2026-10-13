@@ -60,12 +60,18 @@ const unitless = (prop: AdjustProperty | null) => prop === 'line-height';
 
 // ── Which parts a drag changes ──
 
+/** The side whose edge (the segment, not its infinite line) is closest to the point */
 export const nearestSide = (r: Rect, x: number, y: number): Side => {
+  const right = r.left + r.width;
+  const bottom = r.top + r.height;
+  const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
+  const cx = clamp(x, r.left, right);
+  const cy = clamp(y, r.top, bottom);
   const distance: Record<Side, number> = {
-    top: Math.abs(y - r.top),
-    right: Math.abs(x - (r.left + r.width)),
-    bottom: Math.abs(y - (r.top + r.height)),
-    left: Math.abs(x - r.left),
+    top: Math.hypot(x - cx, y - r.top),
+    right: Math.hypot(x - right, y - cy),
+    bottom: Math.hypot(x - cx, y - bottom),
+    left: Math.hypot(x - r.left, y - cy),
   };
   return SIDES.reduce((best, s) => distance[s] < distance[best] ? s : best);
 };
@@ -287,8 +293,12 @@ export const formatEditLine = (e: StyleEdit): string => {
   return `${e.property}: ${cssValue(prop, e.from)} → ${cssValue(prop, e.to)}${notes.length ? ` (${notes.join(', ')})` : ''}`;
 };
 
-/** The property a comment line starts with (`padding-right: …`), if any */
-const lineProperty = (line: string): string | null => line.trimStart().match(/^([a-z-]+)\s*:/)?.[1] ?? null;
+/**
+ * The property of a line kai wrote: `padding-right: 24px → 34px (2.125rem)`, `line-height: 1.5 → 1.6`.
+ * Only lines in that format belong to an edit; `font-size: should match the heading` is the user's.
+ */
+const EDIT_LINE = /^\s*([a-z-]+):\s*-?[\d.]+(?:px)?\s*→\s*-?[\d.]+(?:px)?(?:\s*\(.*\))?\s*$/;
+const lineProperty = (line: string): string | null => line.match(EDIT_LINE)?.[1] ?? null;
 
 /**
  * Brings an annotation's comment in line with its edits: a changed edit replaces its line (matched by
@@ -400,15 +410,39 @@ export const cursorFor = (prop: AdjustProperty, parts: Part[], dragging = false)
 
 // ── Reading the page ──
 
+/** A computed corner radius in px as drawn: the horizontal component, `%` of the width, capped at half the shorter side */
+export const radiusPx = (value: string, width: number, height: number): number => {
+  const first = value.trim().split(/\s+/)[0] ?? '';
+  const radius = first.endsWith('%') ? parseFloat(first) / 100 * width : parseFloat(first) || 0;
+  return Math.min(radius, width / 2, height / 2);
+};
+
+/** A computed gap in px: `%` of the content box along its axis, `normal` is 0 */
+export const gapPx = (value: string, size: number): number =>
+  value.trim().endsWith('%') ? parseFloat(value) / 100 * size : parseFloat(value) || 0;
+
 /** The property's current values on an element, in px (line-height as a ratio of the font size) */
 export const readValues = (el: Element, prop: AdjustProperty): Values => {
   const cs = getComputedStyle(el);
+  const px = (name: string) => parseFloat(cs.getPropertyValue(name)) || 0;
   if (prop === 'line-height') {
     const fontSize = parseFloat(cs.fontSize) || 16;
     const lineHeight = cs.lineHeight === 'normal' ? fontSize * 1.2 : parseFloat(cs.lineHeight);
     return { value: Math.round(lineHeight / fontSize * 1000) / 1000 };
   }
-  return Object.fromEntries(partsOf(prop).map(p => [p, parseFloat(cs.getPropertyValue(longhandOf(prop, p))) || 0]));
+  if (prop === 'border-radius') {
+    const { width, height } = el.getBoundingClientRect();
+    return Object.fromEntries(CORNERS.map(c => [c, radiusPx(cs.getPropertyValue(longhandOf(prop, c)), width, height)]));
+  }
+  if (prop === 'gap') {
+    const { width, height } = el.getBoundingClientRect();
+    const content = {
+      width: width - px('border-left-width') - px('border-right-width') - px('padding-left') - px('padding-right'),
+      height: height - px('border-top-width') - px('border-bottom-width') - px('padding-top') - px('padding-bottom'),
+    };
+    return { row: gapPx(cs.rowGap, content.height), column: gapPx(cs.columnGap, content.width) };
+  }
+  return Object.fromEntries(partsOf(prop).map(p => [p, px(longhandOf(prop, p))]));
 };
 
 const isContainer = (el: Element) => /flex|grid/.test(getComputedStyle(el).display);

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   adjustPropertyFor, adjustValue, cursorFor, dragAxisOf, dragReadout, dragTravel, editDeclarations, editsInComment,
   formatEditLine, longhandsOfDeclaration, mergeEdits, nameWidth, nearestCorner, nearestSide, pickParts,
-  changeLabel, nudgeValue, shorthandValue, shortestEdits, syncEditLines, withChanges, withoutProperty,
+  changeLabel, gapPx, nudgeValue, radiusPx, shorthandValue, shortestEdits, syncEditLines, withChanges, withoutProperty,
 } from '../src/core/adjust.ts';
 import type { StyleEdit } from '../src/types.ts';
 
@@ -451,5 +451,59 @@ describe('undo labels', () => {
       'padding-top': { from: 8, to: 12 }, 'padding-bottom': { from: 8, to: 12 }, 'padding-left': { from: 8, to: 10 },
     })).toBe('padding-block, padding-left');
     expect(changeLabel('gap', { 'row-gap': { from: 8, to: 12 }, 'column-gap': { from: 8, to: 12 } })).toBe('gap');
+  });
+});
+
+describe('review fixes', () => {
+  test('nearest side measures to the edge segment, not its infinite line', () => {
+    // Box 100–300 × 100–200; a press right of it, level with the top edge's line
+    const box = { left: 100, top: 100, width: 200, height: 100 };
+    expect(nearestSide(box, 400, 120)).toBe('right');
+    expect(nearestSide(box, 360, 105)).toBe('right');
+    expect(nearestSide(box, 150, 40)).toBe('top');
+    expect(nearestSide(box, 200, 195)).toBe('bottom');
+  });
+
+  test("user lines that only start like a property aren't kai's", () => {
+    const before = [{ property: 'font-size', from: 16, to: 18 }];
+    const comment = 'font-size: should match the heading\nfont-size: 16px → 18px (1.125rem)';
+    // A changed edit replaces its generated line, not the user's
+    expect(syncEditLines(comment, before, [{ property: 'font-size', from: 16, to: 20 }]))
+      .toBe('font-size: should match the heading\nfont-size: 16px → 20px (1.25rem)');
+    // A removed edit drops only its generated line
+    expect(syncEditLines(comment, before, [])).toBe('font-size: should match the heading');
+    // A new edit appends instead of overwriting the user's line
+    expect(syncEditLines('font-size: should match the heading', [], before))
+      .toBe('font-size: should match the heading\nfont-size: 16px → 18px (1.125rem)');
+    // Deleting the generated line drops the edit even when the user's line stays
+    expect(editsInComment(before, 'font-size: should match the heading')).toEqual([]);
+    expect(editsInComment(before, comment)).toEqual(before);
+  });
+
+  test('generated lines in every format still count', () => {
+    const edits = [
+      { property: 'line-height', from: 1.5, to: 1.6 },
+      { property: 'margin-top', from: 0, to: -8 },
+      { property: 'gap', from: 8, to: 24, token: 'var(--space-6)' },
+    ];
+    const comment = edits.map(formatEditLine).join('\n');
+    expect(editsInComment(edits, comment)).toEqual(edits);
+    // A user who retyped the target value keeps the edit
+    expect(editsInComment([edits[0]], 'line-height: 1.5 → 1.7')).toEqual([edits[0]]);
+  });
+
+  test('radius values: first component, % of the width, capped at half the shorter side', () => {
+    expect(radiusPx('12px', 200, 100)).toBe(12);
+    expect(radiusPx('10px 20px', 200, 100)).toBe(10);
+    expect(radiusPx('9999px', 200, 100)).toBe(50);
+    expect(radiusPx('50%', 200, 100)).toBe(50);
+    expect(radiusPx('10%', 200, 100)).toBe(20);
+    expect(radiusPx('0px', 200, 100)).toBe(0);
+  });
+
+  test('gap values: px, % of the content size, normal is 0', () => {
+    expect(gapPx('12px', 400)).toBe(12);
+    expect(gapPx('10%', 400)).toBe(40);
+    expect(gapPx('normal', 400)).toBe(0);
   });
 });

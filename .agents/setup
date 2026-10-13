@@ -11,3 +11,16 @@ node --version
 
 printf 'Installing locked development dependencies...\n'
 time bun install --frozen-lockfile
+
+# The browser checks (bun run test:browser) drive Chrome for Testing through agent-browser,
+# which Amp orbs preinstall. Fetch the browser if this image lacks it; a failed download only
+# affects the browser checks, so it doesn't fail setup.
+if command -v agent-browser >/dev/null; then
+	agent-browser --version
+	doctor=$(agent-browser doctor --offline --quick 2>/dev/null || true)
+	if ! grep -q '^  pass  .*Chrome' <<<"$doctor"; then
+		agent-browser install || printf 'agent-browser install failed; bun run test:browser needs its Chrome.\n'
+	fi
+else
+	printf 'agent-browser is missing; bun run test:browser needs it (npm i -g agent-browser@0.38.1).\n'
+fi

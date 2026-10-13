@@ -49,16 +49,25 @@ bun run build   # writes the unpacked extension to dist/extension/
 
 Then load `dist/extension/` as above.
 
-#### Amp orbs
+#### Checks
 
-`.agents/setup` installs development dependencies from `bun.lock` using the Bun and Node.js
-toolchains included in Amp orbs. Amp snapshots the prepared environment so matching fresh
-orbs skip setup; when setup runs again, Bun reuses installed dependencies and its package cache.
-No secrets, backing services, or resume hook are required. Run `bun run build` to validate the
-checkout or `bun run dev` to start the development server.
+```bash
+bun run check   # typecheck, build, unit tests, browser checks (what CI runs)
+```
 
-To run the browser regression check, install `agent-browser` and its Chromium browser, then run
-`bun run build && bun scripts/check-interaction.ts`. It tests the packaged extension bundle.
+The browser checks drive the built extension bundle with
+[agent-browser](https://www.npmjs.com/package/agent-browser) 0.38.1 and its Chrome
+(`npm i -g agent-browser@0.38.1 && agent-browser install`), covering keyboard and click
+isolation plus hostile pages: strict CSP, Trusted Types and pages that remove kai.
+`bun run record` saves a video of a sample flow to `.check-artifacts/recordings/`;
+`bun run record --extension` does the same with the unpacked extension loaded in Chrome.
+
+#### Amp orbs and coding agents
+
+`.agents/setup` installs development dependencies from `bun.lock` and makes sure agent-browser
+has its Chrome. No secrets, backing services, or resume hook are required. Agent guidance lives
+in [AGENTS.md](./AGENTS.md) (Claude Code reads it through `CLAUDE.md`), with project skills in
+`.claude/skills/`: `verify-kai` and `release`.
 
 ## How it works
 

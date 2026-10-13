@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "tsc && vite build && bun scripts/build-extension.ts",
     "preview": "vite preview",
-    "test": "bun test tests"
+    "test": "bun test tests",
+    "test:browser": "bun scripts/check-interaction.ts && bun scripts/check-hostile.ts",
+    "check": "bun run build && bun run test && bun run test:browser",
+    "record": "bun scripts/record.ts"
   },
   "devDependencies": {
     "typescript": "~5.9.3",

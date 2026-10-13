@@ -1,12 +1,14 @@
 ---
 name: release
-description: Create a versioned release — bumps version, updates changelog, tags, and pushes.
-user_invocable: true
+description: Create a versioned kai release — bumps the version, updates the changelog, commits, tags and pushes. Run only when the user explicitly asks for a release.
+disable-model-invocation: true
 ---
 
 # Release
 
-Create a new versioned release of kai.
+Create a new versioned release of kai. Only start when the user asked for a release in this
+conversation; finishing other work, green checks or a merged change are not requests to
+release.
 
 If `$ARGUMENTS` contains a version (e.g. `/release 1.2.0`), use that version directly. Otherwise, suggest a version based on commits.
 
@@ -19,6 +21,7 @@ Run these checks and **abort with a clear message** if any fail:
 - Working directory is clean (`git status --porcelain` is empty)
 - On `main` branch
 - No unpushed commits (`git log @{u}.. --oneline` is empty)
+- `bun run check` passes (build, unit and browser checks; see the `verify-kai` skill)
 
 ### 2. Gather commits since last tag
 
@@ -54,7 +57,8 @@ If CHANGELOG.md doesn't exist, create it with:
 # Changelog
 ```
 
-Prepend the new entry **below the `# Changelog` header** (above any existing entries).
+Turn the `## Unreleased` section, if there is one, into the new entry; otherwise prepend the
+new entry **below the `# Changelog` header** (above any existing entries).
 
 Use the current date. Format depends on bump type:
 
@@ -111,6 +115,9 @@ release: vX.Y.Z
 ```
 
 ### 7. Tag and push
+
+Show the user the release commit and ask before tagging and pushing; this publishes the
+release.
 
 ```bash
 git tag -a vX.Y.Z -m "vX.Y.Z"

@@ -233,7 +233,7 @@ dist/
 
 `kai.js` is fully self-contained:
 - All SVG icons inlined as template literal strings
-- All CSS embedded inside Shadow DOM via `<style>` tags
+- All CSS adopted into the Shadow DOM as one constructed stylesheet
 - No CSS files, no asset files, no chunks, no sourcemaps
 - Single IIFE that registers `<ui-annotator>` and auto-injects it into the page
 - Unminified, so it stays human-readable for developers who want to understand or fork

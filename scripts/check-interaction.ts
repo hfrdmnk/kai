@@ -109,6 +109,9 @@ const touchBrowser = async (...args: string[]) => {
   const result = await $`agent-browser --session ${touchSession} ${args}`.quiet();
   return result.text().trim();
 };
+// Kai focuses its editor in an animation frame; agent-browser can type within the same frame as
+// the click, faster than any person, so typing right after an opening click waits for it.
+const nextFrames = () => browser('eval', 'new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))');
 let failures = 0;
 const assert = (condition: boolean, message: string) => {
   if (!condition) failures++;
@@ -131,6 +134,7 @@ try {
   await browser('wait', '600');
   await browser('click', '#action');
   assert(await browser('get', 'text', '#events') === '0', 'Annotation clicks do not reach pre-existing document capture listeners');
+  await nextFrames();
   const annotation = await browser('snapshot', '-i');
   assert(annotation.includes('Annotation comment'), 'Annotation click opens the editor');
   await browser('keyboard', 'type', 'Regression annotation');
@@ -139,6 +143,7 @@ try {
   assert(await browser('get', 'text', '#events') === '0', 'Kai editor keystrokes stay isolated from the host');
   assert(await browser('get', 'text', '#own-events') === '0', 'Host capture listeners receive no kai keyboard or beforeinput events');
   await browser('click', '#under-hud');
+  await nextFrames();
   assert((await browser('snapshot', '-i')).includes('Annotation comment'), 'HUD passes clicks through to the element underneath');
   await browser('keyboard', 'type', '--');
   assert((await browser('snapshot')).includes('--proof-color'), 'Annotation autocomplete still opens');

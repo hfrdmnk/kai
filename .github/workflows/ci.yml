@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Same agent-browser as Amp orbs; it downloads Chrome for Testing and its system libraries
+      - name: Install agent-browser
+        run: |
+          npm install --global agent-browser@0.38.1
+          agent-browser install --with-deps
+
+      - name: Typecheck, build, unit and browser checks
+        run: bun run check
+        env:
+          # Ubuntu runners restrict the unprivileged user namespaces Chrome's sandbox needs
+          AGENT_BROWSER_ARGS: --no-sandbox
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-artifacts
+          path: .check-artifacts/
+          if-no-files-found: ignore

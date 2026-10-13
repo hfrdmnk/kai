@@ -295,6 +295,7 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
       // First show — appear animation
       visible = true;
       currentMode = mode;
+      bar.dataset.mode = mode;
       bar.style.display = '';
       content.replaceChildren(render(mode));
 
@@ -308,6 +309,7 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
     } else {
       // Content swap — crossfade
       currentMode = mode;
+      bar.dataset.mode = mode;
       swapping = true;
 
       contentAnim = content.animate(
@@ -322,7 +324,8 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
         const oldWidth = bar.getBoundingClientRect().width;
 
         swapping = false;
-        if (mode !== 'adjust') resetDragWidth();
+        // A drag's minimum never carries over, not even into adjust hints or a notice
+        resetDragWidth();
         content.replaceChildren(render(mode));
 
         const newWidth = bar.getBoundingClientRect().width;
@@ -379,15 +382,15 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
   };
 
   /**
-   * A confirmation for a moment, display only, then the mode `after()` names. Anything shown in the
-   * meantime (armed hints, a drag, another mode) replaces it and stays.
+   * A confirmation for a moment, display only, then `after()` puts the right content back (a mode's
+   * hints, or the armed hints). Anything shown in the meantime replaces it and stays.
    */
-  const notify = (text: string, check: boolean, after: () => GuideMode) => {
+  const notify = (text: string, check: boolean, after: () => void) => {
     if (noticeTimer) clearTimeout(noticeTimer);
     showAdjust({ kind: 'notice', text, check });
     noticeTimer = setTimeout(() => {
       noticeTimer = null;
-      if (visible && currentMode === 'adjust' && adjustHud?.kind === 'notice') show(after());
+      if (visible && currentMode === 'adjust' && adjustHud?.kind === 'notice') after();
     }, NOTICE_MS);
   };
 

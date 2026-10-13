@@ -155,8 +155,17 @@ export const createAdjustLayer = (shadowRoot: ShadowRoot) => {
     }
   };
 
+  /** Gutters; where a changing gap is 0, a sliver at each boundary between items */
   const drawGaps = (target: Element, hot: Set<Part>) => {
-    for (const gutter of computeBoxModel(target)?.gaps ?? []) band('gap', gutter, hot.has(gutter.axis));
+    for (const gutter of computeBoxModel(target, { emptyGutters: true })?.gaps ?? []) {
+      const changing = hot.has(gutter.axis);
+      // A column gutter is a vertical strip, a row gutter a horizontal one
+      const box = !changing ? gutter
+        : gutter.axis === 'column' && gutter.width <= 0 ? { ...gutter, left: gutter.left - SLIVER / 2, width: SLIVER }
+        : gutter.axis === 'row' && gutter.height <= 0 ? { ...gutter, top: gutter.top - SLIVER / 2, height: SLIVER }
+        : gutter;
+      band('gap', box, changing);
+    }
   };
 
   /** Every other line box of the content area, so the line height reads as stripes */
@@ -198,9 +207,11 @@ export const createAdjustLayer = (shadowRoot: ShadowRoot) => {
 
   const drawGhosts = (others: Element[]) => {
     for (const other of others) {
-      if (!other.isConnected) continue;
+      const rect = other.getBoundingClientRect();
+      // Hidden look-alikes (display: none) have no box to outline
+      if (!other.isConnected || !rect.width || !rect.height) continue;
       const el = next('kai-adjust-ghost');
-      place(el, other.getBoundingClientRect());
+      place(el, rect);
       el.style.borderRadius = getComputedStyle(other).borderRadius;
     }
   };

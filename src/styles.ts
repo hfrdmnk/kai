@@ -1195,11 +1195,13 @@ export const styles = `
 }
 
 @media (max-width: 600px) {
-  /* Narrow viewports wrap the hints onto a second line */
-  .kai-guide-bar { width: calc(100vw - 24px); height: auto; min-height: 32px; padding: 6px 14px; border-radius: var(--radius-lg); }
-  .kai-guide-bar-content { flex-wrap: wrap; justify-content: center; }
-  .kai-guide-bar-content > span:first-child { width: 100%; text-align: center; }
-  .kai-guide-bar-content > .kai-guide-bar-sep:nth-child(2) { display: none; }
+  /* Narrow viewports wrap a mode's hints onto a second line */
+  .kai-guide-bar:not([data-mode="adjust"]) { width: calc(100vw - 24px); height: auto; min-height: 32px; padding: 6px 14px; border-radius: var(--radius-lg); }
+  .kai-guide-bar:not([data-mode="adjust"]) .kai-guide-bar-content { flex-wrap: wrap; justify-content: center; }
+  .kai-guide-bar:not([data-mode="adjust"]) .kai-guide-bar-content > span:first-child { width: 100%; text-align: center; }
+  .kai-guide-bar:not([data-mode="adjust"]) .kai-guide-bar-content > .kai-guide-bar-sep:nth-child(2) { display: none; }
+  /* Drag to adjust stays one 32px line; armed hints that don't fit are clipped */
+  .kai-guide-bar[data-mode="adjust"] { max-width: calc(100vw - 24px); overflow: hidden; }
   .kai-shortcuts { top: 84px; max-height: calc(100vh - 100px); }
 }
 `;

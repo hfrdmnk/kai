@@ -128,6 +128,14 @@ export const dragTravel = (prop: AdjustProperty, parts: Part[], anchor: Part | n
   return { top: -dy, right: dx, bottom: dy, left: -dx }[anchor as Side];
 };
 
+/** One ←/→ step without a scale: to the next whole px (0.05 of line height) in that direction */
+export const nudgeValue = (prop: AdjustProperty, start: number, dir: 1 | -1): number => {
+  const { min, step } = ADJUST[prop];
+  const steps = start / step;
+  const next = dir > 0 ? Math.floor(steps + 1e-6) + 1 : Math.ceil(steps - 1e-6) - 1;
+  return +Math.max(min, next * step).toFixed(3);
+};
+
 export const adjustValue = (prop: AdjustProperty, start: number, travel: number): number => {
   if (Math.abs(travel) < DEAD_ZONE) return start;
   const { perUnit, min, step } = ADJUST[prop];
@@ -315,6 +323,13 @@ export const withChanges = (a: { comment: string; edits?: StyleEdit[] }, prop: A
   return { comment: syncEditLines(a.comment, before, edits), edits: edits.length ? edits : undefined };
 };
 
+/** An annotation's comment and edits without a property's edits and their lines (Backspace while armed) */
+export const withoutProperty = (a: { comment: string; edits?: StyleEdit[] }, prop: AdjustProperty) => {
+  const before = a.edits ?? [];
+  const edits = before.filter(e => propertyOfDeclaration(e.property) !== prop);
+  return { comment: syncEditLines(a.comment, before, edits), edits: edits.length ? edits : undefined };
+};
+
 // ── HUD text ──
 
 const formatValue = (prop: AdjustProperty, v: number) => cssValue(prop, v);
@@ -329,14 +344,18 @@ export const shorthandValue = (prop: AdjustProperty, values: Values): string => 
 };
 
 /**
- * One HUD row for a drag: the declaration's name, the new value and the signed delta at the grabbed part.
- * Several declarations at once collapse to the shorthand's name (`border-radius (right)` for a corner pair).
- * Before the pointer moves it names what will change and has no delta.
+ * One HUD row for a drag or nudge: the declaration's name, the new value and the signed delta at the
+ * grabbed part, and `note`, the grabbed declaration's class or token when it snapped to the scale.
+ * Several declarations at once collapse to the shorthand's name (`border-radius (right)` for a corner
+ * pair). Before the pointer moves it names what will change and has no delta.
  */
-export const dragReadout = (prop: AdjustProperty, parts: Part[], anchor: Part | null, start: Values, cur: Values) => {
+export const dragReadout = (
+  prop: AdjustProperty, parts: Part[], anchor: Part | null, start: Values, cur: Values,
+  refs: Partial<Record<Part, ScaleRef>> = {},
+) => {
   const lead = anchor ?? parts[0];
   const changes: Partial<Record<Part, Change>> = {};
-  for (const p of parts) changes[p] = { from: start[p] ?? 0, to: cur[p] ?? 0 };
+  for (const p of parts) changes[p] = { from: start[p] ?? 0, to: cur[p] ?? 0, ref: refs[p] };
   const moved = parts.filter(p => changed(changes[p]!));
   const decls = group(prop, moved.length ? Object.fromEntries(moved.map(p => [p, changes[p]])) : changes);
   let name: string = prop;
@@ -344,11 +363,12 @@ export const dragReadout = (prop: AdjustProperty, parts: Part[], anchor: Part | 
   else if (kindOf(prop) === 'corners' && parts.length === 2) {
     name = `${prop} (${SIDES.find(s => parts.every(p => p.split('-').includes(s)))})`;
   }
+  const leadDecl = decls.find(d => lead && longhandsOfDeclaration(d.property).includes(longhandOf(prop, lead))) ?? decls[0];
   const from = start[lead] ?? 0;
   const to = cur[lead] ?? 0;
   const d = to - from;
   const delta = Math.abs(d) < 1e-6 ? '' : `${d > 0 ? '+' : '−'}${formatValue(prop, Math.abs(d))}`;
-  return { name, value: formatValue(prop, to), delta };
+  return { name, value: formatValue(prop, to), delta, note: leadDecl?.className ?? leadDecl?.token ?? '' };
 };
 
 /** Characters in the longest name a property's readout can show, so the cell never resizes mid-drag */

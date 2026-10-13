@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   adjustPropertyFor, adjustValue, cursorFor, dragAxisOf, dragReadout, dragTravel, editDeclarations, editsInComment,
   formatEditLine, longhandsOfDeclaration, mergeEdits, nameWidth, nearestCorner, nearestSide, pickParts,
-  shorthandValue, shortestEdits, syncEditLines, withChanges,
+  nudgeValue, shorthandValue, shortestEdits, syncEditLines, withChanges, withoutProperty,
 } from '../src/core/adjust.ts';
 import type { StyleEdit } from '../src/types.ts';
 
@@ -288,26 +288,26 @@ describe('HUD text', () => {
 
   test('drag readout: one declaration, value and signed delta', () => {
     expect(dragReadout('padding', ['right'], 'right', { right: 24 }, { right: 35 }))
-      .toEqual({ name: 'padding-right', value: '35px', delta: '+11px' });
+      .toEqual({ name: 'padding-right', value: '35px', delta: '+11px', note: '' });
     expect(dragReadout('margin', ['top'], 'top', { top: 4 }, { top: -6 }))
-      .toEqual({ name: 'margin-top', value: '-6px', delta: '−10px' });
+      .toEqual({ name: 'margin-top', value: '-6px', delta: '−10px', note: '' });
     expect(dragReadout('line-height', ['value'], 'value', { value: 1.5 }, { value: 1.6 }))
-      .toEqual({ name: 'line-height', value: '1.6', delta: '+0.1' });
+      .toEqual({ name: 'line-height', value: '1.6', delta: '+0.1', note: '' });
   });
 
   test('before the pointer moves: what will change, no delta', () => {
     expect(dragReadout('padding', ['left', 'right'], 'left', { left: 16, right: 16 }, { left: 16, right: 16 }))
-      .toEqual({ name: 'padding-inline', value: '16px', delta: '' });
+      .toEqual({ name: 'padding-inline', value: '16px', delta: '', note: '' });
   });
 
   test('several declarations collapse to one row valued at the grabbed part', () => {
     const start = { top: 8, right: 16, bottom: 8, left: 16 };
     expect(dragReadout('padding', ['top', 'right', 'bottom', 'left'], 'right', start, { top: 12, right: 20, bottom: 12, left: 20 }))
-      .toEqual({ name: 'padding', value: '20px', delta: '+4px' });
+      .toEqual({ name: 'padding', value: '20px', delta: '+4px', note: '' });
     expect(dragReadout('border-radius', ['top-right', 'bottom-right'], 'top-right', { 'top-right': 4, 'bottom-right': 0 }, { 'top-right': 8, 'bottom-right': 4 }))
-      .toEqual({ name: 'border-radius (right)', value: '8px', delta: '+4px' });
+      .toEqual({ name: 'border-radius (right)', value: '8px', delta: '+4px', note: '' });
     expect(dragReadout('gap', ['row', 'column'], null, { row: 8, column: 16 }, { row: 12, column: 20 }))
-      .toEqual({ name: 'gap', value: '12px', delta: '+4px' });
+      .toEqual({ name: 'gap', value: '12px', delta: '+4px', note: '' });
   });
 
   test('the name cell fits the longest name a property can produce', () => {
@@ -396,5 +396,50 @@ describe('annotation updates', () => {
   test('back to the original leaves no edits', () => {
     expect(withChanges({ comment: 'font-size: 16px → 18px (1.125rem)', edits: [{ property: 'font-size', from: 16, to: 18 }] },
       'font-size', { 'font-size': { from: 18, to: 16 } })).toEqual({ comment: '', edits: undefined });
+  });
+});
+
+describe('nudge', () => {
+  test('one whole px, or 0.05 of line height, in either direction', () => {
+    expect(nudgeValue('padding', 24, 1)).toBe(25);
+    expect(nudgeValue('padding', 24, -1)).toBe(23);
+    expect(nudgeValue('line-height', 1.5, 1)).toBe(1.55);
+    expect(nudgeValue('line-height', 1.5, -1)).toBe(1.45);
+  });
+
+  test('a fractional start goes to the next whole step', () => {
+    expect(nudgeValue('font-size', 13.5, 1)).toBe(14);
+    expect(nudgeValue('font-size', 13.5, -1)).toBe(13);
+    expect(nudgeValue('line-height', 1.375, 1)).toBe(1.4);
+  });
+
+  test('respects the minimum', () => {
+    expect(nudgeValue('padding', 0, -1)).toBe(0);
+    expect(nudgeValue('margin', 0, -1)).toBe(-1);
+  });
+});
+
+describe('reset', () => {
+  test("drops one property's edits and lines, keeping the rest", () => {
+    const a = {
+      comment: 'Tighter\npadding-inline: 16px → 24px (1.5rem)\nfont-size: 16px → 18px (1.125rem)',
+      edits: [{ property: 'padding-inline', from: 16, to: 24 }, { property: 'font-size', from: 16, to: 18 }],
+    };
+    expect(withoutProperty(a, 'padding')).toEqual({
+      comment: 'Tighter\nfont-size: 16px → 18px (1.125rem)',
+      edits: [{ property: 'font-size', from: 16, to: 18 }],
+    });
+    expect(withoutProperty({ comment: 'gap: 8px → 12px (0.75rem)', edits: [{ property: 'gap', from: 8, to: 12 }] }, 'gap'))
+      .toEqual({ comment: '', edits: undefined });
+  });
+});
+
+describe('snapped readout', () => {
+  test('names the class or token of the grabbed declaration', () => {
+    expect(dragReadout('padding', ['right'], 'right', { right: 24 }, { right: 32 }, { right: { suffix: '8' } }))
+      .toEqual({ name: 'padding-right', value: '32px', delta: '+8px', note: 'pr-8' });
+    expect(dragReadout('gap', ['row', 'column'], null, { row: 8, column: 8 }, { row: 24, column: 24 }, { row: { token: 'var(--space-6)' }, column: { token: 'var(--space-6)' } }))
+      .toEqual({ name: 'gap', value: '24px', delta: '+16px', note: 'var(--space-6)' });
+    expect(dragReadout('padding', ['right'], 'right', { right: 24 }, { right: 25 }).note).toBe('');
   });
 });

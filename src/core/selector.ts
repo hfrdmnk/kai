@@ -1,5 +1,4 @@
 import type { Annotation } from '../types.ts';
-import { isUtilityClass } from './utility-classes.ts';
 
 /** Separator between a shadow host's selector and the selector scoped to its shadow tree. */
 const SHADOW_SEP = ' >>> ';
@@ -158,12 +157,9 @@ const ownClasses = (el: Element) => Array.from(el.classList).filter(c => !c.star
 const classKey = (classes: string[]) => [...classes].sort().join(' ');
 
 /**
- * Everything an annotation's fix would change, besides the annotated element itself:
- * - siblings with the same tag and the same class list (order aside): a list or grid from one template
- * - when the element has component classes (`card`, `btn-primary`; see `isUtilityClass`), every element
- *   in the same document or shadow root with its tag and all of those, whatever their utility classes
- *
- * An element with only utility classes, or none, matches its identical siblings at most.
+ * Everything an annotation's fix would change: the annotated element and its identical siblings,
+ * same tag and same classes in any order (a list or grid rendered from one template). An element
+ * without classes matches only itself. The annotated element comes first.
  */
 export const resolveAnnotationMatches = (a: Pick<Annotation, 'selector' | 'locator' | 'element'>): Element[] => {
   const target = resolveAnnotation(a);
@@ -175,12 +171,6 @@ export const resolveAnnotationMatches = (a: Pick<Annotation, 'selector' | 'locat
   // parentNode, not parentElement: a shadow root's top-level children are siblings too
   for (const sibling of Array.from((target.parentNode as ParentNode | null)?.children ?? [])) {
     if (sibling.localName === target.localName && classKey(ownClasses(sibling)) === key) matches.add(sibling);
-  }
-  const components = classes.filter(c => !isUtilityClass(c));
-  if (components.length) {
-    const root = target.getRootNode() as Document | ShadowRoot;
-    const selector = CSS.escape(target.localName) + components.map(c => `.${CSS.escape(c)}`).join('');
-    for (const el of Array.from(root.querySelectorAll(selector))) matches.add(el);
   }
   return [...matches];
 };

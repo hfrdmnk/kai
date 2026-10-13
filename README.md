@@ -78,16 +78,17 @@ Hover an element and press a property key: <kbd>P</kbd> padding, <kbd>M</kbd> ma
 (of the element or its nearest flex/grid container), <kbd>F</kbd> font size, <kbd>L</kbd> line height,
 <kbd>B</kbd> border radius. Then press, drag and release anywhere on the page. The side or corner
 nearest the pointer changes; hold <kbd>Alt</kbd> for it and its opposite side (or both corners on that
-side) and <kbd>Shift</kbd> for all of them. The page updates live on its look-alikes too: identical
-siblings (the items of a list) and, for component classes like `card`, every element with them (all the cards
-on the page), and the HUD shows the new value and the change. Release adds a line like
-`padding-right: 24px → 34px (2.125rem)` to the element's annotation. <kbd>Esc</kbd> cancels.
-Deleting the annotation, or its line, puts the page back.
+side) and <kbd>Shift</kbd> for all of them. The page updates live on its identical
+siblings too (the items of a list, the cards of a grid), and the HUD shows the new value and the change.
+Release adds the change to the element's annotation; a sibling group shares one change, so dragging any
+card moves them all. The annotation's popover lists its changes under your note, one per line, each with a
+remove button on hover, and the Markdown export adds them as a **Changes** list.
+<kbd>Esc</kbd> cancels. Deleting the annotation, or one of its changes, puts the page back.
 
 While a property is armed, <kbd>←</kbd> / <kbd>→</kbd> nudge the side under the pointer by one step
 and save it right away, and <kbd>Backspace</kbd> resets the property on the element. If the page has
 its own scale (Tailwind-style utility classes, or `:root` variables like `--space-4`), <kbd>T</kbd>
-snaps drags and nudges to it and the line names the class: `padding-right: 24px → 32px (2rem, pr-8)`.
+snaps drags and nudges to it and the change names the class: `padding-right  24px → 32px  pr-8`.
 Snapping stays on until you press <kbd>T</kbd> again.
 
 Every change can be undone with <kbd>⌘</kbd>+<kbd>Z</kbd> (<kbd>Ctrl</kbd>+<kbd>Z</kbd> elsewhere) and

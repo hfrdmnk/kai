@@ -1,20 +1,18 @@
 import type { Annotation } from './types.ts';
 import {
   ADJUST, adjustPropertyFor, adjustValue, cursorFor, dragAxisOf, dragTravel, editDeclarations, flexAxisOf, gapContainer,
-  kindOf, longhandOf, nudgeValue, partsOf, pickParts, propertyOfDeclaration, readValues, shortestEdits, withChanges,
+  changeLabel, kindOf, longhandOf, nudgeValue, partsOf, pickParts, propertyOfDeclaration, readValues, shortestEdits, withChanges,
   withoutProperty, type AdjustProperty, type Change, type Part, type ScaleRef, type Values,
 } from './core/adjust.ts';
 import type { StylePreview } from './core/edit-styles.ts';
 import type { HeldKeys } from './core/held-keys.ts';
-import { hasSteps, harvestScale, stepOnScale, STEP_TRAVEL, type Scale } from './core/scale.ts';
+import { hasSteps, harvestScale, stepOnScale, styleSignature, STEP_TRAVEL, type Scale } from './core/scale.ts';
 import { composedParent, generateSelector, resolveAnnotation, resolveAnnotationMatches } from './core/selector.ts';
 import { getComputedStyles } from './core/styles.ts';
 import { armedHud, createAdjustLayer, dragHud } from './ui/adjust.ts';
 import type { createGuideBar, GuideMode } from './ui/guide-bar.ts';
 import type { createOverlay } from './ui/highlight.ts';
 
-/** How long the HUD shows a confirmation (`✓ Annotation 3`, `Reset padding`) */
-const NOTICE_MS = 1200;
 /** How long the HUD shows a nudge's readout after the last ←/→ before going back to the hints */
 const NUDGE_MS = 1500;
 
@@ -63,13 +61,15 @@ export type AdjustModeDeps = {
   /** The shared selection a property key arms on */
   selection: () => Element | null;
   annotations: () => Annotation[];
-  /** Replaces the annotations, saves the session and re-derives kai's styles on the page */
-  saveAnnotations: (next: Annotation[]) => void;
+  /** The annotator's one mutation path: replaces the annotations, saves, re-derives kai's styles and records an undo step */
+  commit: (next: Annotation[], label: string) => void;
   createAnnotation: (element: Element, styles: Record<string, string>) => Annotation;
   /** Re-derives kai's styles from the annotations, a drag's preview on top */
   applyEdits: (preview?: StylePreview) => void;
   baseMode: () => GuideMode;
   isActive: () => boolean;
+  /** Armed or not, e.g. to let the pointer through markers while armed */
+  onArmedChange: (armed: boolean) => void;
   /** Called after disarming, so hover can pick up again */
   onDisarm: () => void;
 };
@@ -86,12 +86,12 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
   let armed: Armed | null = null;
   /** T: snap drags and nudges to the project's scale. Sticky until toggled off */
   let snapOn = false;
-  /** Read on the first arming after activation; the page's styles may have loaded since */
+  /** Read when arming, again whenever the page's stylesheets have changed since */
   let scale: Scale | null = null;
+  let scaleSignature = '';
   /** The click that follows an adjustment's press and release is not an annotation click */
   let suppressClick = false;
   let rafId: number | null = null;
-  let noticeTimer: ReturnType<typeof setTimeout> | null = null;
 
   const scaleOf = () => scale ??= harvestScale().scale;
   const canSnap = (prop: AdjustProperty) => hasSteps(scaleOf(), prop);
@@ -110,19 +110,14 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
     if (document.body.style.cursor !== cursor) document.body.style.cursor = cursor;
   };
 
-  const clearNotice = () => {
-    if (noticeTimer) clearTimeout(noticeTimer);
-    noticeTimer = null;
-  };
-
   /** A confirmation for a moment; display only, hover and keys work right away */
-  const showNotice = (text: string, check = false) => {
-    clearNotice();
-    guideBar.showAdjust({ kind: 'notice', text, check });
-    noticeTimer = setTimeout(() => {
-      noticeTimer = null;
-      if (deps.isActive() && !armed && guideBar.mode() === 'adjust') guideBar.show(deps.baseMode());
-    }, NOTICE_MS);
+  const showNotice = (text: string, check = false) => guideBar.notify(text, check, deps.baseMode);
+
+  /** Drops the scale when the page's stylesheets changed, so the next use reads it again */
+  const checkScale = () => {
+    const signature = styleSignature();
+    if (signature !== scaleSignature) scale = null;
+    scaleSignature = signature;
   };
 
   const schedule = () => {
@@ -156,7 +151,7 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
     const updated: Annotation = { ...base, ...withChanges(base, prop, changes) };
     let next = existing ? list.map(a => a === existing ? updated : a) : [...list, updated];
     if (!updated.comment.trim()) next = next.filter(a => a !== updated);
-    deps.saveAnnotations(next);
+    deps.commit(next, changeLabel(prop, changes));
     return { number: next.indexOf(updated) + 1, created: !existing };
   };
 
@@ -223,9 +218,11 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
     if (!selected?.isConnected) return;
     const target = prop === 'gap' ? gapContainer(selected, composedParent) : selected;
     if (!target) return;
-    clearNotice();
     endNudges();
+    checkScale();
+    const wasArmed = !!armed;
     armed = { prop, target, matches: matchesOf(target), parts: [], anchor: null, drag: null, nudges: null };
+    if (!wasArmed) deps.onArmedChange(true);
     update();
   };
 
@@ -246,6 +243,7 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
     if (selected) overlay.show(selected);
     else overlay.hide();
     if (showHud && deps.isActive()) guideBar.show(deps.baseMode());
+    deps.onArmedChange(false);
     deps.onDisarm();
   };
 
@@ -344,7 +342,7 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
     }
     const updated: Annotation = { ...existing, ...withoutProperty(existing, prop) };
     const list = deps.annotations();
-    deps.saveAnnotations(updated.comment.trim() ? list.map(a => a === existing ? updated : a) : list.filter(a => a !== existing));
+    deps.commit(updated.comment.trim() ? list.map(a => a === existing ? updated : a) : list.filter(a => a !== existing), `reset ${name}`);
     showNotice(`Reset ${name}`);
   };
 
@@ -412,10 +410,9 @@ export const createAdjustMode = (deps: AdjustModeDeps) => {
     return consumed;
   };
 
-  /** kai turned off: disarm, drop any confirmation and read the scale afresh next time */
+  /** kai turned off: disarm and read the scale afresh next time */
   const deactivate = () => {
     disarm();
-    clearNotice();
     scale = null;
   };
 

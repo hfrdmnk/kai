@@ -39,6 +39,9 @@ const KEY_LABELS: Record<KeyId, string> = {
 
 type Hint = { keys: KeyId[]; hint: string };
 
+/** How long a notice (`✓ Annotation 3`, `Undid padding-right`) stays before the HUD goes back */
+const NOTICE_MS = 1200;
+
 const CONTENT: Record<Exclude<GuideMode, 'adjust'>, { text: string; hints: Hint[] }> = {
   annotate: {
     text: 'Click elements to annotate',
@@ -128,6 +131,7 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
   let swapping = false;
   /** Widest the bar has been during the current drag */
   let dragWidth = 0;
+  let noticeTimer: ReturnType<typeof setTimeout> | null = null;
 
   const bar = document.createElement('div');
   bar.className = 'kai-guide-bar';
@@ -373,10 +377,25 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
     bar.style.minWidth = `${dragWidth}px`;
   };
 
+  /**
+   * A confirmation for a moment, display only, then the mode `after()` names. Anything shown in the
+   * meantime (armed hints, a drag, another mode) replaces it and stays.
+   */
+  const notify = (text: string, check: boolean, after: () => GuideMode) => {
+    if (noticeTimer) clearTimeout(noticeTimer);
+    showAdjust({ kind: 'notice', text, check });
+    noticeTimer = setTimeout(() => {
+      noticeTimer = null;
+      if (visible && currentMode === 'adjust' && adjustHud?.kind === 'notice') show(after());
+    }, NOTICE_MS);
+  };
+
   const hide = () => {
     closeHelp();
     bar.removeAttribute('data-obscured');
     resetDragWidth();
+    if (noticeTimer) clearTimeout(noticeTimer);
+    noticeTimer = null;
     if (!visible) return;
     visible = false;
     currentMode = null;
@@ -400,6 +419,7 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
   };
 
   const destroy = () => {
+    if (noticeTimer) clearTimeout(noticeTimer);
     barAnim?.cancel();
     contentAnim?.cancel();
     widthAnim?.cancel();
@@ -408,5 +428,5 @@ export const createGuideBar = (shadowRoot: ShadowRoot) => {
     help.remove();
   };
 
-  return { show, showAdjust, hide, updateKeys, updatePointer, toggleHelp, closeHelp, isHelpOpen: () => !help.hidden, mode: () => currentMode, destroy };
+  return { show, showAdjust, notify, hide, updateKeys, updatePointer, toggleHelp, closeHelp, isHelpOpen: () => !help.hidden, mode: () => currentMode, destroy };
 };

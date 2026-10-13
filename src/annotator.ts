@@ -3,7 +3,7 @@ import { styles } from './styles.ts';
 import { generateSelector, generateLocator, generatePath, resolveAnnotation, composedParent, composedChildren, composedContains } from './core/selector.ts';
 import { getComputedStyles } from './core/styles.ts';
 import { getNearbyText } from './core/text.ts';
-import { INTERACTION_KEY, SHORTCUTS, type ShortcutAction } from './core/platform.ts';
+import { INTERACTION_KEY, SHORTCUTS, isMac, type ShortcutAction } from './core/platform.ts';
 import { loadSession, saveSession, clearSession, loadFabCorner, saveFabCorner, loadTheme, saveTheme, loadAccent, saveAccent } from './core/session.ts';
 import { applyAccent } from './core/accents.ts';
 import { computeCrosshair, computeTextInspectData, findLargestEnclosedElement, type TextInspectData } from './core/measure.ts';
@@ -11,6 +11,7 @@ import { computeBoxModel, type BoxModelData } from './core/box-model.ts';
 import { editsInComment } from './core/adjust.ts';
 import { createEditStyles, type StylePreview } from './core/edit-styles.ts';
 import { nextHeld, NONE_HELD, type HeldKeys } from './core/held-keys.ts';
+import { emptyHistory, record, redo, undo, type History } from './core/history.ts';
 import { toMarkdown } from './export/markdown.ts';
 import { createOverlay } from './ui/highlight.ts';
 import { createFab } from './ui/fab.ts';
@@ -67,6 +68,8 @@ class UIAnnotator extends HTMLElement {
   /** Box model of the last target; reading a flex container's children every frame is costly */
   private boxCache: { el: Element; rect: DOMRect; data: BoxModelData | null } | null = null;
   private readonly editStyles = createEditStyles();
+  /** Undo history of the annotation list for this page load; it survives turning kai off and on */
+  private history: History<Annotation[]> = emptyHistory();
 
   private fab!: ReturnType<typeof createFab>;
   private overlay!: ReturnType<typeof createOverlay>;
@@ -142,13 +145,8 @@ class UIAnnotator extends HTMLElement {
       },
       onClearAll: () => {
         this.adjustMode.disarm();
-        this.annotations = [];
-        this.applyEdits();
-        clearSession();
-        this.markers.update([]);
-        this.fab.updateBadge(0);
-        this.fab.updateActionStates(0);
         this.closePopover();
+        if (this.annotations.length) this.commit([], 'clear all');
       },
       onPickToggle: (armed) => {
         this.adjustMode.disarm();
@@ -208,14 +206,12 @@ class UIAnnotator extends HTMLElement {
       pointer: () => this.lastMousePos,
       selection: () => this.selectedElement,
       annotations: () => this.annotations,
-      saveAnnotations: (next) => {
-        this.annotations = next;
-        this.persist();
-      },
+      commit: (next, label) => this.commit(next, label),
       createAnnotation: (element, styles) => this.createAnnotation(element, '', styles),
       applyEdits: (preview) => this.applyEdits(preview),
       baseMode: () => this.baseMode(),
       isActive: () => this.active,
+      onArmedChange: (armed) => this.markers.setPassive(armed),
       onDisarm: () => {
         this.hoverDirty = true;
         if (this.active) this.scheduleHoverUpdate();
@@ -360,6 +356,16 @@ class UIAnnotator extends HTMLElement {
       if (this.passThrough) {
         // Escape still dismisses page overlays after using the interaction button.
         if (own && e.key !== 'Escape') this.forwardKeyEvent(e);
+        return;
+      }
+      // Undo / redo in annotation mode; text fields and kai's panels keep their own (native) undo
+      const historyAction = this.historyKey(e);
+      if (historyAction && !this.activePopover && !this.settingsOpen && !this.guideBar.isHelpOpen()
+        && !e.composedPath().some(isEditable) && !isEditable(this.shadow.activeElement)) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        this.hideFocusRing();
+        this.stepHistory(historyAction);
         return;
       }
       // An armed property's keys come first: they change meaning while armed
@@ -979,9 +985,8 @@ class UIAnnotator extends HTMLElement {
       styles: computedStyles,
       anchorRect,
       onSubmit: (comment) => {
-        this.annotations = [...this.annotations, this.createAnnotation(element, comment, computedStyles)];
         this.markers.clearPreview();
-        this.persist();
+        this.commit([...this.annotations, this.createAnnotation(element, comment, computedStyles)], 'note');
         this.closePopover();
       },
       onClose: () => {
@@ -1044,16 +1049,13 @@ class UIAnnotator extends HTMLElement {
         // Deleting an edit's line takes the edit off the page
         const edits = annotation.edits && editsInComment(annotation.edits, comment);
         const updated: Annotation = { ...annotation, comment, edits: edits?.length ? edits : undefined };
-        this.annotations = comment
-          ? this.annotations.map(a => a.id === annotation.id ? updated : a)
-          // An emptied comment deletes the annotation, its edits included
-          : this.annotations.filter(a => a.id !== annotation.id);
-        this.persist();
+        // Saving an unchanged comment isn't a step to undo; an emptied one deletes the annotation, edits included
+        if (comment && comment !== annotation.comment) this.commit(this.annotations.map(a => a.id === annotation.id ? updated : a), 'note');
+        else if (!comment) this.commit(this.annotations.filter(a => a.id !== annotation.id), 'delete annotation');
         this.closePopover();
       },
       onDelete: () => {
-        this.annotations = this.annotations.filter(a => a.id !== annotation.id);
-        this.persist();
+        this.commit(this.annotations.filter(a => a.id !== annotation.id), 'delete annotation');
         this.closePopover();
       },
       onClose: () => this.closePopover(),
@@ -1069,13 +1071,54 @@ class UIAnnotator extends HTMLElement {
     this.activePopover = null;
   }
 
-  /** Saves the session and re-derives kai's styles on the page from the annotations' edits */
-  private persist() {
+  /**
+   * The one way the annotation list changes (notes, edits, deletes, drags, nudges, resets, clear all):
+   * shows the new list and records an undo step labelled for the HUD.
+   */
+  private commit(next: Annotation[], label: string) {
+    this.history = record(this.history, { label, before: this.annotations, after: next });
+    this.showAnnotations(next);
+  }
+
+  /** Sets the list and brings everything in line: the session, kai's styles on the page, markers and the FAB */
+  private showAnnotations(next: Annotation[]) {
+    this.annotations = next;
     this.applyEdits();
-    saveSession(this.annotations);
-    this.markers.update(this.annotations);
-    this.fab.updateBadge(this.annotations.length);
-    this.fab.updateActionStates(this.annotations.length);
+    if (next.length) saveSession(next);
+    else clearSession();
+    this.markers.update(next);
+    this.fab.updateBadge(next.length);
+    this.fab.updateActionStates(next.length);
+  }
+
+  /** ⌘Z / ⇧⌘Z on a Mac; Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y elsewhere */
+  private historyKey(e: KeyboardEvent): 'undo' | 'redo' | null {
+    if (e.altKey || (isMac ? !e.metaKey || e.ctrlKey : !e.ctrlKey || e.metaKey)) return null;
+    const key = e.key.toLowerCase();
+    if (key === 'z') return e.shiftKey ? 'redo' : 'undo';
+    return key === 'y' && !isMac ? 'redo' : null;
+  }
+
+  /**
+   * Restores the list before (undo) or after (redo) a step without recording one. Disarms and closes
+   * the popover first; mid-drag it does nothing.
+   */
+  private stepHistory(action: 'undo' | 'redo') {
+    if (this.adjustMode.isDragging()) return;
+    const { history, step } = action === 'undo' ? undo(this.history) : redo(this.history);
+    if (!step) {
+      this.notify(`Nothing to ${action}`);
+      return;
+    }
+    this.history = history;
+    this.adjustMode.disarm(false);
+    this.closePopover();
+    this.showAnnotations(action === 'undo' ? step.before : step.after);
+    this.notify(`${action === 'undo' ? 'Undid' : 'Redid'} ${step.label}`);
+  }
+
+  private notify(text: string) {
+    this.guideBar.notify(text, false, () => this.baseMode());
   }
 }
 

@@ -3,11 +3,17 @@ import { $ } from 'bun';
 // Requires agent-browser + Chromium. Exercise the packaged bundle, not private UI state.
 const bundle = Bun.file(process.env.KAI_BUNDLE ?? new URL('../dist/extension/kai.js', import.meta.url));
 if (!await bundle.exists()) throw new Error('Run bun run build first.');
+// Test-only copy with an open shadow root, so checks can read the HUD (aria-hidden, invisible to snapshots).
+// Pages opened with ?open load it; everything else runs against the real closed build.
+const source = await bundle.text();
+const openBundle = source.replace(/attachShadow\(\{ mode: "closed" \}\)/, 'attachShadow({ mode: "open" })');
+if (openBundle === source) throw new Error('Open-shadow build: attachShadow({ mode: "closed" }) not found in the bundle.');
+const js = (body: string | Blob) => new Response(body, { headers: { 'Content-Type': 'text/javascript' } });
 const server = Bun.serve({
   port: 0,
   hostname: '127.0.0.1',
-  fetch: req => new URL(req.url).pathname === '/kai.js'
-    ? new Response(bundle, { headers: { 'Content-Type': 'text/javascript' } })
+  fetch: req => new URL(req.url).pathname === '/kai.js' ? js(bundle)
+    : new URL(req.url).pathname === '/kai-open.js' ? js(openBundle)
     : new Response(`<!doctype html><meta charset="utf-8"><title>Interaction regression</title><style>:root { --proof-color: #336699; } .px-2 { padding-inline: 8px; } .px-4 { padding-inline: 16px; } .px-6 { padding-inline: 24px; } .px-8 { padding-inline: 32px; }</style>
       <main style="padding:80px">
         <section id="parent"><button id="action">Page action</button></section>
@@ -43,7 +49,7 @@ const server = Bun.serve({
         document.addEventListener('focusin', e => {
           if (e.target.id === 'input') document.querySelector('#focus-events').textContent = String(++focuses);
         }, true);
-      </script><script src="/kai.js"></script>`, { headers: { 'Content-Type': 'text/html' } }),
+      </script><script src="${new URL(req.url).searchParams.has('open') ? '/kai-open.js' : '/kai.js'}"></script>`, { headers: { 'Content-Type': 'text/html' } }),
 });
 const session = `kai-check-${process.pid}`;
 const browser = async (...args: string[]) => {
@@ -430,6 +436,139 @@ try {
   await browser('press', 'Backspace');
   await browser('eval', frames);
   assert(!(await stored()).length, 'Backspace unarmed still clears all on the second press');
+
+  // ── The HUD and undo / redo, on the open-shadow build so the HUD can be read ──
+  const resetOpen = async () => {
+    await browser('open', `http://127.0.0.1:${server.port}/?open`);
+    await browser('eval', 'localStorage.clear()');
+    await browser('reload');
+    await browser('find', 'role', 'button', 'click', '--name', 'Toggle UI annotator');
+    await browser('wait', '600');
+  };
+  const inShadow = async (expr: string) => JSON.parse(await browser('eval', `(root => ${expr})(document.querySelector('ui-annotator').shadowRoot)`));
+  const hudText = async () => await inShadow(`root.querySelector('.kai-guide-bar-content').textContent`) as string;
+  const hudVisible = async () => await inShadow(`getComputedStyle(root.querySelector('.kai-guide-bar-content')).opacity`) === '1';
+  /** Mode switches crossfade the HUD (150ms out, 200ms in); read it once the new content is in */
+  const settle = () => browser('wait', '400');
+  const chipPressed = async (key: string) => await inShadow(`!!root.querySelector('.kai-guide-bar-kbd[data-key="${key}"][data-pressed]')`) as boolean;
+
+  await resetOpen();
+  at = await armSnap();
+  await settle();
+  let hud = await hudText();
+  assert(hud.includes('Padding') && hud.includes('axis') && hud.includes('snap') && !(await chipPressed('t')),
+    'The armed HUD names the property and its modifiers, with the T chip off');
+  await browser('press', 't');
+  await browser('eval', frames);
+  assert(await chipPressed('t'), 'T lights the snap chip');
+  await dragRight(at, 30);
+  hud = await hudText();
+  assert(hud === 'padding-right32px+16pxpr-8' && await hudVisible(), 'The drag row shows the declaration, value, delta and class, and is visible');
+  await browser('mouse', 'up', 'left');
+  await browser('eval', frames);
+  assert((await hudText()).includes('Annotation 1'), 'Release confirms the annotation in the HUD');
+
+  // A nudge right after arming lands mid-crossfade; the HUD used to stay blank (opacity 0)
+  await browser('wait', '1300');
+  await browser('hover', '#snap');
+  await browser('eval', frames);
+  await browser('press', 'p');
+  await browser('wait', '250');
+  await browser('press', 'ArrowRight');
+  await browser('eval', frames);
+  assert(await hudVisible() && (await hudText()).startsWith('padding-'), 'A nudge during the arming crossfade leaves the HUD visible');
+  await browser('press', 'Escape');
+
+  // Undo a drag: the style comes off every match and the comment goes back
+  await resetOpen();
+  await browser('click', '.twin .t');
+  await browser('snapshot', '-i');
+  await browser('keyboard', 'type', 'Twins');
+  await browser('press', 'Control+Enter');
+  at = await armTwin('p');
+  await dragRight(at, 20);
+  await browser('mouse', 'up', 'left');
+  await browser('eval', frames);
+  await browser('press', 'Control+z');
+  await browser('eval', frames);
+  saved = await stored();
+  assert((await twinPadding()).join() === '4px,4px' && saved.length === 1 && saved[0].comment === 'Twins' && !saved[0].edits
+    && (await hudText()) === 'Undid padding-right', 'Undo a drag restores every match and the comment');
+  await browser('press', 'Control+Shift+z');
+  await browser('eval', frames);
+  saved = await stored();
+  assert((await twinPadding()).join() === '14px,14px' && saved[0].comment === 'Twins\npadding-right: 4px → 14px (0.875rem)'
+    && (await hudText()) === 'Redid padding-right', 'Redo re-applies the drag');
+
+  // A new edit after undoing drops the redo steps
+  await browser('press', 'Control+z');
+  at = await armTwin('p');
+  await dragRight(at, 10);
+  await browser('mouse', 'up', 'left');
+  await browser('eval', frames);
+  await browser('press', 'Control+y');
+  await browser('eval', frames);
+  assert((await hudText()) === 'Nothing to redo' && (await twinPadding()).join() === '9px,9px', 'A new edit after undo drops redo');
+
+  // Undo a popover delete brings back the annotation and its edits' styles
+  await browser('click', '.twin .t');
+  await browser('find', 'role', 'button', 'click', '--name', 'Delete');
+  await browser('find', 'role', 'button', 'click', '--name', 'Sure?');
+  await browser('eval', frames);
+  assert((await twinPadding()).join() === '4px,4px' && !(await stored()).length, 'Popover delete reverts the edits');
+  await browser('press', 'Control+z');
+  await browser('eval', frames);
+  saved = await stored();
+  assert((await twinPadding()).join() === '9px,9px' && saved.length === 1 && saved[0].comment.startsWith('Twins')
+    && (await hudText()) === 'Undid delete annotation', 'Undo a delete brings back the annotation and its styles');
+
+  // Undo clear all
+  await browser('press', 'Backspace');
+  await browser('press', 'Backspace');
+  await browser('eval', frames);
+  assert(!(await stored()).length && (await twinPadding()).join() === '4px,4px', 'Clear all clears');
+  await browser('press', 'Control+z');
+  await browser('eval', frames);
+  assert((await stored()).length === 1 && (await twinPadding()).join() === '9px,9px' && (await hudText()) === 'Undid clear all', 'Undo clear all brings everything back');
+
+  // Ctrl+Z in the comment box is the text field's own undo, not kai's (after the last notice has gone)
+  await browser('wait', '1400');
+  await browser('click', '.twin .t');
+  await browser('snapshot', '-i');
+  await browser('keyboard', 'type', ' more');
+  await browser('press', 'Control+z');
+  await browser('eval', frames);
+  assert((await stored()).length === 1 && (await twinPadding()).join() === '9px,9px' && !(await hudText()).startsWith('Undid'),
+    'Ctrl+Z in the comment textarea leaves kai\'s history alone');
+  await browser('press', 'Escape');
+
+  // Nothing left to undo after undoing every step
+  await resetOpen();
+  await browser('press', 'Control+z');
+  await settle();
+  assert((await hudText()) === 'Nothing to undo', 'Undo with no history says so');
+
+  // Markers let the pointer through while armed: the annotated corner under the marker can be grabbed
+  at = await armSnap();
+  await dragRight(at, 20);
+  await browser('mouse', 'up', 'left');
+  await browser('eval', frames);
+  const before = (await stored())[0].comment;
+  await browser('hover', '#snap');
+  await browser('eval', frames);
+  await browser('press', 'p');
+  const [mx, my] = await inShadow(`(r => [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)])(root.querySelector('.kai-marker').getBoundingClientRect())`) as number[];
+  await browser('mouse', 'move', String(mx), String(my));
+  await browser('eval', frames);
+  await browser('mouse', 'down', 'left');
+  await browser('mouse', 'move', String(mx + 10), String(my - 10));
+  await browser('mouse', 'move', String(mx + 20), String(my - 20));
+  await browser('eval', frames);
+  await browser('mouse', 'up', 'left');
+  await browser('eval', frames);
+  saved = await stored();
+  assert(saved[0].comment !== before && !(await browser('snapshot', '-i')).includes('Annotation comment'),
+    'While armed, a press on a marker adjusts the element under it instead of opening the editor');
 
   await reset();
   await browser('focus', '#input');

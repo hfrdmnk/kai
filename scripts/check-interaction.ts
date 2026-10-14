@@ -111,6 +111,7 @@ const touchBrowser = async (...args: string[]) => {
 };
 // Kai focuses its editor in an animation frame; agent-browser can type within the same frame as
 // the click, faster than any person, so typing right after an opening click waits for it.
+// A snapshot is no wait: headless Chrome may not render a frame meanwhile, and on CI it often doesn't.
 const nextFrames = () => browser('eval', 'new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))');
 let failures = 0;
 const assert = (condition: boolean, message: string) => {
@@ -222,6 +223,7 @@ try {
   await browser('eval', 'new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))');
   await browser('press', 'ArrowUp');
   await browser('click', '#action');
+  await nextFrames();
   await browser('snapshot', '-i');
   await browser('keyboard', 'type', 'Parent annotation');
   await browser('press', 'Control+Enter');
@@ -267,6 +269,7 @@ try {
   await key('keyup', 'Alt', {});
   await browser('eval', frames);
   await browser('click', '#box-child');
+  await nextFrames();
   await browser('snapshot', '-i');
   await browser('keyboard', 'type', 'Box parent annotation');
   await browser('press', 'Control+Enter');
@@ -285,6 +288,7 @@ try {
   await browser('eval', frames);
   await browser('mouse', 'down');
   await browser('mouse', 'up');
+  await nextFrames();
   await browser('snapshot', '-i');
   await browser('keyboard', 'type', 'Moved on');
   await browser('press', 'Control+Enter');
@@ -415,6 +419,7 @@ try {
   await browser('mouse', 'up', 'left');
   await browser('eval', frames);
   await browser('click', '.twin .t');
+  await nextFrames();
   await browser('snapshot', '-i');
   await browser('press', 'Control+a');
   await browser('keyboard', 'type', 'Just a note');
@@ -488,6 +493,7 @@ try {
   // A second annotation, so a stray Clear all would show
   await browser('press', 'Escape');
   await browser('click', '#action');
+  await nextFrames();
   await browser('snapshot', '-i');
   await browser('keyboard', 'type', 'Keep me');
   await browser('press', 'Control+Enter');
@@ -551,6 +557,7 @@ try {
   // Undo a drag: the style comes off every match and the edit goes
   await resetOpen();
   await browser('click', '.twin .t');
+  await nextFrames();
   await browser('snapshot', '-i');
   await browser('keyboard', 'type', 'Twins');
   await browser('press', 'Control+Enter');
@@ -603,6 +610,7 @@ try {
   // Ctrl+Z in the comment box is the text field's own undo, not kai's (after the last notice has gone)
   await browser('wait', '1400');
   await browser('click', '.twin .t');
+  await nextFrames();
   await browser('snapshot', '-i');
   await browser('keyboard', 'type', ' more');
   await browser('press', 'Control+z');
@@ -661,6 +669,7 @@ try {
   // A marker opens the current annotation: note, then a drag, then the marker shows the edit and keeps it on save
   await resetOpen();
   await browser('click', '#card-a');
+  await nextFrames();
   await browser('snapshot', '-i');
   await browser('keyboard', 'type', 'Card note');
   await browser('press', 'Control+Enter');
@@ -671,6 +680,7 @@ try {
   await browser('mouse', 'move', String(markerAt[0]), String(markerAt[1]));
   await browser('mouse', 'down', 'left');
   await browser('mouse', 'up', 'left');
+  await nextFrames();
   await browser('snapshot', '-i');
   const opened = await inShadow(`root.querySelector('.kai-popover-textarea').value`) as string;
   const rows = await inShadow(`[...root.querySelectorAll('.kai-popover-edit')].map(r => r.textContent)`) as string[];
@@ -786,6 +796,7 @@ try {
   await release();
   await browser('wait', '1300');
   await browser('click', '#card-a');
+  await nextFrames();
   await browser('snapshot', '-i');
   const listRows = await inShadow(`[...root.querySelectorAll('.kai-popover-edit')].map(r => r.textContent)`) as string[];
   // Within a property, edits follow CSS side order
@@ -813,10 +824,12 @@ try {
 
   // An empty note keeps an annotation that has changes
   await browser('click', '#card-a');
+  await nextFrames();
   await browser('snapshot', '-i');
   await browser('keyboard', 'type', 'Temporary');
   await browser('press', 'Control+Enter');
   await browser('click', '#card-a');
+  await nextFrames();
   await browser('snapshot', '-i');
   await browser('press', 'Control+a');
   await browser('press', 'Backspace');
@@ -854,6 +867,7 @@ try {
     await release();
     await browser('wait', '1300');
     await browser('click', '#card-a');
+    await nextFrames();
     await browser('snapshot', '-i');
   };
   const rowCount = () => inShadow(`root.querySelectorAll('.kai-popover-edit').length`);
@@ -928,6 +942,7 @@ try {
 
   // I with focus on Save belongs to the popover: it stays open, the typed note intact
   await browser('click', '#card-a');
+  await nextFrames();
   await browser('snapshot', '-i');
   await browser('keyboard', 'type', 'Half typed');
   await inShadow(`(root.querySelector('.kai-popover .kai-btn--primary').focus(), true)`);
@@ -943,6 +958,7 @@ try {
   await release();
   await browser('wait', '1300');
   await browser('click', '#card-a');
+  await nextFrames();
   await browser('snapshot', '-i');
   await browser('keyboard', 'type', 'Draft note');
   await inShadow(`(root.querySelector('.kai-popover-edit-remove').click(), true)`);
